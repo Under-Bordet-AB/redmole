@@ -3,12 +3,13 @@
  */
 #include "wifi_module.h"
 #include <string.h>
-#include <unistd.h>
+#include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "nvs_flash.h"
 #include "sdkconfig.h"
 
@@ -18,7 +19,7 @@
 
 #if CONFIG_REDMOLE_WPA3_SAE_PWE_HUNT_AND_PECK
     #define REDMOLE_WPA3_SAE_MODE WPA3_SAE_PWE_HUNT_AND_PECK
-    #define REDMOLE_H2E_IDENTIFIER ""
+    #define REDMOLE_H2E_IDENTIFIER
 #elif CONFIG_REDMOLE_WPA3_SAE_PWE_HASH_TO_ELEMENT
     #define REDMOLE_WPA3_SAE_MODE WPA3_SAE_PWE_HASH_TO_ELEMENT
     #define REDMOLE_H2E_IDENTIFIER CONFIG_REDMOLE_WIFI_PW_ID
@@ -50,29 +51,16 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
     wifi_ctx_t *self = (wifi_ctx_t*)arg;
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
-        self->state = WIFI_STATE_CONNECTING;
-        esp_wifi_connect();
+        self->state = WIFI_STATE_DISCONNECTED;
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        if (self->retry_count < REDMOLE_MAX_RETRY)
-        {
-            esp_wifi_connect();
-            self->retry_count++;
-            ESP_LOGI(self->tag, "Retryingx connection, try number %d", self->retry_count);
-        }
-        else
-        {
-            self->state = WIFI_STATE_DISCONNECTED;
-            ESP_LOGI(self->tag, "Failed to connect, max retries reached");
-            xEventGroupSetBits(self->wifi_event_group, WIFI_FAIL_BIT);
-        }
+        xEventGroupSetBits(self->wifi_event_group, WIFI_FAIL_BIT);
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
-        self->state = WIFI_STATE_CONNECTED;
-        self->retry_count = 0;
-        ESP_LOGI(self->tag, "Connected, IP address: %s", ip4addr_ntoa(&((ip_event_got_ip_t*)event_data)->ip_info.ip));
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(self->tag, "Connected, IP address: " IPSTR, IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(self->wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
@@ -115,7 +103,7 @@ void wifi_init(wifi_ctx_t *self)
             .password = REDMOLE_WIFI_PASS,
             .threshold.authmode = REDMOLE_AUTH_THRESHOLD,
             .sae_pwe_h2e = REDMOLE_WPA3_SAE_MODE,
-            .sae_h2e_identifier = REDMOLE_SAE_H2E_IDENTIFIER
+            .sae_h2e_identifier = REDMOLE_H2E_IDENTIFIER
         },
     };
 
@@ -132,22 +120,19 @@ void wifi_task(void *pvParameters)
 
     while (1)
     {
-        /* * This is our "Gatekeeper."
-         * We block here for up to 500ms. If NO event happens, 'bits' will be 0.
-         * This prevents the loop from spinning at 240MHz for no reason.
-         */
+        // ESP_LOGI("DEBUG", "Task is alive. Current State: %d, Retries: %d", self->state, self->retry_count);
         EventBits_t bits = xEventGroupWaitBits(self->wifi_event_group,
                                                WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
                                                pdTRUE,
                                                pdFALSE,
-                                               pdMS_TO_TICKS(500));
+                                               pdMS_TO_TICKS(1000));
 
         switch (self->state)
         {
             case WIFI_STATE_DISCONNECTED:
                 if (self->retry_count < REDMOLE_MAX_RETRY)
                 {
-                    ESP_LOGI(self->tag, "Retrying... Attempt: (%d)", self->retry_count);
+                    ESP_LOGI(self->tag, "Connecting to %s... Attempt: (%d)", REDMOLE_WIFI_SSID, self->retry_count);
                     self->state = WIFI_STATE_CONNECTING;
                     self->retry_count++;
                     esp_wifi_connect();
@@ -165,7 +150,7 @@ void wifi_task(void *pvParameters)
                 {
                     self->state = WIFI_STATE_CONNECTED;
                     self->retry_count = 0;
-                    ESP_LOGI(self->tag, "RedMole is now connected");
+                    ESP_LOGI(self->tag, "RedMole is now connected to WiFi network> %s", REDMOLE_WIFI_SSID);
                 }
                 else if (bits & WIFI_FAIL_BIT)
                 {
@@ -177,6 +162,8 @@ void wifi_task(void *pvParameters)
             /* We will stay here
              * Until bits AND WIFI_FAIL_BIT is 1
              */
+
+            //ESP_LOGI(self->tag, "Connected to WiFi network: %s", REDMOLE_WIFI_SSID);
                 if (bits & WIFI_FAIL_BIT)
                 {
                     ESP_LOGW(self->tag, "Lost connection to WiFi network: %s", REDMOLE_WIFI_SSID);
@@ -193,7 +180,7 @@ void wifi_task(void *pvParameters)
     }
 }
 
-void wifi_deinit(wifi_ctx_t *self)
+void wifi_dispose(wifi_ctx_t *self)
 {
     // TODO: implement
 }
