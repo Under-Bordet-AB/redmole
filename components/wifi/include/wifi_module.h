@@ -29,6 +29,6 @@ typedef struct {
 // void wifi_init(wifi_ctx_t *self, QueueHandle_t log_queue);
 void wifi_init(wifi_ctx_t *self);
 void wifi_task(void *pvParameters);
-void wifi_deinit(wifi_ctx_t *self);
+void wifi_dispose(wifi_ctx_t *self);
 
 #endif // WIFI_MODULE_H

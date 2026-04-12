@@ -1,5 +1,3 @@
-idf_component_register(
-    SRCS "src/app_module.c"
-    INCLUDE_DIRS "include"
-    REQUIRES wifi
-)
+cmake_minimum_required(VERSION 3.16)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(redmole)
