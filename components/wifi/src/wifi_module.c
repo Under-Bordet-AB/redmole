@@ -46,6 +46,28 @@
     #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WAPI_PSK
 #endif
 
+
+
+/*
+ * Implement these functions to always know initial state
+ */
+static void hw_tear_down(); // Will contain unsub wifi events
+static void hw_bring_up(); // Will contain reg wifi events
+
+/*
+ * Will contain hw_tear_down
+ */
+static void wifi_disconnect();
+
+/*
+ * Will contain hw_tear_down and hw_bring_up
+ */
+static void wifi_reconnect();
+
+/*
+ * All logic for driving the wifi module will go here, change name to wifi_event_handler
+ * Switch on
+ */
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     wifi_ctx_t *self = (wifi_ctx_t*)arg;

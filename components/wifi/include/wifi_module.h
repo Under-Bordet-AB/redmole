@@ -9,12 +9,14 @@
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
 
+/* Rebuild this to be about hardware so that we can swithch on last known hw state
 typedef enum {
     WIFI_STATE_DISCONNECTED,
     WIFI_STATE_CONNECTING,
     WIFI_STATE_CONNECTED,
     WIFI_STATE_RECONNECTING
 } wifi_state_t;
+*/
 
 typedef struct {
     wifi_state_t state;
@@ -28,7 +30,12 @@ typedef struct {
 // Will implement UART diagnostics later
 // void wifi_init(wifi_ctx_t *self, QueueHandle_t log_queue);
 void wifi_init(wifi_ctx_t *self);
+
+/*
+ * We will have no task, but will rely on reading states
 void wifi_task(void *pvParameters);
+*/
+
 void wifi_dispose(wifi_ctx_t *self);
 
 #endif // WIFI_MODULE_H
