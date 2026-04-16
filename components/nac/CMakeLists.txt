@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "src/wifi_module.c"
+    SRCS "src/nac.c"
     INCLUDE_DIRS "include"
     REQUIRES esp_wifi esp_event esp_netif freertos log nvs_flash
 )

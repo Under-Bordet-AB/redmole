@@ -1,7 +1,13 @@
-/*
- * WiFi Module
+/* NAC - Network and communication
+ * - This module handles wifi and bluetooth
  */
-#include "wifi_module.h"
+
+#include "esp_log_level.h"
+#include "esp_netif_types.h"
+#include "esp_wifi_default.h"
+#include "esp_wifi_types_generic.h"
+#include "../include/nac.h"
+#include <stdint.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -46,53 +52,56 @@
     #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WAPI_PSK
 #endif
 
-
-
-/*
- * Implement these functions to always know initial state
- */
-static void hw_tear_down(); // Will contain unsub wifi events
-static void hw_bring_up(); // Will contain reg wifi events
-
-/*
- * Will contain hw_tear_down
- */
+/* THESE ARE INTERNAL HELPER FUNCTIONS FOR WIFI MANAGMENT */
+/* ------------------------------------------------------ */
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data);
+static void wifi_bring_hw_online();
+static void wifi_bring_hw_offline();
 static void wifi_disconnect();
-
-/*
- * Will contain hw_tear_down and hw_bring_up
- */
 static void wifi_reconnect();
+static void wifi_scan_done();
+/* ------------------------------------------------------ */
 
-/*
- * All logic for driving the wifi module will go here, change name to wifi_event_handler
- * Switch on
+/* @brief Initializes the NAC context.
+ * @Return A pointer to the initialized NAC context, or NULL if initialization fails.
+ * @Desc: Allocates memory for the NAC context and initializes its components.
  */
-static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+nac_ctx_t *nac_init()
 {
-    wifi_ctx_t *self = (wifi_ctx_t*)arg;
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
+    nac_ctx_t *self = (nac_ctx_t *)malloc(sizeof(nac_ctx_t));
+    if (!self)
     {
-        self->state = WIFI_STATE_DISCONNECTED;
+        ESP_LOGE("NAC", "Failed to allocate memory for nac_ctx_t");
+        return NULL;
     }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
+
+    memset(self, 0, sizeof(nac_ctx_t));
+
+    if (wifi_init(&self->wifi) != 0)
     {
-        xEventGroupSetBits(self->wifi_event_group, WIFI_FAIL_BIT);
+        free(self);
+        return NULL;
     }
-    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    if (bluetooth_init(&self->bluetooth) != 0)
     {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(self->tag, "Connected, IP address: " IPSTR, IP2STR(&event->ip_info.ip));
-        xEventGroupSetBits(self->wifi_event_group, WIFI_CONNECTED_BIT);
+        free(self);
+        return NULL;
     }
+
+    return self;
 }
 
-void wifi_init(wifi_ctx_t *self)
+int8_t wifi_init(wifi_ctx_t *self)
 {
-    self->state = WIFI_STATE_DISCONNECTED;
+    self->state = WIFI_STATE_IDLE;
     self->tag   = "WIFI MODULE";
-    self->retry_count = 0;
-    self->wifi_event_group = xEventGroupCreate();
+    self->netif = esp_netif_create_default_wifi_sta();
+    if (self->netif == NULL)
+    {
+        ESP_LOGE("WIFI", "Failed to create default WiFi station netif");
+        return -1;
+    }
 
     /* Init core Subsystems */
     ESP_ERROR_CHECK(esp_netif_init());
@@ -134,73 +143,76 @@ void wifi_init(wifi_ctx_t *self)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     ESP_ERROR_CHECK(esp_wifi_start() );
     ESP_LOGI(self->tag, "WiFi initialized. Waiting for connection...");
+
+    return 0;
 }
 
-void wifi_task(void *pvParameters)
+/* @Brief: Event handler for WiFi events.
+ * @Param arg: Pointer to the NAC context.
+ * @Param event_base: The event base (WIFI_EVENT).
+ * @Param event_id: The event ID.
+ * @Param event_data: Pointer to the event data.
+ * @Desc: Handles WiFi events such as connection start, scan done, and connection status changes.
+ */
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                                int32_t event_id, void* event_data)
 {
-    wifi_ctx_t *self = (wifi_ctx_t *)pvParameters;
-
-    while (1)
+    wifi_ctx_t *self = (wifi_ctx_t*)arg;
+    if (event_base == WIFI_EVENT)
     {
-        // ESP_LOGI("DEBUG", "Task is alive. Current State: %d, Retries: %d", self->state, self->retry_count);
-        EventBits_t bits = xEventGroupWaitBits(self->wifi_event_group,
-                                               WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                                               pdTRUE,
-                                               pdFALSE,
-                                               pdMS_TO_TICKS(1000));
-
-        switch (self->state)
+        switch (event_id)
         {
+            case WIFI_EVENT_STA_START:
+            {
+                if (self->state == WIFI_STATE_CONNECTING)
+                {
+                    esp_err_t err = esp_wifi_connect();
+                    if (err != ESP_OK && err != ESP_ERR_WIFI_CONN)
+                    {
+                        ESP_LOGI(self->tag, "esp_wifi_connect failed: %d", err);
+                    }
+                }
+                break;
+            }
             case WIFI_STATE_DISCONNECTED:
-                if (self->retry_count < REDMOLE_MAX_RETRY)
+            {
+                if (self->state == WIFI_STATE_CONNECTED || self->state == WIFI_STATE_CONNECTING)
                 {
-                    ESP_LOGI(self->tag, "Connecting to %s... Attempt: (%d)", REDMOLE_WIFI_SSID, self->retry_count);
-                    self->state = WIFI_STATE_CONNECTING;
-                    self->retry_count++;
-                    esp_wifi_connect();
-                }
-                else
-                {
-                    ESP_LOGE(self->tag, "Max attempts reached. Waiting before trying again.");
-                    vTaskDelay(pdMS_TO_TICKS(10000)); // Sleep 10s before trying again
-                    self->retry_count = 0;
+                    ESP_LOGI(self->tag, "Disconnected, attempting to reconnect...");
+                    wifi_reconnect();
                 }
                 break;
-
-            case WIFI_STATE_CONNECTING:
-                if (bits & WIFI_CONNECTED_BIT)
-                {
-                    self->state = WIFI_STATE_CONNECTED;
-                    self->retry_count = 0;
-                    ESP_LOGI(self->tag, "RedMole is now connected to WiFi network> %s", REDMOLE_WIFI_SSID);
-                }
-                else if (bits & WIFI_FAIL_BIT)
-                {
-                    self->state = WIFI_STATE_DISCONNECTED;
-                }
-                break;
-
-            case WIFI_STATE_CONNECTED:
-            /* We will stay here
-             * Until bits AND WIFI_FAIL_BIT is 1
-             */
-
-            //ESP_LOGI(self->tag, "Connected to WiFi network: %s", REDMOLE_WIFI_SSID);
-                if (bits & WIFI_FAIL_BIT)
-                {
-                    ESP_LOGW(self->tag, "Lost connection to WiFi network: %s", REDMOLE_WIFI_SSID);
-                    self->state = WIFI_STATE_DISCONNECTED;
-                }
-                break;
-
-            default:
-                break;
+            }
+            case WIFI_EVENT_SCAN_DONE:
+            {
+                ESP_LOGI(self->tag, "WiFi scan done.");
+                wifi_scan_done();
+            }
         }
-
-        /* Yield */
-        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(self->tag, "Connected, IP address: " IPSTR, IP2STR(&event->ip_info.ip));
+        self->state = WIFI_STATE_CONNECTED;
     }
 }
+
+
+/*
+ * Implement these functions to always know initial state
+ */
+static void wifi_bring_hw_online(); // Will contain unsub wifi events
+static void wifi_bring_hw_offline(); // Will contain reg wifi events
+/*
+ * Will contain hw_tear_down
+ */
+static void wifi_disconnect();
+/*
+ * Will contain hw_tear_down and hw_bring_up
+ */
+static void wifi_reconnect();
+
 
 void wifi_dispose(wifi_ctx_t *self)
 {
