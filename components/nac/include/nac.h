@@ -66,10 +66,13 @@ typedef struct
 // Will implement UART diagnostics later
 // void wifi_init(wifi_ctx_t *self, QueueHandle_t log_queue);
 int8_t wifi_init(wifi_ctx_t *self);
-int8_t bluetooth_init(bluetooth_ctx_t *self);
-nac_ctx_t *nac_init();
 void wifi_dispose(wifi_ctx_t *self);
+int8_t wifi_connect(wifi_ctx_t *self, const char *ssid, const char *password);
+
+int8_t bluetooth_init(bluetooth_ctx_t *self);
 void bluetooth_dispose(bluetooth_ctx_t *self);
+
+nac_ctx_t *nac_init();
 void nac_dispose(nac_ctx_t *self);
 
 #endif /* NAC_H */
