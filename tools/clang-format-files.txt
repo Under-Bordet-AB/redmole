@@ -1,0 +1,2 @@
+components/nvs/include/rm_nvs.h
+components/nvs/src/rm_nvs.c
