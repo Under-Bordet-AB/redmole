@@ -2,6 +2,7 @@
  * - This module handles wifi and bluetooth
  */
 
+#include "esp_err.h"
 #include "esp_log_level.h"
 #include "esp_netif_types.h"
 #include "esp_wifi_default.h"
@@ -56,8 +57,8 @@
 /* ------------------------------------------------------ */
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data);
-static void wifi_bring_hw_online();
-static void wifi_bring_hw_offline();
+static int8_t wifi_bring_hw_online(wifi_ctx_t *self);
+static int8_t wifi_bring_hw_offline(wifi_ctx_t *self);
 static void wifi_disconnect();
 static void wifi_reconnect();
 static void wifi_scan_done();
@@ -92,27 +93,29 @@ nac_ctx_t *nac_init()
     return self;
 }
 
+/* @brief Initializes the WiFi context.
+ * @param self Pointer to the WiFi context to initialize.
+ * @return 0 on success, -1 on failure.
+ * @Desc: sets up the WiFi context with default values, does not initialize the hardware.
+ */
 int8_t wifi_init(wifi_ctx_t *self)
 {
-    self->state = WIFI_STATE_IDLE;
-    self->tag   = "WIFI MODULE";
     self->netif = esp_netif_create_default_wifi_sta();
     if (self->netif == NULL)
     {
         ESP_LOGE("WIFI", "Failed to create default WiFi station netif");
         return -1;
     }
+    self->state         = WIFI_STATE_IDLE;
+    self->tag           = "WIFI MODULE";
+    self->saved_to_nvs  = 0;
+    self->hw_online     = 0;
 
-    /* Init core Subsystems */
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
-
+    // This gets moved in to wifi_connect and wifi_bring_hw_online
     /* Init WiFi driver */
+    /*
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    /* Register event handlers*/
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
@@ -138,11 +141,78 @@ int8_t wifi_init(wifi_ctx_t *self)
         },
     };
 
-    /* Start hardware */
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     ESP_ERROR_CHECK(esp_wifi_start() );
     ESP_LOGI(self->tag, "WiFi initialized. Waiting for connection...");
+    */
+
+    return 0;
+}
+
+/* @brief Initializes the Bluetooth context.
+ * @param self Pointer to the Bluetooth context to initialize.
+ * @return 0 on success, -1 on failure.
+ * @Desc: sets up the Bluetooth context with default values, does not initialize the hardware.
+ */
+int8_t bluetooth_init(bluetooth_ctx_t *self)
+{
+    self->state = BLUETOOTH_STATE_IDLE;
+    self->bluetooth_event_group = xEventGroupCreate();
+    if (self->bluetooth_event_group == NULL)
+    {
+        ESP_LOGE("BLUETOOTH", "Failed to create Bluetooth event group");
+        return -1;
+    }
+
+    return 0;
+}
+
+/* @brief Brings the WiFi hardware online.
+ * @param self Pointer to the WiFi context.
+ * @return 0 on success, -1 on failure.
+ * @Desc: initializes the WiFi hardware, sets the mode to STA, and registers event handlers.
+ */
+static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
+{
+    if (self->hw_online)
+    {
+        return 0;
+    }
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    if (esp_wifi_init(&cfg) != ESP_OK)
+    {
+        ESP_LOGE("WIFI", "Failed to initialize WiFi");
+        return -1;
+    }
+
+    if (esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, self) != ESP_OK)
+    {
+        ESP_LOGE("WIFI", "Failed to register WiFi event handler");
+        esp_wifi_deinit();
+        return -1;
+    }
+
+    if (esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, self) != ESP_OK)
+    {
+        ESP_LOGE("WIFI", "Failed to register IP event handler");
+        esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
+        esp_wifi_deinit();
+        return -1;
+    }
+
+    if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK)
+    {
+        ESP_LOGE("WIFI", "Failed to set WiFi mode to STA");
+        esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
+        esp_event_handler_unregister(IP_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
+        esp_wifi_deinit();
+        return -1;
+    }
+
+    self->hw_online = 1;
+    ESP_LOGI(self->tag, "WiFi hardware online");
 
     return 0;
 }
@@ -169,7 +239,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                     esp_err_t err = esp_wifi_connect();
                     if (err != ESP_OK && err != ESP_ERR_WIFI_CONN)
                     {
-                        ESP_LOGI(self->tag, "esp_wifi_connect failed: %d", err);
+                        ESP_LOGE(self->tag, "esp_wifi_connect failed: %d", err);
                     }
                 }
                 break;
@@ -198,12 +268,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-
-/*
- * Implement these functions to always know initial state
- */
-static void wifi_bring_hw_online(); // Will contain unsub wifi events
-static void wifi_bring_hw_offline(); // Will contain reg wifi events
 /*
  * Will contain hw_tear_down
  */
