@@ -8,15 +8,15 @@ typedef enum {
     SERVER_STATE_IDLE,
     SERVER_STATE_TRANSMITTING,
     SERVER_STATE_BLOCKED // Awaiting WiFi (Sec 3.2)
-} server_state_t;
+} server_state;
 
 typedef struct {
-    server_state_t state;
+    server_state state;
     char endpoint_url[128];
-} server_ctx_t;
+} server_ctx;
 
-void server_init(server_ctx_t *self);
-void server_run(server_ctx_t *self);
-void server_deinit(server_ctx_t *self);
+void server_init(server_ctx *self);
+void server_run(server_ctx *self);
+void server_deinit(server_ctx *self);
 
 #endif // SERVER_MODULE_H

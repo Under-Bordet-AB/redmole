@@ -1,15 +1,11 @@
 #ifndef GUI_MODULE_H
 #define GUI_MODULE_H
 
-#include "freertos/FreeRTOS.h"
+#include "esp_err.h"
 
-typedef struct {
-    bool is_ready;
-    void *frame_buffer; // Pointer to PSRAM allocated memory
-} gui_ctx_t;
-
-void gui_init(gui_ctx_t *self);
-void gui_run(gui_ctx_t *self); // Task to process LVGL timers and render
-void gui_deinit(gui_ctx_t *self);
+esp_err_t gui_init(void);
+esp_err_t gui_start(void);
+bool gui_is_ready(void);
+void gui_deinit(void);
 
 #endif // GUI_MODULE_H

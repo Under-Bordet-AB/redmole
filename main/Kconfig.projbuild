@@ -1,0 +1,22 @@
+menu "RedMole Sensor Configuration"
+
+    choice REDMOLE_BME280_BACKEND
+        prompt "BME280 HAL backend"
+        default REDMOLE_BME280_BACKEND_SIM
+        help
+            Select which backend the public BME280 HAL uses.
+
+        config REDMOLE_BME280_BACKEND_SIM
+            bool "Simulator backend"
+            help
+                Use the fake BME280 backend for bring-up and GUI work.
+
+        config REDMOLE_BME280_BACKEND_HW
+            bool "Hardware backend"
+            help
+                Use the hardware backend inside the public BME280 HAL. The
+                current hardware backend is still stubbed, so reads will fail
+                until hardware support is implemented.
+    endchoice
+
+endmenu

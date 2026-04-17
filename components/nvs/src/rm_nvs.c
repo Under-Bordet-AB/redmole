@@ -35,7 +35,8 @@ esp_err_t rm_nvs_init(const char* default_namespace) {
     }
 
     if (s_is_initialized) {
-        if ((s_default_namespace != NULL) && (strcmp(s_default_namespace, default_namespace) == 0)) {
+        if ((s_default_namespace != NULL) &&
+            (strcmp(s_default_namespace, default_namespace) == 0)) {
             return ESP_OK;
         }
 
@@ -621,7 +622,8 @@ esp_err_t rm_nvs_self_test(void) {
     rv = rm_nvs_get_blob("test_blob", &blob_out, &blob_len);
     if ((rv != ESP_OK) || (blob_len != sizeof(blob_out)) ||
         (memcmp(&blob_in, &blob_out, sizeof(blob_in)) != 0)) {
-        ESP_LOGE(TAG, "rm_nvs_get_blob failed: %s", esp_err_to_name((rv != ESP_OK) ? rv : ESP_FAIL));
+        ESP_LOGE(TAG, "rm_nvs_get_blob failed: %s",
+                 esp_err_to_name((rv != ESP_OK) ? rv : ESP_FAIL));
         return (rv != ESP_OK) ? rv : ESP_FAIL;
     }
 
