@@ -27,7 +27,7 @@ int8_t task_scheduler_add(task_node_t *node, uint32_t delay_ms)
     }
 
     /* Calculate target tick: Current + Offset */
-    node->run_at_ticks = xTaskGetTickCount() + pdMS_TO_TICKS(delay_ms);
+    node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(delay_ms);
 
     /* Prepend to list */
     node->next = g_task_scheduler.head;
@@ -89,7 +89,7 @@ int8_t task_scheduler_work(void)
              * if the result is positive, we know the deadline has passed even if
              * the 32-bit system timer just reset (rolled over) back to zero.
              */
-            if ((int32_t)(now - node->run_at_ticks) >= 0)
+            if ((int32_t)(now - node->run_at_tick) >= 0)
             {
                 task_status_t status = node->work(node);
 

@@ -7,6 +7,7 @@
  * - Becauase the task_node_t is baked into the modules struct, the user does not need to allocate memory for it.
  * - This also allows manipulating the task_node_t directly, for example:
  *  - setting the work function as long as it is a valid function pointer: task_status_t my_work_fnc(task_node_t *node)
+ *  - user can safely get self pointer using container_of macro: my_typedef_t *self = container_of(node, my_typedef_t, node)
  *  - dynamically deciding on delay based on the task's state
  *      ex: task_status_t my_work_fnc(task_node_t *node)
  *      {
