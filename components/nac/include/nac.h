@@ -10,6 +10,9 @@
 #include <esp_netif.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/idf_additions.h"
+
+#include "task_scheduler.h"
 
 #define WIFI_SSID_MAX_LENGTH 32
 #define WIFI_PASS_MAX_LENGTH 64
@@ -43,6 +46,7 @@ typedef struct wifi_scan_result
 
 typedef struct wifi_ctx
 {
+    task_node_t task_node; // task node that gets added to the task scheduler
     wifi_state_t state;
     wifi_scan_result_t scan_result;
     esp_netif_t *netif;
@@ -67,7 +71,12 @@ typedef struct
 // void wifi_init(wifi_ctx_t *self, QueueHandle_t log_queue);
 int8_t wifi_init(wifi_ctx_t *self);
 void wifi_dispose(wifi_ctx_t *self);
-int8_t wifi_connect(wifi_ctx_t *self, const char *ssid, const char *password);
+
+/* @Brief: Connects to the Wi-Fi network using the stored credentials.
+ * Gets added to task scheduler.
+ * @Param task_node: Task node to add to the task scheduler.
+ */
+int8_t wifi_connect(task_node_t *task_node);
 
 int8_t bluetooth_init(bluetooth_ctx_t *self);
 void bluetooth_dispose(bluetooth_ctx_t *self);

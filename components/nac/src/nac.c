@@ -183,20 +183,20 @@ static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     if (esp_wifi_init(&cfg) != ESP_OK)
     {
-        ESP_LOGE("WIFI", "Failed to initialize WiFi");
+        ESP_LOGE(self->tag, "Failed to initialize WiFi");
         return -1;
     }
 
     if (esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, self) != ESP_OK)
     {
-        ESP_LOGE("WIFI", "Failed to register WiFi event handler");
+        ESP_LOGE(self->tag, "Failed to register WiFi event handler");
         esp_wifi_deinit();
         return -1;
     }
 
     if (esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, self) != ESP_OK)
     {
-        ESP_LOGE("WIFI", "Failed to register IP event handler");
+        ESP_LOGE(self->tag, "Failed to register IP event handler");
         esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
         esp_wifi_deinit();
         return -1;
@@ -204,7 +204,7 @@ static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
 
     if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK)
     {
-        ESP_LOGE("WIFI", "Failed to set WiFi mode to STA");
+        ESP_LOGE(self->tag, "Failed to set WiFi mode to STA");
         esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
         esp_event_handler_unregister(IP_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
         esp_wifi_deinit();
@@ -216,6 +216,60 @@ static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
 
     return 0;
 }
+
+static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
+{
+    if (!self->hw_online)
+    {
+        ESP_LOGI(self->tag, "WiFi hardware already offline");
+        return 0;
+    }
+
+    if (self->state == WIFI_STATE_SCANNING)
+    {
+        if (esp_wifi_stop_scan() != ESP_OK)
+        {
+            ESP_LOGE(self->tag, "Failed to stop WiFi scan");
+            return -1;
+        }
+    }
+
+    if (self->state == WIFI_STATE_CONNECTED || self->state == WIFI_STATE_CONNECTING)
+    {
+        if (esp_wifi_disconnect() != ESP_OK)
+        {
+            ESP_LOGE(self->tag, "Failed to disconnect WiFi");
+            return -1;
+        }
+    }
+
+    if (esp_wifi_stop() != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "Failed to stop WiFi");
+        return -1;
+    }
+
+    if (esp_wifi_deinit() != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "Failed to deinit WiFi");
+        return -1;
+    }
+
+    self->state = WIFI_STATE_IDLE;
+    self->hw_online = 0;
+    ESP_LOGI(self->tag, "WiFi hardware offline");
+
+    return 0;
+}
+
+/*
+ * Will contain hw_tear_down
+ */
+static void wifi_disconnect();
+/*
+ * Will contain hw_tear_down and hw_bring_up
+ */
+static void wifi_reconnect();
 
 /* @Brief: Event handler for WiFi events.
  * @Param arg: Pointer to the NAC context.
@@ -246,7 +300,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
             }
             case WIFI_EVENT_STA_DISCONNECTED:
             {
-                if (self->state == WIFI_STATE_CONNECTED || self->state == WIFI_STATE_CONNECTING)
+                if (self->state == WIFI_STATE_CONNECTED || self->state == WIFI_STATE_CONNECTING || self->state == WIFI_STATE_IDLE)
                 {
                     ESP_LOGI(self->tag, "Disconnected, attempting to reconnect...");
                     wifi_reconnect();
@@ -265,17 +319,10 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(self->tag, "Connected, IP address: " IPSTR, IP2STR(&event->ip_info.ip));
         self->state = WIFI_STATE_CONNECTED;
+
+        /* TO DO: call nvs functions to save the connected SSID and password */
     }
 }
-
-/*
- * Will contain hw_tear_down
- */
-static void wifi_disconnect();
-/*
- * Will contain hw_tear_down and hw_bring_up
- */
-static void wifi_reconnect();
 
 
 void wifi_dispose(wifi_ctx_t *self)
