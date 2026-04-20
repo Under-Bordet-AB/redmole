@@ -3,7 +3,7 @@
 
 static task_scheduler_t g_task_scheduler;
 
-int8_t task_scheduler_init(void)
+esp_err_t task_scheduler_init(void)
 {
     g_task_scheduler.head = NULL;
     g_task_scheduler.count = 0;

@@ -4,16 +4,13 @@
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
-
+#include "task_scheduler.h"
 #include "bme280_hal.h"
 #include "gui_module.h"
 #include "nac.h"
 #include "rm_event_notify.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
-/* Old Wi-Fi startup path reference:
-#include "app_module.h"
-*/
 
 static const char* TAG = "MAIN";
 static bme280_hal s_sensor_hal = {0};
@@ -22,6 +19,11 @@ static esp_err_t init_single_instance_modules(void) {
     esp_err_t rv = rm_nvs_init("app");
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "rm_nvs_init failed: %s", esp_err_to_name(rv));
+        return rv;
+    }
+
+    if (task_scheduler_init() != ESP_OK) {
+        ESP_LOGE(TAG, "task_scheduler_init failed:", esp_err_to_name(rv));
         return rv;
     }
 
@@ -96,8 +98,24 @@ static void sensor_local_source_task(void* pvParameters) {
     }
 }
 
-static esp_err_t start_runtime_modules(EventBits_t* out_expected_ready_bits) {
-    EventBits_t expected_ready_bits = 0;
+static esp_err_t start_runtime_modules(/*EventBits_t* out_expected_ready_bits*/) {
+    //EventBits_t expected_ready_bits = 0;
+
+    if (task_scheduler_init() != ESP_OK) {
+        ESP_LOGE(TAG, "task_scheduler_init failed");
+        return ESP_FAIL;
+    }
+
+    //expected_ready_bits |= RM_EVENT_NOTIFY_BIT_SCHEDULER_READY;
+    ESP_LOGI(TAG, "task_scheduler_init started");
+
+    if(nac_request_wifi_connect() != ESP_OK) {
+        ESP_LOGE(TAG, "nac_request_wifi_connect failed");
+        return ESP_FAIL;
+    }
+
+    //expected_ready_bits |= RM_EVENT_NOTIFY_BIT_NAC_READY;
+    ESP_LOGI(TAG, "nac_request_wifi_connect started");
 
     BaseType_t sensor =
         xTaskCreate(sensor_local_source_task, "sensor_local_source_task", 4096, NULL, 5, NULL);
@@ -106,7 +124,7 @@ static esp_err_t start_runtime_modules(EventBits_t* out_expected_ready_bits) {
         return ESP_FAIL;
     }
 
-    expected_ready_bits |= RM_EVENT_NOTIFY_BIT_SENSOR_READY;
+    //expected_ready_bits |= RM_EVENT_NOTIFY_BIT_SENSOR_READY;
     ESP_LOGI(TAG, "sensor_local_source_task started");
 
     if (gui_is_ready()) {
@@ -114,18 +132,18 @@ static esp_err_t start_runtime_modules(EventBits_t* out_expected_ready_bits) {
             ESP_LOGE(TAG, "gui_start failed");
             return ESP_FAIL;
         }
-        expected_ready_bits |= RM_EVENT_NOTIFY_BIT_GUI_READY;
+        //expected_ready_bits |= RM_EVENT_NOTIFY_BIT_GUI_READY;
         ESP_LOGI(TAG, "gui_task started");
     } else {
         ESP_LOGW(TAG, "GUI not ready, skipping gui_task startup");
     }
 
-    *out_expected_ready_bits = expected_ready_bits;
+    //*out_expected_ready_bits = expected_ready_bits;
     return ESP_OK;
 }
 
 void app_main(void) {
-    EventBits_t expected_ready_bits = 0;
+    //EventBits_t expected_ready_bits = 0;
 
     ESP_LOGI(TAG, "app_main entered");
     ESP_LOGI(TAG, "Initializing single-instance modules");
@@ -138,21 +156,24 @@ void app_main(void) {
         goto fatal_error;
     }
 
-    ESP_LOGI(TAG, "Skipping WiFi startup.");
-
-    if (start_runtime_modules(&expected_ready_bits) != ESP_OK) {
+    if (start_runtime_modules(/*&expected_ready_bits*/) != ESP_OK) {
         goto fatal_error;
     }
 
-    if (!rm_event_notify_wait_all(expected_ready_bits, pdMS_TO_TICKS(5000))) {
+    /* Pump the task scheduler to start tasks, needed to connect wifi in this mock code
+     * GUI would trigger scheduler work in real project
+    */
+    task_scheduler_work();
+
+    /*if (!rm_event_notify_wait_all(expected_ready_bits, pdMS_TO_TICKS(5000))) {
         ESP_LOGE(TAG, "Not all tasks reached startup gate");
         goto fatal_error;
-    }
+    }*/
 
-    if (rm_event_notify_signal(RM_EVENT_NOTIFY_BIT_INIT_DONE) != ESP_OK) {
+    /*if (rm_event_notify_signal(RM_EVENT_NOTIFY_BIT_INIT_DONE) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to release startup gate");
         goto fatal_error;
-    }
+    }*/
 
     ESP_LOGI(TAG, "Startup complete");
     return;

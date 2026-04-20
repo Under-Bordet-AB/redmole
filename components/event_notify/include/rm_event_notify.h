@@ -6,9 +6,11 @@
 #include "freertos/event_groups.h"
 #include "esp_err.h"
 
-#define RM_EVENT_NOTIFY_BIT_INIT_DONE     BIT0
-#define RM_EVENT_NOTIFY_BIT_SENSOR_READY  BIT1
-#define RM_EVENT_NOTIFY_BIT_GUI_READY     BIT2
+#define RM_EVENT_NOTIFY_BIT_INIT_DONE       BIT0
+#define RM_EVENT_NOTIFY_BIT_SENSOR_READY    BIT1
+#define RM_EVENT_NOTIFY_BIT_GUI_READY       BIT2
+#define RM_EVENT_NOTIFY_BIT_NAC_READY       BIT3
+#define RM_EVENT_NOTIFY_BIT_SCHEDULER_READY BIT4
 
 esp_err_t rm_event_notify_init(void);
 void rm_event_notify_deinit(void);

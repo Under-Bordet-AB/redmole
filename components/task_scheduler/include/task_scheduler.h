@@ -67,7 +67,7 @@ typedef struct task_scheduler
     const char  *tag;
 } task_scheduler_t;
 
-int8_t task_scheduler_init(void);
+esp_err_t task_scheduler_init(void);
 int8_t task_scheduler_deinit(void);
 
 /* @brief Adds a task to the scheduler, with or without a delay

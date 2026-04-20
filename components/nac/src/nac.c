@@ -1,22 +1,27 @@
 /* NAC - Network and Communications
  * Handles WiFi and Bluetooth.
  *
- * @note
- * The GUI layer never touches wifi_ctx_t or bluetooth_ctx_t directly.
- * It calls only the nac_* abstraction functions declared at the bottom
- * of nac.h.  Those functions translate GUI-level intents ("connect",
- * "scan") into scheduler tasks and internal state transitions.
+ * Architecture note
+ * -----------------
+ * Follows the single-instance module pattern used by rm_nvs and sensor_data.
+ * All state lives in the static s_nac struct. Public functions take no context
+ * pointer — they route directly into s_nac.
  *
- * The WiFi state machine lives entirely in wifi_connect(), which is the
- * single task_scheduler callback for all WiFi work.  A switch on
- * wifi_ctx_t::state selects the correct action each time the scheduler
- * invokes it.  Async events (WIFI_EVENT / IP_EVENT) update state and,
- * when a reconnect is needed, re-add the task node with an exponential
- * back-off delay.
+ * The GUI layer calls only the nac_* API. It never touches wifi_ctx_t.
+ *
+ * The WiFi state machine lives entirely in wifi_connect(), the single
+ * task_scheduler callback for all WiFi work. Async events (WIFI_EVENT /
+ * IP_EVENT) update state and re-add the task node when more work is needed.
+ *
+ * Prerequisites owned by main.c (not this module):
+ *   rm_nvs_init()
+ *   esp_netif_init()
+ *   esp_event_loop_create_default()
  */
 
 #include "nac.h"
-#include <stdlib.h>
+#include "esp_netif_types.h"
+#include "rm_nvs.h"
 #include <string.h>
 #include <inttypes.h>
 #include "esp_err.h"
@@ -25,7 +30,6 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
-#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -69,7 +73,21 @@
     #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA2_PSK
 #endif
 
-/* Internal forward declarations */
+/* ------------------------------------------------------------------ */
+/*  Module-internal state — never exposed outside this file           */
+/* ------------------------------------------------------------------ */
+
+typedef struct
+{
+    wifi_ctx_t      wifi;
+    bluetooth_ctx_t bluetooth;
+} nac_ctx_t;
+
+static nac_ctx_t s_nac;
+
+/* ------------------------------------------------------------------ */
+/*  Internal forward declarations                                       */
+/* ------------------------------------------------------------------ */
 
 static void   wifi_event_handler(void *arg, esp_event_base_t event_base,
                                   int32_t event_id, void *event_data);
@@ -78,170 +96,129 @@ static int8_t wifi_bring_hw_offline(wifi_ctx_t *self);
 static void   wifi_disconnect(wifi_ctx_t *self);
 static void   wifi_reconnect(wifi_ctx_t *self);
 static void   wifi_scan_done(wifi_ctx_t *self);
+static int8_t wifi_init(wifi_ctx_t *self);
+static void   wifi_dispose(wifi_ctx_t *self);
+task_status_t wifi_connect(task_node_t *node);
+static int8_t bluetooth_init(bluetooth_ctx_t *self);
+static void   bluetooth_dispose(bluetooth_ctx_t *self);
 
-/* NAC - Network and communication section */
+/* ================================================================== */
+/*  Public API — singleton wrappers                                    */
+/* ================================================================== */
 
-/**
- * @brief Initializes the NAC context (wifi and bluetooth).
- * @return A pointer to the initialized NAC context, or NULL on failure.
- */
 esp_err_t nac_init(void)
 {
-    /* Init TCP/IP stack and esp_event_loop for WIFI and Bluetooth events */
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    nac_ctx_t *self = (nac_ctx_t *)malloc(sizeof(nac_ctx_t));
-    if (!self)
-    {
-        ESP_LOGE("NAC", "Failed to allocate nac_ctx_t");
-        return NULL;
-    }
-    memset(self, 0, sizeof(nac_ctx_t));
 
-    if (wifi_init(&self->wifi) != 0)
+    memset(&s_nac, 0, sizeof(s_nac));
+
+    if (wifi_init(&s_nac.wifi) != 0)
     {
         ESP_LOGE("NAC", "wifi_init failed");
-        free(self);
-        return NULL;
+        return ESP_FAIL;
     }
 
-    if (bluetooth_init(&self->bluetooth) != 0)
+    if (bluetooth_init(&s_nac.bluetooth) != 0)
     {
         ESP_LOGE("NAC", "bluetooth_init failed");
-        wifi_dispose(&self->wifi);
-        free(self);
-        return NULL;
+        wifi_dispose(&s_nac.wifi);
+        return ESP_FAIL;
     }
 
-    return 0;
+    return ESP_OK;
 }
 
-/**
- * @brief Disposes of the NAC context, freeing all resources.
- * @param self The NAC context to dispose of.
- */
-void nac_dispose(nac_ctx_t *self)
+void nac_dispose(void)
 {
-    if (!self) return;
-    wifi_dispose(&self->wifi);
-    bluetooth_dispose(&self->bluetooth);
-    free(self);
+    wifi_dispose(&s_nac.wifi);
+    bluetooth_dispose(&s_nac.bluetooth);
+    memset(&s_nac, 0, sizeof(s_nac));
 }
 
-
-/* Public API for NAC */
-
-/**
- * @brief Returns the current WiFi status of the NAC.
- * @param self The NAC context.
- * @return The current WiFi status.
- */
-nac_wifi_status_t nac_get_wifi_status(const nac_ctx_t *self)
+nac_wifi_status_t nac_get_wifi_status(void)
 {
-    if (!self) return NAC_WIFI_DISCONNECTED;
-
-    switch (self->wifi.state)
+    switch (s_nac.wifi.state)
     {
-        case WIFI_STATE_CONNECTED:  return NAC_WIFI_CONNECTED;
-        case WIFI_STATE_CONNECTING:  /* fall-through */
-        case WIFI_STATE_RECONNECT:  return NAC_WIFI_CONNECTING;
-        case WIFI_STATE_START_SCAN:  /* fall-through */
-        case WIFI_STATE_SCANNING:  return NAC_WIFI_SCANNING;
-        case WIFI_STATE_IDLE:      return NAC_WIFI_DISCONNECTED;
-        case WIFI_STATE_ERROR:  return NAC_WIFI_ERROR;
-        default:  return NAC_WIFI_DISCONNECTED;
+        case WIFI_STATE_CONNECTED:                       return NAC_WIFI_CONNECTED;
+        case WIFI_STATE_CONNECTING: /* fall-through */
+        case WIFI_STATE_RECONNECT:                       return NAC_WIFI_CONNECTING;
+        case WIFI_STATE_START_SCAN: /* fall-through */
+        case WIFI_STATE_SCANNING:                        return NAC_WIFI_SCANNING;
+        case WIFI_STATE_ERROR:                           return NAC_WIFI_ERROR;
+        case WIFI_STATE_IDLE:       /* fall-through */
+        default:                                         return NAC_WIFI_DISCONNECTED;
     }
 }
 
-/**
- * @brief Requests a WiFi connection.
- * @param self The NAC context.
- * @return 0 on success, -1 on failure.
- */
-int8_t nac_request_wifi_connect(nac_ctx_t *self)
+esp_err_t nac_request_wifi_connect(void)
 {
-    if (!self) return -1;
-
-    wifi_state_t s = self->wifi.state;
+    wifi_state_t s = s_nac.wifi.state;
     if (s == WIFI_STATE_CONNECTED || s == WIFI_STATE_CONNECTING)
     {
         ESP_LOGI("NAC", "WiFi already connected/connecting — ignoring");
-        return 0;
+        return ESP_OK;
     }
 
-    self->wifi.retry_count    = 0;
-    self->wifi.state          = WIFI_STATE_IDLE;
-    self->wifi.task_node.work = wifi_connect;
+    s_nac.wifi.retry_count    = 0;
+    s_nac.wifi.state          = WIFI_STATE_IDLE;
+    s_nac.wifi.task_node.work = wifi_connect;
 
-    return task_scheduler_add(&self->wifi.task_node, 0);
+    return task_scheduler_add(&s_nac.wifi.task_node, 0) == 0 ? ESP_OK : ESP_FAIL;
 }
 
-/**
- * @brief Requests a WiFi disconnect.
- * @param self The NAC context.
- * @return 0 on success, -1 on failure.
- */
-int8_t nac_request_wifi_disconnect(nac_ctx_t *self)
+esp_err_t nac_request_wifi_disconnect(void)
 {
-    if (!self) return -1;
-    wifi_disconnect(&self->wifi);
-    return 0;
+    wifi_disconnect(&s_nac.wifi);
+    return ESP_OK;
 }
 
-/**
- * @brief Requests a WiFi scan.
- * @param self The NAC context.
- * @return 0 on success, -1 on failure.
- */
-int8_t nac_request_wifi_scan(nac_ctx_t *self)
+esp_err_t nac_request_wifi_scan(void)
 {
-    if (!self) return -1;
+    wifi_ctx_t *wifi = &s_nac.wifi;
 
-    if (self->wifi.state == WIFI_STATE_SCANNING || self->wifi.state == WIFI_STATE_START_SCAN)
+    if (wifi->state == WIFI_STATE_SCANNING || wifi->state == WIFI_STATE_START_SCAN)
     {
         ESP_LOGI("NAC", "Scan already in progress — ignoring");
-        return 0;
+        return ESP_OK;
     }
-    self->wifi.scan_complete  = 0;
-    self->wifi.ap_count       = 0;
-    self->wifi.state          = WIFI_STATE_START_SCAN;
-    self->wifi.task_node.work = wifi_connect;
 
-    return task_scheduler_add(&self->wifi.task_node, 0);
+    wifi->ap_count        = 0;
+    wifi->scan_complete   = 0;
+    wifi->state           = WIFI_STATE_START_SCAN;
+    wifi->task_node.work  = wifi_connect;
+
+    return task_scheduler_add(&wifi->task_node, 0) == 0 ? ESP_OK : ESP_FAIL;
 }
 
-/**
- * @brief Returns the scan results.
- * @param self The NAC context.
- * @param out_count Pointer to store the number of scan results.
- * @return Pointer to the scan results, or NULL if none.
- */
-const wifi_ap_record_t *nac_get_scan_results(const nac_ctx_t *self, uint16_t *out_count)
+const wifi_ap_record_t *nac_get_scan_results(uint16_t *out_count)
 {
-    if (!self || !out_count) return NULL;
-    *out_count = self->wifi.ap_count;
-    return self->wifi.ap_records;
+    if (!out_count) return NULL;
+    *out_count = s_nac.wifi.ap_count;
+    return s_nac.wifi.ap_records;
 }
 
-/* WiFi section */
+bool nac_scan_is_complete(void)
+{
+    return s_nac.wifi.scan_complete != 0;
+}
+
+/* ================================================================== */
+/*  WiFi — internal implementation                                     */
+/* ================================================================== */
 
 /**
- * @brief Initializes the WiFi interface.
- * @param self The WiFi context.
- * @return 0 on success, -1 on failure.
- * @note WiFi Initialization Order and where the call lives in the project:
- * 1. [SYSTEM] nvs_flash_init() (app_init)              - Flash storage for PHY/Radio calibration & creds.
- * 2. [STACK]  esp_netif_init() (app_init)              - TCP/IP (LwIP) global stack initialization.
- * 3. [SYSTEM] esp_event_loop_...() (app_init)          - System-wide async event dispatcher.
- * 4. [BIND]   esp_netif_create_...() (wifi_init)       - Creates the 'glue' between LwIP and the WiFi driver.
- * 5. [HAL]    esp_wifi_init() (wifi_bring_hw_online)   - Allocates WiFi buffers and starts the WiFi driver task.
- * 6. [RADIO]  esp_wifi_start() (wifi_connect)          - Powers on the physical Radio/PHY hardware.
+ * @brief Initialises the WiFi interface.
+ * @note  Initialization order and ownership:
+ *   1. [SYSTEM] nvs_flash_init()           rm_nvs_init() in main.c
+ *   2. [STACK]  esp_netif_init()           main.c
+ *   3. [SYSTEM] esp_event_loop_...()       main.c
+ *   4. [BIND]   esp_netif_create_...()     here  — glue between LwIP and WiFi driver
+ *   5. [HAL]    esp_wifi_init()            wifi_bring_hw_online()
+ *   6. [RADIO]  esp_wifi_start()           wifi_connect()
  */
-int8_t wifi_init(wifi_ctx_t *self)
+static int8_t wifi_init(wifi_ctx_t *self)
 {
-    if (!self) return -1;
-
-    /* Create the default WiFi STA netif. */
     self->netif = esp_netif_create_default_wifi_sta();
     if (!self->netif)
     {
@@ -250,7 +227,7 @@ int8_t wifi_init(wifi_ctx_t *self)
     }
 
     /*
-     * Pre-allocate scan buffer in PSRAM once.  wifi_scan_done() writes
+     * Pre-allocate scan buffer in PSRAM once. wifi_scan_done() writes
      * directly into this buffer — no stack allocation, no copy.
      */
     self->ap_records = (wifi_ap_record_t *)heap_caps_malloc(
@@ -264,33 +241,20 @@ int8_t wifi_init(wifi_ctx_t *self)
         return -1;
     }
 
-    /* TO DO: switch these to RedMole nvs */
-    esp_err_t nvs_err = nvs_open("wifi_creds", NVS_READONLY, &self->nvs_handle);
-    if (nvs_err != ESP_OK && nvs_err != ESP_ERR_NVS_NOT_FOUND)
-    {
-        ESP_LOGW("WIFI", "NVS open failed (0x%x) — sdkconfig fallback will be used", nvs_err);
-    }
-
-    self->state           = WIFI_STATE_IDLE;
-    self->tag             = "WIFI";
-    self->retry_count     = 0;
-    self->saved_to_nvs    = 0;
-    self->hw_online       = 0;
-    self->ap_count        = 0;
-    /* The function to call when the task is run */
-    self->task_node.work  = wifi_connect;
+    self->state          = WIFI_STATE_IDLE;
+    self->tag            = "WIFI";
+    self->retry_count    = 0;
+    self->saved_to_nvs   = 0;
+    self->hw_online      = 0;
+    self->ap_count       = 0;
+    self->scan_complete  = 0;
+    self->task_node.work = wifi_connect;
 
     return 0;
 }
 
-/**
- * @brief Disposes of the WiFi context, freeing all allocated resources.
- * @param self The WiFi context.
- */
-void wifi_dispose(wifi_ctx_t *self)
+static void wifi_dispose(wifi_ctx_t *self)
 {
-    if (!self) return;
-
     if (self->task_node.active)
     {
         task_scheduler_remove(&self->task_node);
@@ -304,8 +268,6 @@ void wifi_dispose(wifi_ctx_t *self)
         self->ap_records = NULL;
     }
 
-    nvs_close(self->nvs_handle);
-
     if (self->netif)
     {
         esp_netif_destroy(self->netif);
@@ -317,16 +279,13 @@ void wifi_dispose(wifi_ctx_t *self)
 
 /**
  * @brief Initialises the WiFi driver, registers event handlers, sets STA mode.
- * @param self The WiFi context.
- * @return 0 on success, -1 on failure.
- * @note Please note that the final call to esp_wifi_start() is left to wifi_connect()
+ * @note  esp_wifi_start() is left to wifi_connect() — the scheduler controls timing.
  */
 static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
 {
     if (self->hw_online) return 0;
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    /* Initialise the WiFi driver with default configuration and starts the WiFi task */
     if (esp_wifi_init(&cfg) != ESP_OK)
     {
         ESP_LOGE(self->tag, "esp_wifi_init failed");
@@ -349,7 +308,7 @@ static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
         esp_wifi_deinit();
         return -1;
     }
-    /* Set WiFi mode to STA (Station mode) */
+
     if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK)
     {
         ESP_LOGE(self->tag, "Failed to set WiFi mode STA");
@@ -365,9 +324,7 @@ static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
 }
 
 /**
- * @brief Tears down the WiFi driver.  Safe to call when already offline.
- * @param self The WiFi context.
- * @return 0 on success, -1 on failure.
+ * @brief Tears down the WiFi driver. Safe to call when already offline.
  */
 static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
 {
@@ -383,7 +340,7 @@ static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
     {
         esp_wifi_disconnect();
     }
-    /* Stop the WiFi driver */
+
     if (esp_wifi_stop() != ESP_OK)
     {
         ESP_LOGE(self->tag, "esp_wifi_stop failed");
@@ -393,7 +350,7 @@ static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
     /* Unregister before deinit to prevent late callbacks */
     esp_event_handler_unregister(IP_EVENT,   ESP_EVENT_ANY_ID, wifi_event_handler);
     esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
-    /* Frees all resources allocated by the WiFi driver and stops the task */
+
     if (esp_wifi_deinit() != ESP_OK)
     {
         ESP_LOGE(self->tag, "esp_wifi_deinit failed");
@@ -420,16 +377,13 @@ static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
  *                   parent context with:
  *                   container_of(task_node, wifi_ctx_t, task_node)
  *
- * @return TASK_DONE      Work for this invocation is complete. The node
- *                        is removed from the scheduler; it will be re-added
- *                        only if reconnection is required.
- * @return TASK_ERROR     A non-recoverable driver call failed, or the retry
- *                        limit was reached. The node is removed from the
- *                        scheduler. Call nac_request_wifi_connect() to retry.
+ * @return TASK_DONE   Invocation complete; node removed from scheduler.
+ *                     Re-added automatically if reconnection is needed.
+ * @return TASK_ERROR  Driver failure or retry limit reached; node removed.
+ *                     Call nac_request_wifi_connect() to start over.
  *
- * @note TASK_RUN_AGAIN is intentionally unused. All rescheduling goes
- *       through task_scheduler_add() with an explicit delay so that
- *       reconnect back-off is enforced at the call site, not here.
+ * @note TASK_RUN_AGAIN is unused — all rescheduling goes through
+ *       task_scheduler_add() so back-off delay is enforced explicitly.
  */
 task_status_t wifi_connect(task_node_t *task_node)
 {
@@ -437,6 +391,7 @@ task_status_t wifi_connect(task_node_t *task_node)
 
     switch (self->state)
     {
+        /* ---- Initial connect or scheduled reconnect ---- */
         case WIFI_STATE_IDLE:
         case WIFI_STATE_RECONNECT:
         {
@@ -444,7 +399,7 @@ task_status_t wifi_connect(task_node_t *task_node)
             {
                 ESP_LOGE(self->tag, "Max retries (%d) reached — aborting", REDMOLE_MAX_RETRY);
                 self->retry_count = 0;
-                self->state       = WIFI_STATE_IDLE;
+                self->state       = WIFI_STATE_ERROR;
                 return TASK_ERROR;
             }
 
@@ -463,29 +418,23 @@ task_status_t wifi_connect(task_node_t *task_node)
             }
 
             /* --------------------------------------------------
-             * TODO: NVS credential lookup
+             * TODO: NVS credential lookup via rm_nvs
              *
-             * Attempt to read saved credentials from NVS before
-             * falling back to the sdkconfig compile-time values:
+             * Replace sdkconfig fallback values with stored credentials:
              *
              *   char ssid[WIFI_SSID_MAX_LENGTH + 1] = REDMOLE_WIFI_SSID;
-             *   char pass[WIFI_PASS_MAX_LENGTH + 1] = REDMOLE_WIFI_PASS;
+             *   char pass[WIFI_PASS_MAX_LENGTH + 1]  = REDMOLE_WIFI_PASS;
              *   size_t ssid_len = sizeof(ssid);
              *   size_t pass_len = sizeof(pass);
-             *   nvs_get_str(self->nvs_handle, "ssid",     ssid, &ssid_len);
-             *   nvs_get_str(self->nvs_handle, "password", pass, &pass_len);
+             *   rm_nvs_get_str("wifi_ssid", ssid, &ssid_len);
+             *   rm_nvs_get_str("wifi_pass", pass, &pass_len);
              *
-             * On IP_EVENT_STA_GOT_IP (below), if saved_to_nvs == 0:
-             *   nvs_handle_t rw;
-             *   nvs_open("wifi_creds", NVS_READWRITE, &rw);
-             *   nvs_set_str(rw, "ssid",     (char*)wifi_config.sta.ssid);
-             *   nvs_set_str(rw, "password", (char*)wifi_config.sta.password);
-             *   nvs_commit(rw);
-             *   nvs_close(rw);
+             * On IP_EVENT_STA_GOT_IP, if saved_to_nvs == 0:
+             *   rm_nvs_set_str("wifi_ssid", (char *)wifi_config.sta.ssid);
+             *   rm_nvs_set_str("wifi_pass", (char *)wifi_config.sta.password);
              *   self->saved_to_nvs = 1;
              * -------------------------------------------------- */
 
-            /* These are defaults values for the WiFi configuration if no saved credentials are found */
             wifi_config_t wifi_config;
             memset(&wifi_config, 0, sizeof(wifi_config));
             wifi_config.sta.threshold.authmode = REDMOLE_AUTH_THRESHOLD;
@@ -504,23 +453,22 @@ task_status_t wifi_connect(task_node_t *task_node)
             if (esp_wifi_set_config(WIFI_IF_STA, &wifi_config) != ESP_OK)
             {
                 ESP_LOGE(self->tag, "esp_wifi_set_config failed");
-                /* Clean up and return error */
                 wifi_bring_hw_offline(self);
                 return TASK_ERROR;
             }
 
-            /* Ensuring we're the correct state before starting WiFi
-             * The call posts WIFI_EVENT_STA_START to the event loop queue
-             * before returning.  Once it returns, the event loop task can
-             * preempt us and dispatch the event before we get another
-             * instruction.
+            /*
+             * Set CONNECTING before esp_wifi_start(). The call posts
+             * WIFI_EVENT_STA_START to the event loop queue before returning.
+             * Once it returns, the event loop task can preempt us and dispatch
+             * the event before we get another instruction. Setting state first
+             * closes that window.
              */
             self->state = WIFI_STATE_CONNECTING;
             self->retry_count++;
             ESP_LOGI(self->tag, "Starting WiFi (attempt %d/%d)",
                      self->retry_count, REDMOLE_MAX_RETRY);
 
-            /* This is where the radio is powered on and WiFi is started, the last step of the setup process */
             if (esp_wifi_start() != ESP_OK)
             {
                 ESP_LOGE(self->tag, "esp_wifi_start failed");
@@ -528,14 +476,14 @@ task_status_t wifi_connect(task_node_t *task_node)
                 self->state = WIFI_STATE_IDLE;
                 return TASK_ERROR;
             }
-            /* Disable power saving mode to keep the radio awake, will consume more power */
+
+            /* Disable modem sleep — avoids latency spikes on the 7" display */
             esp_wifi_set_ps(WIFI_PS_NONE);
 
-            /* Event handler drives everything from here. Task is re-added to the scheduler only by wifi_reconnect(). */
             return TASK_DONE;
         }
 
-        /* WiFi scan requested */
+        /* ---- WiFi scan requested ---- */
         case WIFI_STATE_START_SCAN:
         {
             if (!self->hw_online && wifi_bring_hw_online(self) != 0)
@@ -566,7 +514,7 @@ task_status_t wifi_connect(task_node_t *task_node)
             return TASK_DONE;
         }
 
-        /* Entirely event-driven states */
+        /* ---- Entirely event-driven states ---- */
         case WIFI_STATE_CONNECTING:
             ESP_LOGD(self->tag, "Connection in progress");
             return TASK_DONE;
@@ -587,13 +535,14 @@ task_status_t wifi_connect(task_node_t *task_node)
 }
 
 /**
- * @brief Explicit user-requested disconnect. Sets WIFI_STATE_IDLE before
- * tearing down hardware so the resulting disconnect event is ignored.
+ * @brief Explicit user-requested disconnect. Sets IDLE before tearing down
+ *        hardware so the resulting disconnect event is ignored by the handler.
  */
 static void wifi_disconnect(wifi_ctx_t *self)
 {
     self->state = WIFI_STATE_IDLE;
-    if (wifi_bring_hw_offline(self) != 0) {
+    if (wifi_bring_hw_offline(self) != 0)
+    {
         ESP_LOGE(self->tag, "Failed to bring WiFi hardware offline");
         return;
     }
@@ -602,9 +551,7 @@ static void wifi_disconnect(wifi_ctx_t *self)
 
 /**
  * @brief Schedules the next connect attempt with exponential back-off.
- *
- * Delay: 500 ms × 2^attempt, capped at 32 s.
- * retry_count was already incremented by the last wifi_connect() call.
+ *        Delay: 500 ms × 2^attempt, capped at 32 s.
  */
 static void wifi_reconnect(wifi_ctx_t *self)
 {
@@ -619,10 +566,8 @@ static void wifi_reconnect(wifi_ctx_t *self)
 }
 
 /**
- * @brief Callback invoked when a Wi-Fi scan completes.
- *
- * Reads the scan results into the pre-allocated PSRAM buffer and
- * transitions the state machine to WIFI_STATE_IDLE.
+ * @brief Reads AP records from the driver into the pre-allocated PSRAM buffer.
+ *        No stack allocation, no copy.
  */
 static void wifi_scan_done(wifi_ctx_t *self)
 {
@@ -636,15 +581,13 @@ static void wifi_scan_done(wifi_ctx_t *self)
         return;
     }
 
-    self->state = WIFI_STATE_IDLE;
     self->scan_complete = 1;
+    self->state         = WIFI_STATE_IDLE;
     ESP_LOGI(self->tag, "Scan complete: %" PRIu16 " AP(s) found", self->ap_count);
 }
 
 /**
- * @brief Event handler for WIFI_EVENT and IP_EVENT.
- *
- * arg is always wifi_ctx_t *.
+ * @brief Event handler for WIFI_EVENT and IP_EVENT. arg is always wifi_ctx_t *.
  */
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
@@ -657,7 +600,11 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         {
             case WIFI_EVENT_STA_START:
             {
-                /* Check that we are in the correct state before attempting to connect. */
+                /*
+                 * Only call esp_wifi_connect() if we asked for a connection.
+                 * A scan also triggers STA_START but state will be SCANNING,
+                 * not CONNECTING, so we correctly skip here in that case.
+                 */
                 if (self->state == WIFI_STATE_CONNECTING)
                 {
                     esp_err_t err = esp_wifi_connect();
@@ -671,17 +618,25 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
             case WIFI_EVENT_STA_DISCONNECTED:
             {
+                /*
+                 * Reconnect only from active states. IDLE means the disconnect
+                 * was intentional (wifi_disconnect() sets IDLE before tearing
+                 * down hardware), so we leave it alone.
+                 */
                 if (self->state == WIFI_STATE_CONNECTING ||
                     self->state == WIFI_STATE_CONNECTED  ||
                     self->state == WIFI_STATE_RECONNECT)
                 {
-                    wifi_event_sta_disconnected_t *d = (wifi_event_sta_disconnected_t *)event_data;
-                    ESP_LOGW(self->tag, "Disconnected, reason: %d, scheduling reconnect", d->reason);
+                    wifi_event_sta_disconnected_t *d =
+                        (wifi_event_sta_disconnected_t *)event_data;
+                    ESP_LOGW(self->tag, "Disconnected, reason: %d — scheduling reconnect",
+                             d->reason);
                     wifi_reconnect(self);
                 }
                 else
                 {
-                    ESP_LOGI(self->tag, "Disconnect event ignored (state = %d)", (int)self->state);
+                    ESP_LOGI(self->tag, "Disconnect event ignored (state = %d)",
+                             (int)self->state);
                 }
                 break;
             }
@@ -701,16 +656,16 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         self->state       = WIFI_STATE_CONNECTED;
         self->retry_count = 0;
 
-        /* TODO: NVS write-back — see comment block in wifi_connect() */
+        /* TODO: NVS write-back via rm_nvs — see comment block in wifi_connect() */
     }
 }
 
-/* Bluetooth */
+/* ================================================================== */
+/*  Bluetooth                                                           */
+/* ================================================================== */
 
-int8_t bluetooth_init(bluetooth_ctx_t *self)
+static int8_t bluetooth_init(bluetooth_ctx_t *self)
 {
-    if (!self) return -1;
-
     self->state                 = BLUETOOTH_STATE_IDLE;
     self->bluetooth_event_group = xEventGroupCreate();
 
@@ -723,10 +678,8 @@ int8_t bluetooth_init(bluetooth_ctx_t *self)
     return 0;
 }
 
-void bluetooth_dispose(bluetooth_ctx_t *self)
+static void bluetooth_dispose(bluetooth_ctx_t *self)
 {
-    if (!self) return;
-
     if (self->bluetooth_event_group)
     {
         vEventGroupDelete(self->bluetooth_event_group);
