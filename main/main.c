@@ -1,4 +1,6 @@
 #include "app_module.h"
+#include "esp_heap_caps.h"
+#include "multi_heap.h"
 #include "nac.h"
 #include "task_scheduler.h"
 #include "esp_log.h"

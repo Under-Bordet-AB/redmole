@@ -1,8 +1,7 @@
 /* NAC - Network and Communications
  * Handles WiFi and Bluetooth.
  *
- * Architecture note
- * -----------------
+ * @note
  * The GUI layer never touches wifi_ctx_t or bluetooth_ctx_t directly.
  * It calls only the nac_* abstraction functions declared at the bottom
  * of nac.h.  Those functions translate GUI-level intents ("connect",
@@ -14,9 +13,6 @@
  * invokes it.  Async events (WIFI_EVENT / IP_EVENT) update state and,
  * when a reconnect is needed, re-add the task node with an exponential
  * back-off delay.
- *
- * System-wide singletons (nvs_flash_init, esp_netif_init,
- * esp_event_loop_create_default) are owned by app_init() — not here.
  */
 
 #include "nac.h"
