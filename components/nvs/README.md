@@ -37,6 +37,7 @@ The wrapper currently supports:
 
 It also supports:
 
+- `rm_nvs_key_exists()`
 - `rm_nvs_erase_key()`
 - `rm_nvs_self_test()`
 

@@ -465,6 +465,36 @@ esp_err_t rm_nvs_get_blob(const char* key, void* buffer, size_t* length) {
     return rv;
 }
 
+esp_err_t rm_nvs_key_exists(const char* key, bool* out_exists) {
+    esp_err_t rv;
+    nvs_handle_t handle;
+
+    if ((key == NULL) || (out_exists == NULL)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *out_exists = false;
+
+    rv = rm_nvs_open(NVS_READONLY, &handle);
+    if (rv != ESP_OK) {
+        return rv;
+    }
+
+    rv = nvs_find_key(handle, key, NULL);
+    nvs_close(handle);
+
+    if (rv == ESP_ERR_NVS_NOT_FOUND) {
+        return ESP_OK;
+    }
+
+    if (rv != ESP_OK) {
+        return rv;
+    }
+
+    *out_exists = true;
+    return ESP_OK;
+}
+
 esp_err_t rm_nvs_erase_key(const char* key) {
     esp_err_t rv;
     nvs_handle_t handle;
@@ -502,6 +532,7 @@ esp_err_t rm_nvs_self_test(void) {
     rm_nvs_test_blob_t blob_in = {0x12345678u, -123, "redmole"};
     rm_nvs_test_blob_t blob_out = {0};
     size_t blob_len = sizeof(blob_out);
+    bool key_exists = false;
 
     ESP_LOGI(TAG, "Starting NVS self-test");
 
@@ -627,10 +658,24 @@ esp_err_t rm_nvs_self_test(void) {
         return (rv != ESP_OK) ? rv : ESP_FAIL;
     }
 
+    rv = rm_nvs_key_exists("test_u8", &key_exists);
+    if ((rv != ESP_OK) || (!key_exists)) {
+        ESP_LOGE(TAG, "rm_nvs_key_exists failed before erase: %s",
+                 esp_err_to_name((rv != ESP_OK) ? rv : ESP_FAIL));
+        return (rv != ESP_OK) ? rv : ESP_FAIL;
+    }
+
     rv = rm_nvs_erase_key("test_u8");
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "rm_nvs_erase_key failed: %s", esp_err_to_name(rv));
         return rv;
+    }
+
+    rv = rm_nvs_key_exists("test_u8", &key_exists);
+    if ((rv != ESP_OK) || key_exists) {
+        ESP_LOGE(TAG, "rm_nvs_key_exists failed after erase: %s",
+                 esp_err_to_name((rv != ESP_OK) ? rv : ESP_FAIL));
+        return (rv != ESP_OK) ? rv : ESP_FAIL;
     }
 
     rv = rm_nvs_get_u8("test_u8", &u8_value);

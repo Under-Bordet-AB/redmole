@@ -17,6 +17,7 @@
  */
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
 
@@ -85,6 +86,16 @@ esp_err_t rm_nvs_get_str(const char* key, char* buffer, size_t* length);
  */
 esp_err_t rm_nvs_set_blob(const char* key, const void* value, size_t length);
 esp_err_t rm_nvs_get_blob(const char* key, void* buffer, size_t* length);
+
+/**
+ * @brief Check if a key exists in the default namespace.
+ *
+ * @param key NVS key to look up.
+ * @param out_exists Set to true when the key exists, otherwise false.
+ *
+ * @return ESP_OK on success, otherwise an ESP-IDF error code.
+ */
+esp_err_t rm_nvs_key_exists(const char* key, bool* out_exists);
 
 /**
  * @brief Erase a single key from the default namespace.
