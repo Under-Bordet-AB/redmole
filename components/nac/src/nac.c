@@ -1,22 +1,9 @@
 /* NAC - Network and Communications
  * Handles WiFi and Bluetooth.
  *
- * Architecture note
- * -----------------
- * Follows the single-instance module pattern used by rm_nvs and sensor_data.
- * All state lives in the static s_nac struct. Public functions take no context
- * pointer — they route directly into s_nac.
- *
- * The GUI layer calls only the nac_* API. It never touches wifi_ctx_t.
- *
  * The WiFi state machine lives entirely in wifi_connect(), the single
  * task_scheduler callback for all WiFi work. Async events (WIFI_EVENT /
  * IP_EVENT) update state and re-add the task node when more work is needed.
- *
- * Prerequisites owned by main.c (not this module):
- *   rm_nvs_init()
- *   esp_netif_init()
- *   esp_event_loop_create_default()
  */
 
 #include "nac.h"
@@ -73,10 +60,6 @@
     #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA2_PSK
 #endif
 
-/* ------------------------------------------------------------------ */
-/*  Module-internal state — never exposed outside this file           */
-/* ------------------------------------------------------------------ */
-
 typedef struct
 {
     wifi_ctx_t      wifi;
@@ -85,9 +68,7 @@ typedef struct
 
 static nac_ctx_t s_nac;
 
-/* ------------------------------------------------------------------ */
-/*  Internal forward declarations                                       */
-/* ------------------------------------------------------------------ */
+/*  Internal forward declarations */
 
 static void   wifi_event_handler(void *arg, esp_event_base_t event_base,
                                   int32_t event_id, void *event_data);
@@ -102,9 +83,7 @@ task_status_t wifi_connect(task_node_t *node);
 static int8_t bluetooth_init(bluetooth_ctx_t *self);
 static void   bluetooth_dispose(bluetooth_ctx_t *self);
 
-/* ================================================================== */
-/*  Public API — singleton wrappers                                    */
-/* ================================================================== */
+/*  Public API */
 
 esp_err_t nac_init(void)
 {
@@ -203,19 +182,18 @@ bool nac_scan_is_complete(void)
     return s_nac.wifi.scan_complete != 0;
 }
 
-/* ================================================================== */
-/*  WiFi — internal implementation                                     */
-/* ================================================================== */
+/*  WiFi — internal implementation */
 
 /**
  * @brief Initialises the WiFi interface.
  * @note  Initialization order and ownership:
  *   1. [SYSTEM] nvs_flash_init()           rm_nvs_init() in main.c
- *   2. [STACK]  esp_netif_init()           main.c
- *   3. [SYSTEM] esp_event_loop_...()       main.c
+ *   2. [STACK]  esp_netif_init()           nac_init()
+ *   3. [SYSTEM] esp_event_loop_...()       nac_init()
  *   4. [BIND]   esp_netif_create_...()     here  — glue between LwIP and WiFi driver
  *   5. [HAL]    esp_wifi_init()            wifi_bring_hw_online()
  *   6. [RADIO]  esp_wifi_start()           wifi_connect()
+ * @return 0 on success, -1 on failure
  */
 static int8_t wifi_init(wifi_ctx_t *self)
 {
@@ -280,6 +258,7 @@ static void wifi_dispose(wifi_ctx_t *self)
 /**
  * @brief Initialises the WiFi driver, registers event handlers, sets STA mode.
  * @note  esp_wifi_start() is left to wifi_connect() — the scheduler controls timing.
+ * @return 0 on success, -1 on failure
  */
 static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
 {
@@ -325,6 +304,7 @@ static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
 
 /**
  * @brief Tears down the WiFi driver. Safe to call when already offline.
+ * @return 0 on success, -1 on failure
  */
 static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
 {
@@ -391,7 +371,7 @@ task_status_t wifi_connect(task_node_t *task_node)
 
     switch (self->state)
     {
-        /* ---- Initial connect or scheduled reconnect ---- */
+        /*  Initial connect or scheduled reconnect */
         case WIFI_STATE_IDLE:
         case WIFI_STATE_RECONNECT:
         {
@@ -477,7 +457,7 @@ task_status_t wifi_connect(task_node_t *task_node)
                 return TASK_ERROR;
             }
 
-            /* Disable modem sleep — avoids latency spikes on the 7" display */
+            /* Disable modem sleep avoids latency spikes on the 7" display */
             esp_wifi_set_ps(WIFI_PS_NONE);
 
             return TASK_DONE;
@@ -660,9 +640,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-/* ================================================================== */
-/*  Bluetooth                                                           */
-/* ================================================================== */
+/*  Bluetooth */
 
 static int8_t bluetooth_init(bluetooth_ctx_t *self)
 {
