@@ -85,8 +85,11 @@ static void   wifi_scan_done(wifi_ctx_t *self);
  * @brief Initializes the NAC context (wifi and bluetooth).
  * @return A pointer to the initialized NAC context, or NULL on failure.
  */
-nac_ctx_t *nac_init(void)
+esp_err_t nac_init(void)
 {
+    /* Init TCP/IP stack and esp_event_loop for WIFI and Bluetooth events */
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
     nac_ctx_t *self = (nac_ctx_t *)malloc(sizeof(nac_ctx_t));
     if (!self)
     {
@@ -110,7 +113,7 @@ nac_ctx_t *nac_init(void)
         return NULL;
     }
 
-    return self;
+    return 0;
 }
 
 /**
@@ -238,6 +241,7 @@ int8_t wifi_init(wifi_ctx_t *self)
 {
     if (!self) return -1;
 
+    /* Create the default WiFi STA netif. */
     self->netif = esp_netif_create_default_wifi_sta();
     if (!self->netif)
     {

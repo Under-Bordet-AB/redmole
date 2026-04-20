@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "esp_err.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "nvs.h"
@@ -87,7 +88,7 @@ task_status_t wifi_connect(task_node_t *node);
 int8_t bluetooth_init(bluetooth_ctx_t *self);
 void   bluetooth_dispose(bluetooth_ctx_t *self);
 
-nac_ctx_t *nac_init(void);
+esp_err_t nac_init(void);
 void       nac_dispose(nac_ctx_t *self);
 nac_wifi_status_t nac_get_wifi_status(const nac_ctx_t *self);
 int8_t nac_request_wifi_connect(nac_ctx_t *self);

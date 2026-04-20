@@ -7,6 +7,7 @@
 
 #include "bme280_hal.h"
 #include "gui_module.h"
+#include "nac.h"
 #include "rm_event_notify.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
@@ -21,6 +22,11 @@ static esp_err_t init_single_instance_modules(void) {
     esp_err_t rv = rm_nvs_init("app");
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "rm_nvs_init failed: %s", esp_err_to_name(rv));
+        return rv;
+    }
+
+    if (nac_init() != ESP_OK) {
+        ESP_LOGE(TAG, "nac_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
@@ -133,17 +139,6 @@ void app_main(void) {
     }
 
     ESP_LOGI(TAG, "Skipping WiFi startup.");
-    /*
-    app_ctx_t *app_ctx = app_init();
-    if (!app_ctx) {
-        esp_restart();
-    }
-
-    BaseType_t wifi = xTaskCreate(wifi_task, "wifi_task", 4096, &app_ctx->wifi, 5, NULL);
-    if (wifi != pdPASS) {
-        ESP_LOGE(TAG, "Could not spawn wifi_task!");
-    }
-    */
 
     if (start_runtime_modules(&expected_ready_bits) != ESP_OK) {
         goto fatal_error;
