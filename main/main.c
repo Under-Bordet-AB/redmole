@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -163,7 +164,6 @@ void app_main(void) {
     /* Pump the task scheduler to start tasks, needed to connect wifi in this mock code
      * GUI would trigger scheduler work in real project
     */
-    task_scheduler_work();
 
     /*if (!rm_event_notify_wait_all(expected_ready_bits, pdMS_TO_TICKS(5000))) {
         ESP_LOGE(TAG, "Not all tasks reached startup gate");
@@ -174,8 +174,12 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to release startup gate");
         goto fatal_error;
     }*/
-
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP_LOGI(TAG, "Startup complete");
+    while (1) {
+        task_scheduler_work();
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
     return;
 
 fatal_error:
