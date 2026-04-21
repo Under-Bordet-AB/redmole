@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "app_gui_bindings.h"
 #include "task_scheduler.h"
 #include "bme280_hal.h"
 #include "gui_module.h"
@@ -14,6 +15,7 @@
 
 static const char* TAG = "MAIN";
 static bme280_hal s_sensor_hal = {0};
+static gui_ctx_t s_gui = {0};
 
 static esp_err_t init_single_instance_modules(void) {
     esp_err_t rv = rm_nvs_init("app");
@@ -48,9 +50,11 @@ static esp_err_t init_runtime_modules(void) {
         return rv;
     }
 
-    rv = gui_init();
+    gui_init(&s_gui);
+    rv = app_gui_bindings_init(&s_gui);
     if (rv != ESP_OK) {
-        ESP_LOGW(TAG, "gui_init failed, continuing without GUI: %s", esp_err_to_name(rv));
+        ESP_LOGE(TAG, "app_gui_bindings_init failed: %s", esp_err_to_name(rv));
+        return rv;
     }
 
     return ESP_OK;
@@ -111,14 +115,8 @@ static esp_err_t start_runtime_modules() {
     }
     ESP_LOGI(TAG, "sensor_local_source_task started");
 
-    if (gui_is_ready()) {
-        if (gui_start() != ESP_OK) {
-            ESP_LOGE(TAG, "gui_start failed");
-            return ESP_FAIL;
-        }
-        ESP_LOGI(TAG, "gui_task started");
-    } else {
-        ESP_LOGW(TAG, "GUI not ready, skipping gui_task startup");
+    if (!s_gui.is_ready) {
+        ESP_LOGW(TAG, "GUI not ready after initialization");
     }
 
     return ESP_OK;
@@ -148,6 +146,7 @@ void app_main(void) {
      * GUI would trigger scheduler work in real project
      */
     while (1) {
+        app_gui_bindings_sync(&s_gui);
         task_scheduler_work();
         vTaskDelay(pdMS_TO_TICKS(100));
     }

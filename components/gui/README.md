@@ -1,59 +1,53 @@
 # GUI Module
 
-Temporary LVGL screen module for the Waveshare `ESP32-S3-LCD-7B` board.
+LVGL-based GUI module for the Waveshare `ESP32-S3-LCD-7B` board.
 
-## Current Role
+## Current Layout
 
-The GUI module:
+The GUI component is now organized under `components/gui/src` as:
 
-- initializes the board RGB LCD with the current Waveshare timing and pin map
-- enables the LCD backlight through the board I2C IO expander
-- starts LVGL on the LCD
-- reads the latest local `sensor_data` snapshot
-- renders temperature, humidity, pressure, and freshness/update count
+- `module/`: module lifecycle, LVGL/event wiring, and platform integration
+- `control/`: GUI control state and view-model building
+- `view/`: top-level view composition, shared UI helpers, and panel-specific visuals under `view/panels/`
+- `gui_defs.h`: shared internal GUI definitions
 
-This module is a display consumer only.
-It does not talk to the BME280 directly.
+See `components/gui/src/README.md` for the internal ownership rules and file breakdown.
 
-## Ownership Model
+## Current Screen
 
-`gui` is currently a single-instance module.
+The active screen contains:
 
-The public API is:
+- a vertical navigation bar on the left
+- a `BME280` panel showing temperature, humidity, and pressure
+- a `Settings` panel placeholder
 
-- `gui_init()`
-- `gui_start()`
-- `gui_is_ready()`
-- `gui_deinit()`
+If no live `sensor_data` snapshot is available yet, the BME280 panel waits for the first published reading instead of generating placeholder measurements.
 
-All GUI runtime state is owned privately inside the module.
-`main.c` does not own a GUI context object.
+## Public API
 
-## Data Source
+The public header is `include/gui_module.h`.
 
-Current active path:
+Current API:
 
-`selected BME280 HAL backend -> bme280_hal -> sensor_data -> gui`
+- `gui_init(gui_ctx_t *self)`
+- `gui_run(gui_ctx_t *self)`
+- `gui_deinit(gui_ctx_t *self)`
 
-The GUI reads from `sensor_data`.
-It does not own sensor state and it does not keep borrowed pointers into sensor storage.
+The module is still effectively single-instance. `gui_ctx_t` carries readiness state plus internal module-owned storage.
 
-## Backend Switching
+The public API also exposes callback bindings plus setters/getters for GUI-owned Wi-Fi state.
 
-The app always calls `bme280_hal_read()`.
+## Data Flow
 
-Which values appear on screen depends on the selected HAL backend:
+Current data path:
 
-- sim backend: GUI shows simulated values
-- hardware backend: GUI shows real values once the hardware backend is implemented
+`selected BME280 HAL backend -> bme280_hal -> sensor_data -> gui_control -> gui_view`
 
-Compile-time selection is in:
-
-`idf.py menuconfig -> RedMole Sensor Configuration -> BME280 HAL backend`
+The GUI does not talk to the BME280 directly. At the moment the BME280 values are intentionally left at zero until a real GUI-side sensor integration path is wired in.
 
 ## Measurement Format
 
-The GUI renders scaled integer values from `sensor_data`:
+Rendered values use the scaled integers published by `sensor_data`:
 
 - temperature: deci-C
 - humidity: deci-percent
@@ -62,15 +56,3 @@ The GUI renders scaled integer values from `sensor_data`:
 Example:
 
 - `112` is rendered as `11.2 C`
-
-## Current Limits
-
-This module still mixes several layers for bring-up convenience:
-
-- board pin/timing setup
-- LCD panel setup
-- LVGL integration
-- screen creation
-- label formatting
-
-That is acceptable for current bring-up, but later it should be split more cleanly.
