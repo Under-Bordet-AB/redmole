@@ -9,7 +9,6 @@
 #include "bme280_hal.h"
 #include "gui_module.h"
 #include "nac.h"
-#include "rm_event_notify.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
 
@@ -39,12 +38,6 @@ static esp_err_t init_single_instance_modules(void) {
         return rv;
     }
 
-    rv = rm_event_notify_init();
-    if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "rm_event_notify_init failed: %s", esp_err_to_name(rv));
-        return rv;
-    }
-
     return ESP_OK;
 }
 
@@ -69,9 +62,6 @@ static void sensor_local_source_task(void* pvParameters) {
     uint32_t period_ms = 1000U;
 
     (void)pvParameters;
-
-    ESP_ERROR_CHECK(rm_event_notify_signal(RM_EVENT_NOTIFY_BIT_SENSOR_READY));
-    rm_event_notify_wait(RM_EVENT_NOTIFY_BIT_INIT_DONE);
 
     period_ms = bme280_hal_get_period_ms(&s_sensor_hal);
     if (period_ms == 0U) {
@@ -99,23 +89,18 @@ static void sensor_local_source_task(void* pvParameters) {
     }
 }
 
-static esp_err_t start_runtime_modules(/*EventBits_t* out_expected_ready_bits*/) {
-    //EventBits_t expected_ready_bits = 0;
+static esp_err_t start_runtime_modules() {
 
     if (task_scheduler_init() != ESP_OK) {
         ESP_LOGE(TAG, "task_scheduler_init failed");
         return ESP_FAIL;
     }
-
-    //expected_ready_bits |= RM_EVENT_NOTIFY_BIT_SCHEDULER_READY;
     ESP_LOGI(TAG, "task_scheduler_init started");
 
     if(nac_request_wifi_connect() != ESP_OK) {
         ESP_LOGE(TAG, "nac_request_wifi_connect failed");
         return ESP_FAIL;
     }
-
-    //expected_ready_bits |= RM_EVENT_NOTIFY_BIT_NAC_READY;
     ESP_LOGI(TAG, "nac_request_wifi_connect started");
 
     BaseType_t sensor =
@@ -124,8 +109,6 @@ static esp_err_t start_runtime_modules(/*EventBits_t* out_expected_ready_bits*/)
         ESP_LOGE(TAG, "Could not spawn sensor_local_source_task!");
         return ESP_FAIL;
     }
-
-    //expected_ready_bits |= RM_EVENT_NOTIFY_BIT_SENSOR_READY;
     ESP_LOGI(TAG, "sensor_local_source_task started");
 
     if (gui_is_ready()) {
@@ -133,18 +116,15 @@ static esp_err_t start_runtime_modules(/*EventBits_t* out_expected_ready_bits*/)
             ESP_LOGE(TAG, "gui_start failed");
             return ESP_FAIL;
         }
-        //expected_ready_bits |= RM_EVENT_NOTIFY_BIT_GUI_READY;
         ESP_LOGI(TAG, "gui_task started");
     } else {
         ESP_LOGW(TAG, "GUI not ready, skipping gui_task startup");
     }
 
-    //*out_expected_ready_bits = expected_ready_bits;
     return ESP_OK;
 }
 
 void app_main(void) {
-    //EventBits_t expected_ready_bits = 0;
 
     ESP_LOGI(TAG, "app_main entered");
     ESP_LOGI(TAG, "Initializing single-instance modules");
@@ -157,19 +137,10 @@ void app_main(void) {
         goto fatal_error;
     }
 
-    if (start_runtime_modules(/*&expected_ready_bits*/) != ESP_OK) {
+    if (start_runtime_modules() != ESP_OK) {
         goto fatal_error;
     }
 
-    /*if (!rm_event_notify_wait_all(expected_ready_bits, pdMS_TO_TICKS(5000))) {
-        ESP_LOGE(TAG, "Not all tasks reached startup gate");
-        goto fatal_error;
-    }*/
-
-    /*if (rm_event_notify_signal(RM_EVENT_NOTIFY_BIT_INIT_DONE) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to release startup gate");
-        goto fatal_error;
-    }*/
     vTaskDelay(pdMS_TO_TICKS(5000));
     ESP_LOGI(TAG, "Startup complete");
 

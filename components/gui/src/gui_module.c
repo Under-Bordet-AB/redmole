@@ -16,14 +16,14 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "lvgl.h"
-#include "rm_event_notify.h"
 #include "sensor_data.h"
 
 static const char* TAG = "GUI";
 
 #define GUI_LCD_H_RES 1024
 #define GUI_LCD_V_RES 600
-#define GUI_LCD_PIXEL_CLOCK_HZ 30850000UL
+//#define GUI_LCD_PIXEL_CLOCK_HZ 30850000UL
+#define GUI_LCD_PIXEL_CLOCK_HZ 24000000UL
 #define GUI_LCD_DATA_WIDTH 16
 #define GUI_LCD_NUM_FRAME_BUFFERS 2
 #define GUI_LCD_BOUNCE_BUFFER_SIZE_PX (GUI_LCD_H_RES * 10)
@@ -32,7 +32,8 @@ static const char* TAG = "GUI";
 #define GUI_LVGL_TASK_MIN_DELAY_MS 1
 #define GUI_LABEL_UPDATE_PERIOD_MS 500
 #define GUI_I2C_TIMEOUT_MS 100
-#define GUI_TASK_STACK_SIZE 8192
+//#define GUI_TASK_STACK_SIZE 8192
+#define GUI_TASK_STACK_SIZE 10240
 #define GUI_TASK_PRIORITY 4
 
 #define GUI_I2C_SDA_GPIO GPIO_NUM_8
@@ -363,14 +364,6 @@ static esp_err_t gui_build_screen(void) {
 
 static void gui_task(void* pvParameters) {
     (void)pvParameters;
-
-    if (rm_event_notify_signal(RM_EVENT_NOTIFY_BIT_GUI_READY) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to signal GUI ready");
-        vTaskDelete(NULL);
-        return;
-    }
-
-    rm_event_notify_wait(RM_EVENT_NOTIFY_BIT_INIT_DONE);
 
     while (true) {
         uint32_t delay_ms = lv_timer_handler();
