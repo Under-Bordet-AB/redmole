@@ -1,6 +1,18 @@
 #include "gui_view_energy_panel.h"
 
+#include <string.h>
+
 #include "../gui_view_common.h"
+
+static bool gui_view_energy_plan_changed(gui_view_t *view, const gui_energy_plan_t *energy_plan)
+{
+    if ((view == NULL) || (energy_plan == NULL)) {
+        return false;
+    }
+
+    return !view->has_last_energy_plan ||
+           (memcmp(&view->last_energy_plan, energy_plan, sizeof(*energy_plan)) != 0);
+}
 
 void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
 {
@@ -102,6 +114,10 @@ void gui_view_apply_energy_panel(gui_view_t *view, const gui_view_model_t *model
         return;
     }
 
+    if (!gui_view_energy_plan_changed(view, &model->energy_plan)) {
+        return;
+    }
+
     gui_view_apply_energy_series(view->energy_plan_chart, view->buy_series,
                                  model->energy_plan.buy_electricity);
     gui_view_apply_energy_series(view->energy_plan_chart, view->solar_series,
@@ -111,4 +127,6 @@ void gui_view_apply_energy_panel(gui_view_t *view, const gui_view_model_t *model
     gui_view_apply_energy_series(view->energy_plan_chart, view->sell_series,
                                  model->energy_plan.sell_excess);
     lv_chart_refresh(view->energy_plan_chart);
+    view->last_energy_plan = model->energy_plan;
+    view->has_last_energy_plan = true;
 }

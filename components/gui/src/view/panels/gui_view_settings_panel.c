@@ -1,8 +1,62 @@
 #include "gui_view_settings_panel.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "../gui_view_common.h"
+
+static bool gui_view_wifi_network_equals(const gui_wifi_network_t *left,
+                                         const gui_wifi_network_t *right)
+{
+    if ((left == NULL) || (right == NULL)) {
+        return false;
+    }
+
+    return (strcmp(left->ssid, right->ssid) == 0) &&
+           (left->signal_strength_pct == right->signal_strength_pct) &&
+           (left->secured == right->secured);
+}
+
+static bool gui_view_wifi_settings_changed(gui_view_t *view, const gui_wifi_settings_t *wifi)
+{
+    const gui_wifi_settings_t *last_wifi;
+    uint8_t index;
+
+    if ((view == NULL) || (wifi == NULL)) {
+        return false;
+    }
+
+    if (!view->has_last_wifi_settings) {
+        return true;
+    }
+
+    last_wifi = &view->last_wifi_settings;
+    if ((last_wifi->network_count != wifi->network_count) ||
+        (last_wifi->known_network_count != wifi->known_network_count) ||
+        (last_wifi->selected_network_index != wifi->selected_network_index) ||
+        (last_wifi->selected_known_network_index != wifi->selected_known_network_index) ||
+        (last_wifi->state != wifi->state) ||
+        (strcmp(last_wifi->selected_ssid, wifi->selected_ssid) != 0) ||
+        (strcmp(last_wifi->password, wifi->password) != 0) ||
+        (strcmp(last_wifi->status_text, wifi->status_text) != 0)) {
+        return true;
+    }
+
+    for (index = 0; index < GUI_WIFI_NETWORK_COUNT; index++) {
+        if (!gui_view_wifi_network_equals(&last_wifi->networks[index], &wifi->networks[index])) {
+            return true;
+        }
+    }
+
+    for (index = 0; index < GUI_WIFI_KNOWN_NETWORK_COUNT; index++) {
+        if (!gui_view_wifi_network_equals(&last_wifi->known_networks[index],
+                                          &wifi->known_networks[index])) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 static lv_obj_t *gui_view_create_settings_card(lv_obj_t *parent, const char *title_text,
                                                const char *subtitle_text, lv_coord_t height)
@@ -318,6 +372,10 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
         return;
     }
 
+    if (!gui_view_wifi_settings_changed(view, &model->wifi)) {
+        return;
+    }
+
     gui_view_set_label_text_if_changed(view->wifi_status_label, "");
     if (model->wifi.selected_ssid[0] != '\0') {
         gui_view_set_label_text_if_changed(view->password_dialog_network_label,
@@ -376,4 +434,7 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
             lv_obj_add_flag(view->network_dialog_buttons[network_index], LV_OBJ_FLAG_HIDDEN);
         }
     }
+
+    view->last_wifi_settings = model->wifi;
+    view->has_last_wifi_settings = true;
 }

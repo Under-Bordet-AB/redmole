@@ -44,6 +44,10 @@ typedef struct {
     lv_chart_series_t *sell_series;
     gui_panel_id_t last_active_panel;
     bool has_last_active_panel;
+    gui_energy_plan_t last_energy_plan;
+    bool has_last_energy_plan;
+    gui_wifi_settings_t last_wifi_settings;
+    bool has_last_wifi_settings;
 } gui_view_t;
 
 void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_t nav_event_cb,
