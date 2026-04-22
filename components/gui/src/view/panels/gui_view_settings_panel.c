@@ -195,9 +195,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_t *settings_grid;
     lv_obj_t *connectivity_card;
     lv_obj_t *connectivity_stack;
-    lv_obj_t *future_card;
+    lv_obj_t *other_settings_card;
+    lv_obj_t *other_settings_stack;
     lv_obj_t *wifi_card;
     lv_obj_t *bluetooth_card;
+    lv_obj_t *brightness_card;
     lv_obj_t *bluetooth_status;
     lv_obj_t *settings_text;
     lv_obj_t *dialog_title;
@@ -246,10 +248,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_grid_cell(connectivity_card, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0,
                          1);
 
-    future_card = gui_view_create_settings_card(settings_grid, "Other settings",
-                                                "Room for display, account, or automation controls.",
-                                                LV_PCT(100));
-    lv_obj_set_grid_cell(future_card, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+    other_settings_card = gui_view_create_settings_card(
+        settings_grid, "Other settings",
+        "Display and system controls that affect the overall device experience.", LV_PCT(100));
+    lv_obj_set_grid_cell(other_settings_card, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH,
+                         0, 1);
 
     connectivity_stack = lv_obj_create(connectivity_card);
     lv_obj_set_size(connectivity_stack, LV_PCT(100), 296);
@@ -280,6 +283,46 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_label_set_text(bluetooth_status, "Coming later.");
     lv_obj_set_style_text_color(bluetooth_status, lv_color_hex(0x4A5C78), 0);
     lv_obj_align(bluetooth_status, LV_ALIGN_TOP_LEFT, 0, 66);
+
+    other_settings_stack = lv_obj_create(other_settings_card);
+    lv_obj_set_size(other_settings_stack, LV_PCT(100), 296);
+    lv_obj_align(other_settings_stack, LV_ALIGN_TOP_LEFT, 0, 68);
+    lv_obj_set_layout(other_settings_stack, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(other_settings_stack, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(other_settings_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(other_settings_stack, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(other_settings_stack, 0, 0);
+    lv_obj_set_style_shadow_width(other_settings_stack, 0, 0);
+    lv_obj_set_style_pad_all(other_settings_stack, 0, 0);
+    lv_obj_set_style_pad_row(other_settings_stack, 12, 0);
+    lv_obj_clear_flag(other_settings_stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    brightness_card = gui_view_create_setting_item_card(
+        other_settings_stack, "Screen brightness",
+        "Adjust the display backlight level for readability and power use.", 140);
+
+    view->brightness_value_label = lv_label_create(brightness_card);
+    lv_label_set_text(view->brightness_value_label, "82%");
+    lv_obj_set_style_text_color(view->brightness_value_label, lv_color_hex(0x1D4ED8), 0);
+    lv_obj_set_style_text_font(view->brightness_value_label, &lv_font_montserrat_20, 0);
+    lv_obj_align(view->brightness_value_label, LV_ALIGN_TOP_RIGHT, 0, -2);
+
+    view->brightness_slider = lv_slider_create(brightness_card);
+    lv_obj_set_size(view->brightness_slider, LV_PCT(100), 18);
+    lv_obj_align(view->brightness_slider, LV_ALIGN_TOP_LEFT, 0, 78);
+    lv_slider_set_range(view->brightness_slider, 5, 100);
+    lv_obj_add_event_cb(view->brightness_slider, settings_event_cb, LV_EVENT_VALUE_CHANGED,
+                        event_user_data);
+    lv_obj_set_style_bg_color(view->brightness_slider, lv_color_hex(0xD9E3F1), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(view->brightness_slider, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(view->brightness_slider, lv_color_hex(0x1D4ED8), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(view->brightness_slider, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(view->brightness_slider, lv_color_hex(0xFFFFFF), LV_PART_KNOB);
+    lv_obj_set_style_bg_opa(view->brightness_slider, LV_OPA_COVER, LV_PART_KNOB);
+    lv_obj_set_style_border_width(view->brightness_slider, 2, LV_PART_KNOB);
+    lv_obj_set_style_border_color(view->brightness_slider, lv_color_hex(0x1D4ED8), LV_PART_KNOB);
+    lv_obj_set_style_pad_all(view->brightness_slider, 4, LV_PART_KNOB);
 
     view->dialog_scrim = NULL;
 
@@ -363,13 +406,15 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
                         event_user_data);
 
     view->wifi_keyboard = lv_keyboard_create(view->password_dialog);
-    lv_obj_set_size(view->wifi_keyboard, 662, 252);
+    lv_obj_set_size(view->wifi_keyboard, LV_PCT(100), 292);
     lv_obj_align(view->wifi_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_radius(view->wifi_keyboard, 18, 0);
+    lv_obj_set_style_bg_color(view->wifi_keyboard, lv_color_hex(0xE7EDF5), 0);
+    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER, 0);
     lv_obj_set_style_shadow_width(view->wifi_keyboard, 0, 0);
     lv_obj_set_style_border_width(view->wifi_keyboard, 1, 0);
     lv_obj_set_style_border_color(view->wifi_keyboard, lv_color_hex(0xD7E1EE), 0);
-    lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_14, LV_PART_ITEMS);
+    lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_20, LV_PART_ITEMS);
 
     view->password_dialog_cancel_button = gui_view_create_action_button(
         view->password_dialog, 426, 146, 128, "Back", LV_EVENT_CLICKED, settings_event_cb,

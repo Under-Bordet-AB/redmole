@@ -25,12 +25,13 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     }
 
     view->energy_plan_panel = lv_obj_create(content);
-    lv_obj_set_size(view->energy_plan_panel, 718, 398);
+    lv_obj_set_size(view->energy_plan_panel, 746, 378);
     lv_obj_align(view->energy_plan_panel, LV_ALIGN_BOTTOM_MID, 0, -24);
     lv_obj_set_style_radius(view->energy_plan_panel, 26, 0);
-    lv_obj_set_style_bg_color(view->energy_plan_panel, lv_color_hex(0xF4F8FD), 0);
+    lv_obj_set_style_bg_color(view->energy_plan_panel, lv_color_hex(0xF8FBFF), 0);
     lv_obj_set_style_bg_opa(view->energy_plan_panel, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(view->energy_plan_panel, 0, 0);
+    lv_obj_set_style_border_width(view->energy_plan_panel, 1, 0);
+    lv_obj_set_style_border_color(view->energy_plan_panel, lv_color_hex(0xD9E3F1), 0);
     lv_obj_clear_flag(view->energy_plan_panel, LV_OBJ_FLAG_SCROLLABLE);
 
     // energy_caption = lv_label_create(view->energy_plan_panel);
@@ -76,7 +77,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
 
     time_row = lv_obj_create(view->energy_plan_panel);
     lv_obj_set_size(time_row, 662, 26);
-    lv_obj_align(time_row, LV_ALIGN_BOTTOM_MID, 0, -18);
+    lv_obj_align(time_row, LV_ALIGN_BOTTOM_MID, 0, -14);
     lv_obj_set_style_bg_opa(time_row, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(time_row, 0, 0);
     lv_obj_set_style_pad_all(time_row, 0, 0);

@@ -20,6 +20,8 @@ typedef struct {
     lv_obj_t *settings_panel;
     lv_obj_t *settings_home_panel;
     lv_obj_t *scan_button;
+    lv_obj_t *brightness_slider;
+    lv_obj_t *brightness_value_label;
     lv_obj_t *wifi_status_label;
     lv_obj_t *wifi_selected_label;
     lv_obj_t *dialog_scrim;

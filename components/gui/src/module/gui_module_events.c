@@ -1,5 +1,6 @@
 #include "gui_module_internal.h"
 
+#include <stdio.h>
 #include <string.h>
 
 static void gui_module_notify_panel_changed(gui_module_runtime_t *runtime, gui_panel_id_t panel)
@@ -98,6 +99,7 @@ void gui_module_event_settings_cb(lv_event_t *event)
     gui_module_runtime_t *runtime;
     lv_event_code_t event_code;
     lv_obj_t *target;
+    char brightness_text[8];
     int8_t known_network_index;
     uint8_t network_index;
 
@@ -108,6 +110,18 @@ void gui_module_event_settings_cb(lv_event_t *event)
 
     event_code = lv_event_get_code(event);
     target = lv_event_get_target(event);
+
+    if ((target == runtime->view.brightness_slider) && (event_code == LV_EVENT_VALUE_CHANGED)) {
+        int32_t brightness_percent = lv_slider_get_value(runtime->view.brightness_slider);
+
+        gui_module_apply_brightness(brightness_percent);
+        if (runtime->view.brightness_value_label != NULL) {
+            snprintf(brightness_text, sizeof(brightness_text), "%ld%%",
+                     (long)brightness_percent);
+            lv_label_set_text(runtime->view.brightness_value_label, brightness_text);
+        }
+        return;
+    }
 
     if (target == runtime->view.wifi_password_textarea) {
         if ((event_code == LV_EVENT_PRESSED) || (event_code == LV_EVENT_CLICKED) ||
