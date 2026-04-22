@@ -152,6 +152,56 @@ static void gui_view_style_nav_button(lv_obj_t *button, gui_view_theme_t theme, 
     lv_obj_set_style_text_color(button, text_color, 0);
 }
 
+static void gui_view_style_action_button(lv_obj_t *button, gui_view_theme_t theme,
+                                         bool is_primary)
+{
+    lv_color_t bg_color;
+    lv_color_t text_color;
+    lv_color_t border_color;
+
+    if (button == NULL) {
+        return;
+    }
+
+    if (theme == GUI_VIEW_THEME_DARK) {
+        if (is_primary) {
+            bg_color = lv_color_hex(0x2563EB);
+            text_color = lv_color_hex(0xF8FAFC);
+            border_color = lv_color_hex(0x60A5FA);
+        } else {
+            bg_color = lv_color_hex(0x172033);
+            text_color = lv_color_hex(0xD7E3F4);
+            border_color = lv_color_hex(0x475569);
+        }
+    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+        if (is_primary) {
+            bg_color = lv_color_hex(0xFB7185);
+            text_color = lv_color_hex(0xFFFDFE);
+            border_color = lv_color_hex(0xF472B6);
+        } else {
+            bg_color = lv_color_hex(0xFFF0F6);
+            text_color = lv_color_hex(0x8A1D47);
+            border_color = lv_color_hex(0xF4A3BE);
+        }
+    } else {
+        if (is_primary) {
+            bg_color = lv_color_hex(0x1D4ED8);
+            text_color = lv_color_hex(0xFFFFFF);
+            border_color = lv_color_hex(0x1D4ED8);
+        } else {
+            bg_color = lv_color_hex(0xFFFFFF);
+            text_color = lv_color_hex(0x10213D);
+            border_color = lv_color_hex(0xD7E1EE);
+        }
+    }
+
+    lv_obj_set_style_bg_color(button, bg_color, 0);
+    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(button, border_color, 0);
+    lv_obj_set_style_border_width(button, is_primary ? 0 : 1, 0);
+    lv_obj_set_style_text_color(button, text_color, 0);
+}
+
 static lv_obj_t *gui_view_create_nav_button(lv_obj_t *parent, lv_coord_t y, const char *label_text,
                                             lv_event_cb_t nav_event_cb, void *nav_user_data)
 {
@@ -193,6 +243,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
     lv_color_t keyboard_border;
     lv_color_t keyboard_key_bg;
     lv_color_t keyboard_key_text;
+    lv_color_t keyboard_special_bg;
+    lv_color_t keyboard_special_text;
+    lv_color_t keyboard_special_border;
     lv_color_t slider_bg;
     lv_color_t slider_knob_bg;
     lv_color_t dropdown_bg;
@@ -232,6 +285,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
         keyboard_border = lv_color_hex(0x334155);
         keyboard_key_bg = lv_color_hex(0x334155);
         keyboard_key_text = lv_color_hex(0xF8FAFC);
+        keyboard_special_bg = lv_color_hex(0x2563EB);
+        keyboard_special_text = lv_color_hex(0xF8FAFC);
+        keyboard_special_border = lv_color_hex(0x60A5FA);
         slider_bg = lv_color_hex(0x334155);
         slider_knob_bg = lv_color_hex(0xE2E8F0);
         dropdown_bg = lv_color_hex(0x172033);
@@ -262,6 +318,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
         keyboard_border = lv_color_hex(0xF4A3BE);
         keyboard_key_bg = lv_color_hex(0xFFF5F8);
         keyboard_key_text = lv_color_hex(0x8A1D47);
+        keyboard_special_bg = lv_color_hex(0xFB7185);
+        keyboard_special_text = lv_color_hex(0xFFFDFE);
+        keyboard_special_border = lv_color_hex(0xF472B6);
         slider_bg = lv_color_hex(0xF6C1D4);
         slider_knob_bg = lv_color_hex(0xFFFFFF);
         dropdown_bg = lv_color_hex(0xFFF8FB);
@@ -292,6 +351,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
         keyboard_border = lv_color_hex(0xD7E1EE);
         keyboard_key_bg = lv_color_hex(0xFFFFFF);
         keyboard_key_text = lv_color_hex(0x10213D);
+        keyboard_special_bg = lv_color_hex(0x1D4ED8);
+        keyboard_special_text = lv_color_hex(0xFFFFFF);
+        keyboard_special_border = lv_color_hex(0x1D4ED8);
         slider_bg = lv_color_hex(0xD9E3F1);
         slider_knob_bg = lv_color_hex(0xFFFFFF);
         dropdown_bg = lv_color_hex(0xFFFFFF);
@@ -370,6 +432,11 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
         }
     }
 
+    gui_view_style_action_button(view->scan_button, theme, true);
+    gui_view_style_action_button(view->network_dialog_cancel_button, theme, false);
+    gui_view_style_action_button(view->password_dialog_cancel_button, theme, false);
+    gui_view_style_action_button(view->password_dialog_connect_button, theme, true);
+
     lv_obj_set_style_bg_color(view->network_dialog, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->network_dialog, LV_OPA_COVER, 0);
     if (view->network_dialog_title != NULL) {
@@ -405,6 +472,14 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
     lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER, LV_PART_ITEMS);
     lv_obj_set_style_border_color(view->wifi_keyboard, keyboard_border, LV_PART_ITEMS);
     lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_key_text, LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(view->wifi_keyboard, keyboard_special_bg,
+                              LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER,
+                            LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_border_color(view->wifi_keyboard, keyboard_special_border,
+                                  LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_special_text,
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
 
     if (view->has_last_active_panel) {
         gui_view_style_nav_button(view->bme280_button, view->current_theme,
