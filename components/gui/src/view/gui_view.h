@@ -8,6 +8,7 @@
 typedef enum {
     GUI_VIEW_THEME_LIGHT = 0,
     GUI_VIEW_THEME_DARK,
+    GUI_VIEW_THEME_HELLO_KITTY,
 } gui_view_theme_t;
 
 typedef struct {

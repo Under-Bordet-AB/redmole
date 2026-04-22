@@ -135,6 +135,10 @@ static void gui_view_style_nav_button(lv_obj_t *button, gui_view_theme_t theme, 
         bg_color = is_active ? lv_color_hex(0x1D4ED8) : lv_color_hex(0x0F172A);
         text_color = is_active ? lv_color_hex(0xF8FAFC) : lv_color_hex(0xCBD5E1);
         border_color = is_active ? lv_color_hex(0x60A5FA) : lv_color_hex(0x334155);
+    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+        bg_color = is_active ? lv_color_hex(0xFFE0EB) : lv_color_hex(0xFFF5F8);
+        text_color = is_active ? lv_color_hex(0x8A1D47) : lv_color_hex(0xA13A64);
+        border_color = is_active ? lv_color_hex(0xFB7185) : lv_color_hex(0xF4A3BE);
     } else {
         bg_color = is_active ? lv_color_hex(0xE8F0FF) : lv_color_hex(0x1B2437);
         text_color = is_active ? lv_color_hex(0x10213D) : lv_color_hex(0xDCE6F5);
@@ -193,6 +197,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
     lv_color_t slider_knob_bg;
     lv_color_t dropdown_bg;
     lv_color_t dropdown_border;
+    lv_color_t accent_color;
+    lv_color_t accent_soft_color;
+    lv_color_t energy_chart_bg;
     lv_obj_t *brand;
     lv_obj_t *dropdown_list;
 
@@ -229,6 +236,39 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
         slider_knob_bg = lv_color_hex(0xE2E8F0);
         dropdown_bg = lv_color_hex(0x172033);
         dropdown_border = lv_color_hex(0x475569);
+        accent_color = lv_color_hex(0x60A5FA);
+        accent_soft_color = lv_color_hex(0x93C5FD);
+        energy_chart_bg = lv_color_hex(0x0F172A);
+    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+        screen_bg = lv_color_hex(0xFFDDE8);
+        screen_grad = lv_color_hex(0xFFF7FB);
+        sidebar_bg = lv_color_hex(0xFFF0F5);
+        sidebar_grad = lv_color_hex(0xFFE3EC);
+        sidebar_shadow = lv_color_hex(0xF4A3BE);
+        brand_text = lv_color_hex(0xC2185B);
+        content_bg = lv_color_hex(0xFFFDFE);
+        content_shadow = lv_color_hex(0xF6B8CC);
+        title_text = lv_color_hex(0x8A1D47);
+        subtitle_text = lv_color_hex(0xA65374);
+        panel_bg = lv_color_hex(0xFFF5F8);
+        panel_border = lv_color_hex(0xF6BDD0);
+        card_bg = lv_color_hex(0xFFFFFF);
+        card_border = lv_color_hex(0xF7C9D8);
+        item_bg = lv_color_hex(0xFFF8FB);
+        item_border = lv_color_hex(0xF7C9D8);
+        muted_text = lv_color_hex(0xB0597E);
+        value_text = lv_color_hex(0x8A1D47);
+        keyboard_bg = lv_color_hex(0xFFD8E6);
+        keyboard_border = lv_color_hex(0xF4A3BE);
+        keyboard_key_bg = lv_color_hex(0xFFF5F8);
+        keyboard_key_text = lv_color_hex(0x8A1D47);
+        slider_bg = lv_color_hex(0xF6C1D4);
+        slider_knob_bg = lv_color_hex(0xFFFFFF);
+        dropdown_bg = lv_color_hex(0xFFF8FB);
+        dropdown_border = lv_color_hex(0xF4A3BE);
+        accent_color = lv_color_hex(0xFB7185);
+        accent_soft_color = lv_color_hex(0xF472B6);
+        energy_chart_bg = lv_color_hex(0xFFFFFF);
     } else {
         screen_bg = lv_color_hex(0xDCE8F5);
         screen_grad = lv_color_hex(0xF5F9FF);
@@ -256,6 +296,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
         slider_knob_bg = lv_color_hex(0xFFFFFF);
         dropdown_bg = lv_color_hex(0xFFFFFF);
         dropdown_border = lv_color_hex(0xD7E1EE);
+        accent_color = lv_color_hex(0x1D4ED8);
+        accent_soft_color = lv_color_hex(0x1D4ED8);
+        energy_chart_bg = lv_color_hex(0xFFFFFF);
     }
 
     lv_obj_set_style_bg_color(view->screen, screen_bg, 0);
@@ -284,10 +327,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
 
     lv_obj_set_style_bg_color(view->energy_plan_panel, panel_bg, 0);
     lv_obj_set_style_border_color(view->energy_plan_panel, panel_border, 0);
-    lv_obj_set_style_bg_color(view->energy_plan_chart,
-                              (theme == GUI_VIEW_THEME_DARK) ? lv_color_hex(0x0F172A)
-                                                             : lv_color_hex(0xFFFFFF),
-                              0);
+    lv_obj_set_style_bg_color(view->energy_plan_chart, energy_chart_bg, 0);
     lv_obj_set_style_border_color(view->energy_plan_chart, panel_border, 0);
     gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text);
 
@@ -306,22 +346,13 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme)
         lv_obj_set_style_text_color(view->bluetooth_status_label, muted_text, 0);
     }
     if (view->brightness_value_label != NULL) {
-        lv_obj_set_style_text_color(view->brightness_value_label,
-                                    (theme == GUI_VIEW_THEME_DARK) ? lv_color_hex(0x93C5FD)
-                                                                   : lv_color_hex(0x1D4ED8),
-                                    0);
+        lv_obj_set_style_text_color(view->brightness_value_label, accent_soft_color, 0);
     }
     if (view->brightness_slider != NULL) {
         lv_obj_set_style_bg_color(view->brightness_slider, slider_bg, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(view->brightness_slider,
-                                  (theme == GUI_VIEW_THEME_DARK) ? lv_color_hex(0x60A5FA)
-                                                                 : lv_color_hex(0x1D4ED8),
-                                  LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(view->brightness_slider, accent_color, LV_PART_INDICATOR);
         lv_obj_set_style_bg_color(view->brightness_slider, slider_knob_bg, LV_PART_KNOB);
-        lv_obj_set_style_border_color(view->brightness_slider,
-                                      (theme == GUI_VIEW_THEME_DARK) ? lv_color_hex(0x60A5FA)
-                                                                     : lv_color_hex(0x1D4ED8),
-                                      LV_PART_KNOB);
+        lv_obj_set_style_border_color(view->brightness_slider, accent_color, LV_PART_KNOB);
     }
 
     if (view->theme_dropdown != NULL) {

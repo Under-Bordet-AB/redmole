@@ -113,10 +113,15 @@ void gui_module_event_settings_cb(lv_event_t *event)
 
     if ((target == runtime->view.theme_dropdown) && (event_code == LV_EVENT_VALUE_CHANGED)) {
         uint16_t selected_theme = lv_dropdown_get_selected(runtime->view.theme_dropdown);
+        gui_view_theme_t theme = GUI_VIEW_THEME_LIGHT;
 
-        gui_view_apply_theme(&runtime->view,
-                             (selected_theme == 0U) ? GUI_VIEW_THEME_LIGHT
-                                                    : GUI_VIEW_THEME_DARK);
+        if (selected_theme == 1U) {
+            theme = GUI_VIEW_THEME_DARK;
+        } else if (selected_theme == 2U) {
+            theme = GUI_VIEW_THEME_HELLO_KITTY;
+        }
+
+        gui_view_apply_theme(&runtime->view, theme);
         return;
     }
 

@@ -339,7 +339,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->theme_dropdown = lv_dropdown_create(theme_card);
     lv_obj_set_size(view->theme_dropdown, LV_PCT(100), 46);
     lv_obj_align(view->theme_dropdown, LV_ALIGN_TOP_LEFT, 0, 66);
-    lv_dropdown_set_options(view->theme_dropdown, "Light mode\nDark mode");
+    lv_dropdown_set_options(view->theme_dropdown, "Light mode\nDark mode\nHello Kitty");
     lv_dropdown_set_selected(view->theme_dropdown, 0);
     lv_obj_add_event_cb(view->theme_dropdown, settings_event_cb, LV_EVENT_VALUE_CHANGED,
                         event_user_data);
