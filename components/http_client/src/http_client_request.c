@@ -21,7 +21,7 @@ const char *tls_get_cert(void);
 
 static esp_err_t on_http_event(esp_http_client_event_t *event)
 {
-    switch(evt->event_id) 
+    switch(event->event_id) 
     {
         case HTTP_EVENT_ON_DATA:
             ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA");
@@ -33,12 +33,12 @@ static esp_err_t on_http_event(esp_http_client_event_t *event)
     return ESP_OK;
 }
 
-esp_err_t request_get(const char* url, char* buf, size_t buf_len)
-{
+// esp_err_t request_get(const char* url, char* buf, size_t buf_len)
+// {
 
-}
+// }
 
-esp_err_t request_post(const char *url, const char *body, const char *content_type)
-{
+// esp_err_t request_post(const char *url, const char *body, const char *content_type)
+// {
 
-}
+// }
