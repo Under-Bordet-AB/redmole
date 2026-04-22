@@ -13,8 +13,6 @@
  */
 #define LVGL_PORT_H_RES             (1024)
 #define LVGL_PORT_V_RES             (600)
-// #define LVGL_PORT_H_RES             (512)
-// #define LVGL_PORT_V_RES             (300)
 #define LVGL_PORT_TICK_PERIOD_MS    (2)
 
 
