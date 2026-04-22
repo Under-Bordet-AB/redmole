@@ -4,11 +4,12 @@
 #include "lvgl.h"
 
 #include "../gui_defs.h"
+#include "gui_view.h"
 
 void gui_view_set_label_text_if_changed(lv_obj_t *label, const char *text);
 void gui_view_set_textarea_text_if_changed(lv_obj_t *textarea, const char *text);
-void gui_view_style_scanned_wifi_button(lv_obj_t *button, bool is_selected, bool is_known,
-                                        bool is_connected);
+void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme,
+                                        bool is_selected, bool is_known, bool is_connected);
 bool gui_view_wifi_is_connected(const gui_view_model_t *model, const char *ssid);
 int8_t gui_view_find_known_network_index(const gui_view_model_t *model, const char *ssid);
 int32_t gui_view_abs_i32(int32_t value);

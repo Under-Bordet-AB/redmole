@@ -1,5 +1,6 @@
 #include "gui_module.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "esp_check.h"
@@ -94,9 +95,20 @@ void gui_init(gui_ctx_t *self)
     gui_control_build_model(&runtime->control, &model);
 
     if (lvgl_port_lock(-1)) {
+        char brightness_text[8];
+
         gui_view_init(&runtime->view, &model, gui_module_event_nav_cb,
                       gui_module_event_settings_cb, runtime);
         gui_module_platform_start_refresh_timer(self, runtime);
+        if ((runtime->view.brightness_slider != NULL) &&
+            (runtime->view.brightness_value_label != NULL)) {
+            int32_t brightness_percent = gui_module_get_brightness();
+
+            lv_slider_set_value(runtime->view.brightness_slider, brightness_percent, LV_ANIM_OFF);
+            snprintf(brightness_text, sizeof(brightness_text), "%ld%%",
+                     (long)brightness_percent);
+            lv_label_set_text(runtime->view.brightness_value_label, brightness_text);
+        }
         lvgl_port_unlock();
     }
 

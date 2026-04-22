@@ -31,6 +31,7 @@ void gui_module_event_settings_cb(lv_event_t *event);
 void gui_module_refresh_timer_cb(lv_timer_t *timer);
 
 void gui_module_apply_brightness(int32_t brightness_percent);
+int32_t gui_module_get_brightness(void);
 esp_err_t gui_module_platform_init_display(void);
 void gui_module_platform_start_refresh_timer(gui_ctx_t *self, gui_module_runtime_t *runtime);
 void gui_module_platform_stop_refresh_timer(gui_module_runtime_t *runtime);

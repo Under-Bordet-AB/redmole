@@ -18,10 +18,10 @@ typedef struct {
 
 static app_gui_bindings_ctx_t s_bindings;
 
-static bool app_gui_bindings_on_wifi_connect_requested(gui_ctx_t *self, const char *ssid,
-                                                       const char *password, void *user_data);
+static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password,
+                                      void *user_data);
 
-static uint8_t app_gui_bindings_signal_strength_pct(int8_t rssi)
+static uint8_t signal_strength_pct(int8_t rssi)
 {
     if (rssi <= -100) {
         return 0;
@@ -34,7 +34,7 @@ static uint8_t app_gui_bindings_signal_strength_pct(int8_t rssi)
     return (uint8_t)((rssi + 100) * 2);
 }
 
-static gui_wifi_state_t app_gui_bindings_map_wifi_state(nac_wifi_status_t status)
+static gui_wifi_state_t map_wifi_state(nac_wifi_status_t status)
 {
     switch (status) {
         case NAC_WIFI_CONNECTED:
@@ -49,8 +49,7 @@ static gui_wifi_state_t app_gui_bindings_map_wifi_state(nac_wifi_status_t status
     }
 }
 
-static void app_gui_bindings_set_status(gui_ctx_t *gui, const char *status_text,
-                                        gui_wifi_state_t state)
+static void set_wifi_status(gui_ctx_t *gui, const char *status_text, gui_wifi_state_t state)
 {
     gui_wifi_settings_t wifi = { 0 };
 
@@ -63,7 +62,7 @@ static void app_gui_bindings_set_status(gui_ctx_t *gui, const char *status_text,
     gui_set_wifi_settings(gui, &wifi);
 }
 
-static void app_gui_bindings_copy_scan_results(gui_wifi_settings_t *wifi)
+static void copy_scan_results(gui_wifi_settings_t *wifi)
 {
     const wifi_ap_record_t *records;
     uint16_t record_count;
@@ -84,16 +83,19 @@ static void app_gui_bindings_copy_scan_results(gui_wifi_settings_t *wifi)
 
     count = (record_count > GUI_WIFI_NETWORK_COUNT) ? GUI_WIFI_NETWORK_COUNT : (uint8_t)record_count;
     for (uint8_t index = 0; index < count; index++) {
-        snprintf(wifi->networks[index].ssid, sizeof(wifi->networks[index].ssid), "%s",
-                 (const char *)records[index].ssid);
+        size_t ssid_len = strnlen((const char *)records[index].ssid,
+                                  sizeof(wifi->networks[index].ssid) - 1U);
+
+        memcpy(wifi->networks[index].ssid, records[index].ssid, ssid_len);
+        wifi->networks[index].ssid[ssid_len] = '\0';
         wifi->networks[index].signal_strength_pct =
-            app_gui_bindings_signal_strength_pct(records[index].rssi);
+            signal_strength_pct(records[index].rssi);
         wifi->networks[index].secured = records[index].authmode != WIFI_AUTH_OPEN;
     }
     wifi->network_count = count;
 }
 
-static void app_gui_bindings_sync_sensor(gui_ctx_t *gui)
+static void sync_sensor(gui_ctx_t *gui)
 {
     sensor_data_sample sample = { 0 };
     gui_sensor_state_t sensor = { 0 };
@@ -113,7 +115,7 @@ static void app_gui_bindings_sync_sensor(gui_ctx_t *gui)
     gui_set_sensor_state(gui, &sensor);
 }
 
-static void app_gui_bindings_sync_wifi(gui_ctx_t *gui)
+static void sync_wifi(gui_ctx_t *gui)
 {
     gui_wifi_settings_t wifi = { 0 };
     nac_wifi_status_t nac_status;
@@ -123,13 +125,13 @@ static void app_gui_bindings_sync_wifi(gui_ctx_t *gui)
     }
 
     nac_status = nac_get_wifi_status();
-    wifi.state = app_gui_bindings_map_wifi_state(nac_status);
+    wifi.state = map_wifi_state(nac_status);
 
     if (nac_status == NAC_WIFI_SCANNING) {
         snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
                  "Scanning for Wi-Fi networks...");
     } else if (s_bindings.wifi_scan_requested && nac_scan_is_complete()) {
-        app_gui_bindings_copy_scan_results(&wifi);
+        copy_scan_results(&wifi);
         if (wifi.network_count > 0U) {
             wifi.state = GUI_WIFI_STATE_SCANNED;
             snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
@@ -154,14 +156,14 @@ static void app_gui_bindings_sync_wifi(gui_ctx_t *gui)
     gui_set_wifi_settings(gui, &wifi);
 }
 
-static void app_gui_bindings_on_panel_changed(gui_ctx_t *self, gui_panel_id_t panel, void *user_data)
+static void on_panel_changed(gui_ctx_t *gui, gui_panel_id_t panel, void *user_data)
 {
-    (void)self;
+    (void)gui;
     (void)user_data;
     ESP_LOGI(TAG, "GUI panel changed to %d", (int)panel);
 }
 
-static bool app_gui_bindings_on_wifi_scan_requested(gui_ctx_t *self, void *user_data)
+static bool on_wifi_scan_requested(gui_ctx_t *gui, void *user_data)
 {
     esp_err_t result;
 
@@ -169,20 +171,19 @@ static bool app_gui_bindings_on_wifi_scan_requested(gui_ctx_t *self, void *user_
     result = nac_request_wifi_scan();
     if (result != ESP_OK) {
         ESP_LOGE(TAG, "nac_request_wifi_scan failed: %s", esp_err_to_name(result));
-        app_gui_bindings_set_status(self, "Failed to start Wi-Fi scan.", GUI_WIFI_STATE_FAILED);
+        set_wifi_status(gui, "Failed to start Wi-Fi scan.", GUI_WIFI_STATE_FAILED);
         return true;
     }
 
     s_bindings.wifi_scan_requested = true;
-    app_gui_bindings_set_status(self, "Scanning for Wi-Fi networks...", GUI_WIFI_STATE_IDLE);
+    set_wifi_status(gui, "Scanning for Wi-Fi networks...", GUI_WIFI_STATE_IDLE);
     return true;
 }
 
-static void app_gui_bindings_on_wifi_network_selected(gui_ctx_t *self,
-                                                      const gui_wifi_network_t *network,
-                                                      void *user_data)
+static void on_wifi_network_selected(gui_ctx_t *gui, const gui_wifi_network_t *network,
+                                     void *user_data)
 {
-    (void)self;
+    (void)gui;
     (void)user_data;
 
     if (network == NULL) {
@@ -192,9 +193,8 @@ static void app_gui_bindings_on_wifi_network_selected(gui_ctx_t *self,
     ESP_LOGI(TAG, "GUI selected Wi-Fi network: %s", network->ssid);
 }
 
-static bool app_gui_bindings_on_wifi_known_network_requested(gui_ctx_t *self,
-                                                             const gui_wifi_network_t *network,
-                                                             void *user_data)
+static bool on_wifi_known_network_requested(gui_ctx_t *gui, const gui_wifi_network_t *network,
+                                            void *user_data)
 {
     const char *ssid = NULL;
 
@@ -202,11 +202,11 @@ static bool app_gui_bindings_on_wifi_known_network_requested(gui_ctx_t *self,
         ssid = network->ssid;
     }
 
-    return app_gui_bindings_on_wifi_connect_requested(self, ssid, NULL, user_data);
+    return on_wifi_connect_requested(gui, ssid, NULL, user_data);
 }
 
-static bool app_gui_bindings_on_wifi_connect_requested(gui_ctx_t *self, const char *ssid,
-                                                       const char *password, void *user_data)
+static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password,
+                                      void *user_data)
 {
     esp_err_t result;
 
@@ -216,15 +216,14 @@ static bool app_gui_bindings_on_wifi_connect_requested(gui_ctx_t *self, const ch
     result = nac_request_wifi_connect();
     if (result != ESP_OK) {
         ESP_LOGE(TAG, "nac_request_wifi_connect failed: %s", esp_err_to_name(result));
-        app_gui_bindings_set_status(self, "Failed to request Wi-Fi connection.",
-                                    GUI_WIFI_STATE_FAILED);
+        set_wifi_status(gui, "Failed to request Wi-Fi connection.", GUI_WIFI_STATE_FAILED);
         return true;
     }
 
     s_bindings.wifi_connect_requested = true;
     ESP_LOGI(TAG, "GUI requested Wi-Fi connection for %s", (ssid != NULL) ? ssid : "<none>");
-    app_gui_bindings_set_status(self, "Connection requested. NAC uses configured Wi-Fi credentials.",
-                                GUI_WIFI_STATE_IDLE);
+    set_wifi_status(gui, "Connection requested. NAC uses configured Wi-Fi credentials.",
+                    GUI_WIFI_STATE_IDLE);
     return true;
 }
 
@@ -240,11 +239,11 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
     s_bindings.gui = gui;
 
     bindings.user_data = &s_bindings;
-    bindings.on_panel_changed = app_gui_bindings_on_panel_changed;
-    bindings.on_wifi_scan_requested = app_gui_bindings_on_wifi_scan_requested;
-    bindings.on_wifi_network_selected = app_gui_bindings_on_wifi_network_selected;
-    bindings.on_wifi_known_network_requested = app_gui_bindings_on_wifi_known_network_requested;
-    bindings.on_wifi_connect_requested = app_gui_bindings_on_wifi_connect_requested;
+    bindings.on_panel_changed = on_panel_changed;
+    bindings.on_wifi_scan_requested = on_wifi_scan_requested;
+    bindings.on_wifi_network_selected = on_wifi_network_selected;
+    bindings.on_wifi_known_network_requested = on_wifi_known_network_requested;
+    bindings.on_wifi_connect_requested = on_wifi_connect_requested;
     gui_set_bindings(gui, &bindings);
 
     app_gui_bindings_sync(gui);
@@ -257,6 +256,6 @@ void app_gui_bindings_sync(gui_ctx_t *gui)
         return;
     }
 
-    app_gui_bindings_sync_sensor(gui);
-    app_gui_bindings_sync_wifi(gui);
+    sync_sensor(gui);
+    sync_wifi(gui);
 }

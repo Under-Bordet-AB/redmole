@@ -38,6 +38,11 @@ void gui_module_apply_brightness(int32_t brightness_percent)
     IO_EXTENSION_Pwm_Output(pwm_percent);
 }
 
+int32_t gui_module_get_brightness(void)
+{
+    return s_backlight_percent;
+}
+
 esp_err_t gui_module_platform_init_display(void)
 {
     esp_lcd_touch_handle_t touch_handle;

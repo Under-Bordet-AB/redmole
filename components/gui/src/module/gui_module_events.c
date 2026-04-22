@@ -1,5 +1,6 @@
 #include "gui_module_internal.h"
 
+#include <stdio.h>
 #include <string.h>
 
 static void gui_module_notify_panel_changed(gui_module_runtime_t *runtime, gui_panel_id_t panel)
@@ -98,6 +99,7 @@ void gui_module_event_settings_cb(lv_event_t *event)
     gui_module_runtime_t *runtime;
     lv_event_code_t event_code;
     lv_obj_t *target;
+    char brightness_text[8];
     int8_t known_network_index;
     uint8_t network_index;
 
@@ -109,6 +111,32 @@ void gui_module_event_settings_cb(lv_event_t *event)
     event_code = lv_event_get_code(event);
     target = lv_event_get_target(event);
 
+    if ((target == runtime->view.theme_dropdown) && (event_code == LV_EVENT_VALUE_CHANGED)) {
+        uint16_t selected_theme = lv_dropdown_get_selected(runtime->view.theme_dropdown);
+        gui_view_theme_t theme = GUI_VIEW_THEME_LIGHT;
+
+        if (selected_theme == 1U) {
+            theme = GUI_VIEW_THEME_DARK;
+        } else if (selected_theme == 2U) {
+            theme = GUI_VIEW_THEME_HELLO_KITTY;
+        }
+
+        gui_view_apply_theme(&runtime->view, theme);
+        return;
+    }
+
+    if ((target == runtime->view.brightness_slider) && (event_code == LV_EVENT_VALUE_CHANGED)) {
+        int32_t brightness_percent = lv_slider_get_value(runtime->view.brightness_slider);
+
+        gui_module_apply_brightness(brightness_percent);
+        if (runtime->view.brightness_value_label != NULL) {
+            snprintf(brightness_text, sizeof(brightness_text), "%ld%%",
+                     (long)brightness_percent);
+            lv_label_set_text(runtime->view.brightness_value_label, brightness_text);
+        }
+        return;
+    }
+
     if (target == runtime->view.wifi_password_textarea) {
         if ((event_code == LV_EVENT_PRESSED) || (event_code == LV_EVENT_CLICKED) ||
             (event_code == LV_EVENT_FOCUSED)) {
@@ -117,13 +145,7 @@ void gui_module_event_settings_cb(lv_event_t *event)
                                      runtime->view.wifi_password_textarea);
             lv_obj_clear_flag(runtime->view.wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
             lv_obj_move_foreground(runtime->view.wifi_keyboard);
-        } else if (event_code == LV_EVENT_DEFOCUSED) {
-            lv_keyboard_set_textarea(runtime->view.wifi_keyboard, NULL);
-            lv_obj_add_flag(runtime->view.wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
-            lv_indev_reset(NULL, runtime->view.wifi_password_textarea);
         } else if ((event_code == LV_EVENT_READY) || (event_code == LV_EVENT_CANCEL)) {
-            lv_keyboard_set_textarea(runtime->view.wifi_keyboard, NULL);
-            lv_obj_add_flag(runtime->view.wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_state(runtime->view.wifi_password_textarea, LV_STATE_FOCUSED);
             lv_indev_reset(NULL, runtime->view.wifi_password_textarea);
             gui_control_set_wifi_password(

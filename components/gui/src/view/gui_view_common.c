@@ -39,25 +39,69 @@ void gui_view_set_textarea_text_if_changed(lv_obj_t *textarea, const char *text)
     lv_textarea_set_text(textarea, text);
 }
 
-void gui_view_style_scanned_wifi_button(lv_obj_t *button, bool is_selected, bool is_known,
-                                        bool is_connected)
+void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme,
+                                        bool is_selected, bool is_known, bool is_connected)
 {
-    lv_color_t bg_color = lv_color_hex(0xFFFFFF);
-    lv_color_t border_color = lv_color_hex(0xD7E1EE);
-    lv_color_t text_color = lv_color_hex(0x334155);
+    lv_color_t bg_color;
+    lv_color_t border_color;
+    lv_color_t text_color;
+
+    if (theme == GUI_VIEW_THEME_DARK) {
+        bg_color = lv_color_hex(0x182334);
+        border_color = lv_color_hex(0x314155);
+        text_color = lv_color_hex(0xD7E3F4);
+    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+        bg_color = lv_color_hex(0xFFF7FB);
+        border_color = lv_color_hex(0xF9B7CD);
+        text_color = lv_color_hex(0x8A284E);
+    } else {
+        bg_color = lv_color_hex(0xFFFFFF);
+        border_color = lv_color_hex(0xD7E1EE);
+        text_color = lv_color_hex(0x334155);
+    }
 
     if (is_connected) {
-        bg_color = lv_color_hex(0xDCFCE7);
-        border_color = lv_color_hex(0x22C55E);
-        text_color = lv_color_hex(0x14532D);
+        if (theme == GUI_VIEW_THEME_DARK) {
+            bg_color = lv_color_hex(0x153528);
+            border_color = lv_color_hex(0x4ADE80);
+            text_color = lv_color_hex(0xBBF7D0);
+        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+            bg_color = lv_color_hex(0xFFE7EF);
+            border_color = lv_color_hex(0xFF6B9A);
+            text_color = lv_color_hex(0x8A1D47);
+        } else {
+            bg_color = lv_color_hex(0xDCFCE7);
+            border_color = lv_color_hex(0x22C55E);
+            text_color = lv_color_hex(0x14532D);
+        }
     } else if (is_known) {
-        bg_color = lv_color_hex(0xF0FDF4);
-        border_color = lv_color_hex(0x86EFAC);
-        text_color = lv_color_hex(0x166534);
+        if (theme == GUI_VIEW_THEME_DARK) {
+            bg_color = lv_color_hex(0x162D22);
+            border_color = lv_color_hex(0x86EFAC);
+            text_color = lv_color_hex(0xD1FAE5);
+        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+            bg_color = lv_color_hex(0xFFF0F6);
+            border_color = lv_color_hex(0xF9A8C4);
+            text_color = lv_color_hex(0x9D174D);
+        } else {
+            bg_color = lv_color_hex(0xF0FDF4);
+            border_color = lv_color_hex(0x86EFAC);
+            text_color = lv_color_hex(0x166534);
+        }
     } else if (is_selected) {
-        bg_color = lv_color_hex(0xE6F0FF);
-        border_color = lv_color_hex(0x7CA6F8);
-        text_color = lv_color_hex(0x123364);
+        if (theme == GUI_VIEW_THEME_DARK) {
+            bg_color = lv_color_hex(0x1A2B45);
+            border_color = lv_color_hex(0x60A5FA);
+            text_color = lv_color_hex(0xBFDBFE);
+        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+            bg_color = lv_color_hex(0xFFE2EC);
+            border_color = lv_color_hex(0xFB7185);
+            text_color = lv_color_hex(0x881337);
+        } else {
+            bg_color = lv_color_hex(0xE6F0FF);
+            border_color = lv_color_hex(0x7CA6F8);
+            text_color = lv_color_hex(0x123364);
+        }
     }
 
     lv_obj_set_style_radius(button, 14, 0);

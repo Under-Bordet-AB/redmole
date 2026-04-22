@@ -148,7 +148,7 @@ void app_main(void) {
     while (1) {
         app_gui_bindings_sync(&s_gui);
         task_scheduler_work();
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(30));
     }
     return;
 
