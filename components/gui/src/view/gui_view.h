@@ -18,6 +18,7 @@ typedef struct {
     lv_obj_t *bme280_panel;
     lv_obj_t *energy_plan_panel;
     lv_obj_t *settings_panel;
+    lv_obj_t *settings_home_panel;
     lv_obj_t *scan_button;
     lv_obj_t *wifi_status_label;
     lv_obj_t *wifi_selected_label;

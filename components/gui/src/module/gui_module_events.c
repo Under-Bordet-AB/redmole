@@ -117,13 +117,7 @@ void gui_module_event_settings_cb(lv_event_t *event)
                                      runtime->view.wifi_password_textarea);
             lv_obj_clear_flag(runtime->view.wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
             lv_obj_move_foreground(runtime->view.wifi_keyboard);
-        } else if (event_code == LV_EVENT_DEFOCUSED) {
-            lv_keyboard_set_textarea(runtime->view.wifi_keyboard, NULL);
-            lv_obj_add_flag(runtime->view.wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
-            lv_indev_reset(NULL, runtime->view.wifi_password_textarea);
         } else if ((event_code == LV_EVENT_READY) || (event_code == LV_EVENT_CANCEL)) {
-            lv_keyboard_set_textarea(runtime->view.wifi_keyboard, NULL);
-            lv_obj_add_flag(runtime->view.wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
             lv_obj_clear_state(runtime->view.wifi_password_textarea, LV_STATE_FOCUSED);
             lv_indev_reset(NULL, runtime->view.wifi_password_textarea);
             gui_control_set_wifi_password(

@@ -84,8 +84,11 @@ static void app_gui_bindings_copy_scan_results(gui_wifi_settings_t *wifi)
 
     count = (record_count > GUI_WIFI_NETWORK_COUNT) ? GUI_WIFI_NETWORK_COUNT : (uint8_t)record_count;
     for (uint8_t index = 0; index < count; index++) {
-        snprintf(wifi->networks[index].ssid, sizeof(wifi->networks[index].ssid), "%s",
-                 (const char *)records[index].ssid);
+        size_t ssid_len = strnlen((const char *)records[index].ssid,
+                                  sizeof(wifi->networks[index].ssid) - 1U);
+
+        memcpy(wifi->networks[index].ssid, records[index].ssid, ssid_len);
+        wifi->networks[index].ssid[ssid_len] = '\0';
         wifi->networks[index].signal_strength_pct =
             app_gui_bindings_signal_strength_pct(records[index].rssi);
         wifi->networks[index].secured = records[index].authmode != WIFI_AUTH_OPEN;
