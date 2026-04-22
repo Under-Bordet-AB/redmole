@@ -111,6 +111,15 @@ void gui_module_event_settings_cb(lv_event_t *event)
     event_code = lv_event_get_code(event);
     target = lv_event_get_target(event);
 
+    if ((target == runtime->view.theme_dropdown) && (event_code == LV_EVENT_VALUE_CHANGED)) {
+        uint16_t selected_theme = lv_dropdown_get_selected(runtime->view.theme_dropdown);
+
+        gui_view_apply_theme(&runtime->view,
+                             (selected_theme == 0U) ? GUI_VIEW_THEME_LIGHT
+                                                    : GUI_VIEW_THEME_DARK);
+        return;
+    }
+
     if ((target == runtime->view.brightness_slider) && (event_code == LV_EVENT_VALUE_CHANGED)) {
         int32_t brightness_percent = lv_slider_get_value(runtime->view.brightness_slider);
 

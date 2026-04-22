@@ -200,6 +200,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_t *wifi_card;
     lv_obj_t *bluetooth_card;
     lv_obj_t *brightness_card;
+    lv_obj_t *theme_card;
     lv_obj_t *bluetooth_status;
     lv_obj_t *settings_text;
     lv_obj_t *dialog_title;
@@ -245,12 +246,14 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     connectivity_card = gui_view_create_settings_card(settings_grid, "Connectivity",
                                                       "Manage how Redmole connects to nearby devices and networks.",
                                                       LV_PCT(100));
+    view->connectivity_card = connectivity_card;
     lv_obj_set_grid_cell(connectivity_card, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0,
                          1);
 
     other_settings_card = gui_view_create_settings_card(
         settings_grid, "Other settings",
         "Display and system controls that affect the overall device experience.", LV_PCT(100));
+    view->other_settings_card = other_settings_card;
     lv_obj_set_grid_cell(other_settings_card, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH,
                          0, 1);
 
@@ -270,6 +273,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     wifi_card = gui_view_create_setting_item_card(connectivity_stack, "Wi-Fi",
                                                   "Scan to find networks, then choose one to connect.", 140);
+    view->wifi_card = wifi_card;
 
     view->scan_button = gui_view_create_action_button(wifi_card, 0, 74, 120, "Scan",
                                                       LV_EVENT_CLICKED, settings_event_cb,
@@ -278,8 +282,10 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     bluetooth_card = gui_view_create_setting_item_card(
         connectivity_stack, "Bluetooth",
         "Reserved for nearby device discovery and pairing.", 128);
+    view->bluetooth_card = bluetooth_card;
 
     bluetooth_status = lv_label_create(bluetooth_card);
+    view->bluetooth_status_label = bluetooth_status;
     lv_label_set_text(bluetooth_status, "Coming later.");
     lv_obj_set_style_text_color(bluetooth_status, lv_color_hex(0x4A5C78), 0);
     lv_obj_align(bluetooth_status, LV_ALIGN_TOP_LEFT, 0, 66);
@@ -301,6 +307,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     brightness_card = gui_view_create_setting_item_card(
         other_settings_stack, "Screen brightness",
         "Adjust the display backlight level for readability and power use.", 140);
+    view->brightness_card = brightness_card;
 
     view->brightness_value_label = lv_label_create(brightness_card);
     lv_label_set_text(view->brightness_value_label, "82%");
@@ -324,6 +331,26 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_border_color(view->brightness_slider, lv_color_hex(0x1D4ED8), LV_PART_KNOB);
     lv_obj_set_style_pad_all(view->brightness_slider, 4, LV_PART_KNOB);
 
+    theme_card = gui_view_create_setting_item_card(
+        other_settings_stack, "Theme",
+        "Choose how the interface should look. More themes can be added later.", 144);
+    view->theme_card = theme_card;
+
+    view->theme_dropdown = lv_dropdown_create(theme_card);
+    lv_obj_set_size(view->theme_dropdown, LV_PCT(100), 46);
+    lv_obj_align(view->theme_dropdown, LV_ALIGN_TOP_LEFT, 0, 66);
+    lv_dropdown_set_options(view->theme_dropdown, "Light mode\nDark mode");
+    lv_dropdown_set_selected(view->theme_dropdown, 0);
+    lv_obj_add_event_cb(view->theme_dropdown, settings_event_cb, LV_EVENT_VALUE_CHANGED,
+                        event_user_data);
+    lv_obj_set_style_radius(view->theme_dropdown, 14, 0);
+    lv_obj_set_style_shadow_width(view->theme_dropdown, 0, 0);
+    lv_obj_set_style_border_width(view->theme_dropdown, 1, 0);
+    lv_obj_set_style_border_color(view->theme_dropdown, lv_color_hex(0xD7E1EE), 0);
+    lv_obj_set_style_bg_color(view->theme_dropdown, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_bg_opa(view->theme_dropdown, LV_OPA_COVER, 0);
+    lv_obj_set_style_text_color(view->theme_dropdown, lv_color_hex(0x10213D), 0);
+
     view->dialog_scrim = NULL;
 
     view->network_dialog = gui_view_create_settings_page(view->settings_panel);
@@ -334,6 +361,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_border_width(view->network_dialog, 0, 0);
 
     dialog_title = lv_label_create(view->network_dialog);
+    view->network_dialog_title = dialog_title;
     lv_obj_set_width(dialog_title, 662);
     lv_label_set_text(dialog_title, "Finding Networks");
     lv_obj_set_style_text_color(dialog_title, lv_color_hex(0x10213D), 0);
@@ -341,6 +369,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_align(dialog_title, LV_ALIGN_TOP_MID, 0, 8);
 
     settings_text = lv_label_create(view->network_dialog);
+    view->network_dialog_subtitle = settings_text;
     lv_obj_set_width(settings_text, 662);
     lv_label_set_long_mode(settings_text, LV_LABEL_LONG_WRAP);
     lv_label_set_text(settings_text, "Only the scan results are shown here. Pick a network to continue.");
@@ -355,8 +384,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
                      88 + ((lv_coord_t)network_index * 64));
         lv_obj_add_event_cb(view->network_dialog_buttons[network_index], settings_event_cb,
                             LV_EVENT_CLICKED, event_user_data);
-        gui_view_style_scanned_wifi_button(view->network_dialog_buttons[network_index], false,
-                                           false, false);
+        gui_view_style_scanned_wifi_button(view->network_dialog_buttons[network_index],
+                           view->current_theme, false, false, false);
         view->network_dialog_button_labels[network_index] =
             lv_label_create(view->network_dialog_buttons[network_index]);
         lv_obj_center(view->network_dialog_button_labels[network_index]);
@@ -382,6 +411,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_border_width(view->password_dialog, 0, 0);
 
     dialog_title = lv_label_create(view->password_dialog);
+    view->password_dialog_title = dialog_title;
     lv_obj_set_width(dialog_title, 662);
     lv_label_set_text(dialog_title, "Enter Password");
     lv_obj_set_style_text_color(dialog_title, lv_color_hex(0x10213D), 0);
@@ -479,7 +509,7 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
             bool is_connected = gui_view_wifi_is_connected(model, ssid);
 
             gui_view_style_scanned_wifi_button(
-                view->network_dialog_buttons[network_index],
+                view->network_dialog_buttons[network_index], view->current_theme,
                 model->wifi.selected_network_index == (int8_t)network_index, is_known,
                 is_connected);
 
