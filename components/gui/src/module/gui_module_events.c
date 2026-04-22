@@ -121,7 +121,16 @@ void gui_module_event_settings_cb(lv_event_t *event)
             theme = GUI_VIEW_THEME_HELLO_KITTY;
         }
 
-        gui_view_apply_theme(&runtime->view, theme);
+        runtime->control.appearance.theme = theme;
+        gui_module_apply_model(runtime);
+        return;
+    }
+
+    if ((target == runtime->view.theme_background_switch) &&
+        (event_code == LV_EVENT_VALUE_CHANGED)) {
+        runtime->control.appearance.show_background_image =
+            lv_obj_has_state(runtime->view.theme_background_switch, LV_STATE_CHECKED);
+        gui_module_apply_model(runtime);
         return;
     }
 

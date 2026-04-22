@@ -10,6 +10,12 @@ typedef enum {
     GUI_PANEL_SETTINGS,
 } gui_panel_id_t;
 
+typedef enum {
+    GUI_VIEW_THEME_LIGHT = 0,
+    GUI_VIEW_THEME_DARK,
+    GUI_VIEW_THEME_HELLO_KITTY,
+} gui_view_theme_t;
+
 #define GUI_ENERGY_PLAN_POINT_COUNT 24
 #define GUI_WIFI_NETWORK_COUNT 4
 #define GUI_WIFI_KNOWN_NETWORK_COUNT 3
@@ -59,10 +65,16 @@ typedef struct {
 } gui_wifi_settings_t;
 
 typedef struct {
+    gui_view_theme_t theme;
+    bool show_background_image;
+} gui_appearance_settings_t;
+
+typedef struct {
     gui_panel_id_t active_panel;
     gui_sensor_state_t sensor;
     gui_energy_plan_t energy_plan;
     gui_wifi_settings_t wifi;
+    gui_appearance_settings_t appearance;
 } gui_view_model_t;
 
 #endif

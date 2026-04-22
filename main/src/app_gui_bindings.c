@@ -18,8 +18,13 @@ typedef struct {
 
 static app_gui_bindings_ctx_t s_bindings;
 
-static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password,
-                                      void *user_data);
+// Forward declarations
+//////////////////////////
+
+static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password, void *user_data);
+
+// Function definitions
+//////////////////////////
 
 static uint8_t signal_strength_pct(int8_t rssi)
 {
@@ -156,6 +161,9 @@ static void sync_wifi(gui_ctx_t *gui)
     gui_set_wifi_settings(gui, &wifi);
 }
 
+// UI Events
+//////////////////////////
+
 static void on_panel_changed(gui_ctx_t *gui, gui_panel_id_t panel, void *user_data)
 {
     (void)gui;
@@ -180,8 +188,7 @@ static bool on_wifi_scan_requested(gui_ctx_t *gui, void *user_data)
     return true;
 }
 
-static void on_wifi_network_selected(gui_ctx_t *gui, const gui_wifi_network_t *network,
-                                     void *user_data)
+static void on_wifi_network_selected(gui_ctx_t *gui, const gui_wifi_network_t *network, void *user_data)
 {
     (void)gui;
     (void)user_data;
@@ -193,8 +200,7 @@ static void on_wifi_network_selected(gui_ctx_t *gui, const gui_wifi_network_t *n
     ESP_LOGI(TAG, "GUI selected Wi-Fi network: %s", network->ssid);
 }
 
-static bool on_wifi_known_network_requested(gui_ctx_t *gui, const gui_wifi_network_t *network,
-                                            void *user_data)
+static bool on_wifi_known_network_requested(gui_ctx_t *gui, const gui_wifi_network_t *network, void *user_data)
 {
     const char *ssid = NULL;
 
@@ -205,8 +211,7 @@ static bool on_wifi_known_network_requested(gui_ctx_t *gui, const gui_wifi_netwo
     return on_wifi_connect_requested(gui, ssid, NULL, user_data);
 }
 
-static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password,
-                                      void *user_data)
+static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password, void *user_data)
 {
     esp_err_t result;
 
@@ -226,6 +231,9 @@ static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const ch
                     GUI_WIFI_STATE_IDLE);
     return true;
 }
+
+// Basics
+//////////////////////////
 
 esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
 {

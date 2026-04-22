@@ -58,6 +58,27 @@ static bool gui_view_wifi_settings_changed(gui_view_t *view, const gui_wifi_sett
     return false;
 }
 
+static bool gui_view_appearance_settings_changed(gui_view_t *view,
+                                                 const gui_appearance_settings_t *appearance)
+{
+    bool background_enabled;
+
+    if ((view == NULL) || (appearance == NULL)) {
+        return false;
+    }
+
+    if ((view->theme_dropdown == NULL) || (view->theme_background_switch == NULL)) {
+        return true;
+    }
+
+    if (lv_dropdown_get_selected(view->theme_dropdown) != (uint16_t)appearance->theme) {
+        return true;
+    }
+
+    background_enabled = lv_obj_has_state(view->theme_background_switch, LV_STATE_CHECKED);
+    return background_enabled != appearance->show_background_image;
+}
+
 static lv_obj_t *gui_view_create_settings_card(lv_obj_t *parent, const char *title_text,
                                                const char *subtitle_text, lv_coord_t height)
 {
@@ -252,7 +273,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     other_settings_card = gui_view_create_settings_card(
         settings_grid, "Other settings",
-        "Display and system controls that affect the overall device experience.", LV_PCT(100));
+        "Display and system controls for the device.", LV_PCT(100));
     view->other_settings_card = other_settings_card;
     lv_obj_set_grid_cell(other_settings_card, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH,
                          0, 1);
@@ -291,7 +312,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_align(bluetooth_status, LV_ALIGN_TOP_LEFT, 0, 66);
 
     other_settings_stack = lv_obj_create(other_settings_card);
-    lv_obj_set_size(other_settings_stack, LV_PCT(100), 296);
+    lv_obj_set_size(other_settings_stack, LV_PCT(100), 376);
     lv_obj_align(other_settings_stack, LV_ALIGN_TOP_LEFT, 0, 68);
     lv_obj_set_layout(other_settings_stack, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(other_settings_stack, LV_FLEX_FLOW_COLUMN);
@@ -312,7 +333,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->brightness_value_label = lv_label_create(brightness_card);
     lv_label_set_text(view->brightness_value_label, "82%");
     lv_obj_set_style_text_color(view->brightness_value_label, lv_color_hex(0x1D4ED8), 0);
-    lv_obj_set_style_text_font(view->brightness_value_label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(view->brightness_value_label, &lv_font_montserrat_24, 0);
     lv_obj_align(view->brightness_value_label, LV_ALIGN_TOP_RIGHT, 0, -2);
 
     view->brightness_slider = lv_slider_create(brightness_card);
@@ -333,7 +354,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     theme_card = gui_view_create_setting_item_card(
         other_settings_stack, "Theme",
-        "Choose how the interface should look. More themes can be added later.", 144);
+        "Choose how the interface should look.", 178);
     view->theme_card = theme_card;
 
     view->theme_dropdown = lv_dropdown_create(theme_card);
@@ -350,6 +371,32 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_bg_color(view->theme_dropdown, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(view->theme_dropdown, LV_OPA_COVER, 0);
     lv_obj_set_style_text_color(view->theme_dropdown, lv_color_hex(0x10213D), 0);
+
+    view->theme_background_label = lv_label_create(theme_card);
+    lv_label_set_text(view->theme_background_label, "Show background image");
+    lv_obj_set_style_text_color(view->theme_background_label, lv_color_hex(0x10213D), 0);
+    lv_obj_align(view->theme_background_label, LV_ALIGN_TOP_LEFT, 0, 128);
+
+    view->theme_background_switch = lv_switch_create(theme_card);
+    lv_obj_align(view->theme_background_switch, LV_ALIGN_TOP_RIGHT, 0, 120);
+    lv_obj_add_state(view->theme_background_switch, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(view->theme_background_switch, settings_event_cb, LV_EVENT_VALUE_CHANGED,
+                        event_user_data);
+    lv_obj_set_style_bg_color(view->theme_background_switch, lv_color_hex(0xD9E3F1),
+                              LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(view->theme_background_switch, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(view->theme_background_switch, lv_color_hex(0xD7E1EE),
+                                  LV_PART_MAIN);
+    lv_obj_set_style_bg_color(view->theme_background_switch, lv_color_hex(0x1D4ED8),
+                              LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER,
+                            LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_border_width(view->theme_background_switch, 0,
+                                  LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(view->theme_background_switch, lv_color_hex(0xFFFFFF),
+                              LV_PART_KNOB);
+    lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_KNOB);
 
     view->dialog_scrim = NULL;
 
@@ -422,7 +469,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_width(view->password_dialog_network_label, 662);
     lv_label_set_long_mode(view->password_dialog_network_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_color(view->password_dialog_network_label, lv_color_hex(0x607089), 0);
-    lv_obj_set_style_text_font(view->password_dialog_network_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(view->password_dialog_network_label, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_align(view->password_dialog_network_label, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_align(view->password_dialog_network_label, LV_ALIGN_TOP_MID, 0, 34);
 
@@ -444,7 +491,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_shadow_width(view->wifi_keyboard, 0, 0);
     lv_obj_set_style_border_width(view->wifi_keyboard, 1, 0);
     lv_obj_set_style_border_color(view->wifi_keyboard, lv_color_hex(0xD7E1EE), 0);
-    lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_20, LV_PART_ITEMS);
+    lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
 
     view->password_dialog_cancel_button = gui_view_create_action_button(
         view->password_dialog, 426, 146, 128, "Back", LV_EVENT_CLICKED, settings_event_cb,
@@ -464,14 +511,33 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
 {
     char wifi_text[72];
     const char *network_empty_text = "No networks found yet.";
+    bool wifi_changed;
     uint8_t network_index;
 
     if ((view == NULL) || (model == NULL)) {
         return;
     }
 
-    if (!gui_view_wifi_settings_changed(view, &model->wifi)) {
+    wifi_changed = gui_view_wifi_settings_changed(view, &model->wifi);
+    if (!wifi_changed && !gui_view_appearance_settings_changed(view, &model->appearance)) {
         return;
+    }
+
+    if ((view->theme_dropdown != NULL) &&
+        (lv_dropdown_get_selected(view->theme_dropdown) != (uint16_t)model->appearance.theme)) {
+        lv_dropdown_set_selected(view->theme_dropdown, (uint16_t)model->appearance.theme);
+    }
+
+    if (view->theme_background_switch != NULL) {
+        bool background_enabled = lv_obj_has_state(view->theme_background_switch, LV_STATE_CHECKED);
+
+        if (background_enabled != model->appearance.show_background_image) {
+            if (model->appearance.show_background_image) {
+                lv_obj_add_state(view->theme_background_switch, LV_STATE_CHECKED);
+            } else {
+                lv_obj_clear_state(view->theme_background_switch, LV_STATE_CHECKED);
+            }
+        }
     }
 
     gui_view_set_label_text_if_changed(view->wifi_status_label, "");

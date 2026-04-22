@@ -12,6 +12,8 @@ void gui_control_init(gui_control_t *control)
 
     memset(control, 0, sizeof(*control));
     control->active_panel = GUI_PANEL_BME280;
+    control->appearance.theme = GUI_VIEW_THEME_LIGHT;
+    control->appearance.show_background_image = true;
     control->wifi.selected_network_index = -1;
     control->wifi.selected_known_network_index = -1;
     control->wifi.state = GUI_WIFI_STATE_IDLE;
