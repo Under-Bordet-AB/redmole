@@ -1,5 +1,8 @@
 #include "gui_view.h"
 
+#include <stdio.h>
+#include <time.h>
+
 #include "gui_view_common.h"
 #include "panels/gui_view_bme280_panel.h"
 #include "panels/gui_view_energy_panel.h"
@@ -17,6 +20,30 @@ static const lv_font_t *gui_view_body_font(gui_view_theme_t theme)
 static const lv_font_t *gui_view_emphasis_font(gui_view_theme_t theme)
 {
     return (theme == GUI_VIEW_THEME_HELLO_KITTY) ? &hellokitty24 : &lv_font_montserrat_24;
+}
+
+static void gui_view_update_sidebar_clock_impl(gui_view_t *view)
+{
+    time_t now;
+    struct tm time_info;
+    char clock_text[16];
+    char date_text[32];
+
+    if (view == NULL) {
+        return;
+    }
+
+    now = time(NULL);
+    if ((now < 1700000000) || (localtime_r(&now, &time_info) == NULL)) {
+        gui_view_set_label_text_if_changed(view->sidebar_clock_label, "--:--");
+        gui_view_set_label_text_if_changed(view->sidebar_date_label, "--- -- ---");
+        return;
+    }
+
+    strftime(clock_text, sizeof(clock_text), "%H:%M", &time_info);
+    strftime(date_text, sizeof(date_text), "%a %d %b", &time_info);
+    gui_view_set_label_text_if_changed(view->sidebar_clock_label, clock_text);
+    gui_view_set_label_text_if_changed(view->sidebar_date_label, date_text);
 }
 
 static void gui_view_apply_header(gui_view_t *view, const gui_view_model_t *model)
@@ -533,6 +560,15 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_font(view->theme_background_label, body_font, 0);
     }
 
+    if (view->sidebar_clock_label != NULL) {
+        lv_obj_set_style_text_color(view->sidebar_clock_label, title_text, 0);
+        lv_obj_set_style_text_font(view->sidebar_clock_label, &lv_font_montserrat_24, 0);
+    }
+    if (view->sidebar_date_label != NULL) {
+        lv_obj_set_style_text_color(view->sidebar_date_label, subtitle_text, 0);
+        lv_obj_set_style_text_font(view->sidebar_date_label, body_font, 0);
+    }
+
     if (view->theme_background_switch != NULL) {
         lv_obj_set_style_bg_color(view->theme_background_switch, slider_bg, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_MAIN);
@@ -648,6 +684,11 @@ void gui_view_show_password_dialog(gui_view_t *view)
     gui_view_show_password_dialog_impl(view);
 }
 
+void gui_view_update_sidebar_clock_labels(gui_view_t *view)
+{
+    gui_view_update_sidebar_clock_impl(view);
+}
+
 void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_t nav_event_cb,
                    lv_event_cb_t settings_event_cb, void *event_user_data)
 {
@@ -696,6 +737,18 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_obj_set_style_text_color(brand, lv_color_hex(0xF8FAFC), 0);
     lv_obj_align(brand, LV_ALIGN_TOP_MID, 0, 28);
 
+    view->sidebar_clock_label = lv_label_create(sidebar);
+    lv_label_set_text(view->sidebar_clock_label, "--:--");
+    lv_obj_set_style_text_font(view->sidebar_clock_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(view->sidebar_clock_label, lv_color_hex(0xDCE6F5), 0);
+    lv_obj_align(view->sidebar_clock_label, LV_ALIGN_TOP_MID, 0, 58);
+
+    view->sidebar_date_label = lv_label_create(sidebar);
+    lv_label_set_text(view->sidebar_date_label, "--- -- ---");
+    lv_obj_set_style_text_font(view->sidebar_date_label, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(view->sidebar_date_label, lv_color_hex(0x94A3B8), 0);
+    lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 84);
+
     view->bme280_button = gui_view_create_nav_button(sidebar, 140, "BME280", nav_event_cb,
                                                        event_user_data);
     view->energy_plan_button = gui_view_create_nav_button(sidebar, 212, "Energy plan",
@@ -729,6 +782,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     gui_view_init_energy_panel(view, content);
 
     gui_view_apply(view, model);
+    gui_view_update_sidebar_clock_impl(view);
 }
 
 void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)

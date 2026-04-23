@@ -16,6 +16,8 @@ typedef struct {
     lv_obj_t *header_title;
     lv_obj_t *header_subtitle;
     lv_obj_t *update_label;
+    lv_obj_t *sidebar_clock_label;
+    lv_obj_t *sidebar_date_label;
     lv_obj_t *bme280_panel;
     lv_obj_t *energy_plan_panel;
     lv_obj_t *settings_panel;
@@ -75,6 +77,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
                    lv_event_cb_t settings_event_cb, void *event_user_data);
 void gui_view_apply(gui_view_t *view, const gui_view_model_t *model);
 void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_background_image);
+void gui_view_update_sidebar_clock_labels(gui_view_t *view);
 void gui_view_hide_wifi_dialogs(gui_view_t *view);
 void gui_view_show_network_dialog(gui_view_t *view);
 void gui_view_show_password_dialog(gui_view_t *view);
