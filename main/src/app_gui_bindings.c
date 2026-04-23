@@ -210,10 +210,10 @@ static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const ch
 {
     esp_err_t result;
 
-    (void)password;
-    (void)user_data;
+    //(void)password;
+    //(void)user_data;
 
-    result = nac_request_wifi_connect();
+    result = nac_request_wifi_connect(ssid, password);
     if (result != ESP_OK) {
         ESP_LOGE(TAG, "nac_request_wifi_connect failed: %s", esp_err_to_name(result));
         set_wifi_status(gui, "Failed to request Wi-Fi connection.", GUI_WIFI_STATE_FAILED);

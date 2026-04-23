@@ -10,7 +10,7 @@ static const char *tls_cert = NULL;
  * Set ca_cert_pem to CA Certificate for TLS
  * Set ca_cert_pem to NULL if plain HTTP is wanted
  */
-esp_err_t tls_init(const char *ca_cert_pem)
+esp_err_t _tls_init(const char *ca_cert_pem)
 {
     ESP_LOGD(TAG, "Initializing TLS");
 
@@ -32,14 +32,14 @@ esp_err_t tls_init(const char *ca_cert_pem)
  */
 const char *tls_get_cert(void)
 {
-    return tls_cert; 
+    return tls_cert;
 }
 
 /*
  * TLS deinitializer
  * Sets certificate to NULL
  */
-void tls_deinit(void)
+void _tls_deinit(void)
 {
     ESP_LOGD(TAG, "Deinitializing TLS");
     tls_cert = NULL;

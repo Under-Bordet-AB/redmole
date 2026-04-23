@@ -6,7 +6,10 @@
  * IP_EVENT) update state and re-add the task node when more work is needed.
  */
 
+#include "http_client.h"
 #include "nac.h"
+#include "esp_attr.h"
+#include "esp_log_level.h"
 #include "esp_netif_types.h"
 #include "rm_nvs.h"
 #include <string.h>
@@ -67,6 +70,8 @@ typedef struct
 } nac_ctx_t;
 
 static nac_ctx_t s_nac;
+static char s_wifi_ssid[WIFI_CRED_MAX_LENGTH];
+static char s_wifi_pass[WIFI_CRED_MAX_LENGTH];
 
 /*  Internal forward declarations */
 
@@ -130,7 +135,7 @@ nac_wifi_status_t nac_get_wifi_status(void)
     }
 }
 
-esp_err_t nac_request_wifi_connect(void)
+esp_err_t nac_request_wifi_connect(const char *ssid, const char *password)
 {
     wifi_state_t s = s_nac.wifi.state;
     if (s == WIFI_STATE_CONNECTED || s == WIFI_STATE_CONNECTING)
@@ -139,7 +144,20 @@ esp_err_t nac_request_wifi_connect(void)
         return ESP_OK;
     }
 
+    if (ssid && ssid[0] != 0)
+    {
+        strncpy(s_wifi_ssid, ssid, WIFI_CRED_MAX_LENGTH - 1);
+        s_wifi_ssid[WIFI_CRED_MAX_LENGTH - 1] = '\0';
+    }
+    if (password != 0)
+    {
+        strncpy(s_wifi_pass, password, WIFI_CRED_MAX_LENGTH - 1);
+        s_wifi_pass[WIFI_CRED_MAX_LENGTH - 1] = '\0';
+    }
+    ESP_LOGI("NAC", "Got ssid=%s, password=%s", ssid, password);
+
     s_nac.wifi.retry_count    = 0;
+    s_nac.wifi.saved_to_nvs   = 0;
     s_nac.wifi.state          = WIFI_STATE_IDLE;
     s_nac.wifi.task_node.work = wifi_connect;
 
@@ -397,38 +415,24 @@ task_status_t wifi_connect(task_node_t *task_node)
                 return TASK_ERROR;
             }
 
-            /* --------------------------------------------------
-             * TODO: NVS credential lookup via rm_nvs
-             *
-             * Replace sdkconfig fallback values with stored credentials:
-             *
-             *   char ssid[WIFI_SSID_MAX_LENGTH + 1] = REDMOLE_WIFI_SSID;
-             *   char pass[WIFI_PASS_MAX_LENGTH + 1]  = REDMOLE_WIFI_PASS;
-             *   size_t ssid_len = sizeof(ssid);
-             *   size_t pass_len = sizeof(pass);
-             *   rm_nvs_get_str("wifi_ssid", ssid, &ssid_len);
-             *   rm_nvs_get_str("wifi_pass", pass, &pass_len);
-             *
-             * On IP_EVENT_STA_GOT_IP, if saved_to_nvs == 0:
-             *   rm_nvs_set_str("wifi_ssid", (char *)wifi_config.sta.ssid);
-             *   rm_nvs_set_str("wifi_pass", (char *)wifi_config.sta.password);
-             *   self->saved_to_nvs = 1;
-             * -------------------------------------------------- */
+            if (s_wifi_ssid[0] == '\0')
+            {
+                size_t ssid_len = WIFI_CRED_MAX_LENGTH;
+                size_t pass_len = WIFI_CRED_MAX_LENGTH;
+                rm_nvs_get_str("wifi_ssid", s_wifi_ssid, &ssid_len);
+                rm_nvs_get_str("wifi_pass", s_wifi_pass, &pass_len);
+            }
 
             wifi_config_t wifi_config;
             memset(&wifi_config, 0, sizeof(wifi_config));
-            wifi_config.sta.threshold.authmode = REDMOLE_AUTH_THRESHOLD;
-            wifi_config.sta.sae_pwe_h2e        = REDMOLE_WPA3_SAE_MODE;
+            //wifi_config.sta.threshold.authmode = REDMOLE_AUTH_THRESHOLD;
+            //wifi_config.sta.sae_pwe_h2e        = REDMOLE_WPA3_SAE_MODE;
 
-            strncpy((char *)wifi_config.sta.ssid,
-                    REDMOLE_WIFI_SSID,
-                    sizeof(wifi_config.sta.ssid) - 1);
-            strncpy((char *)wifi_config.sta.password,
-                    REDMOLE_WIFI_PASS,
-                    sizeof(wifi_config.sta.password) - 1);
-            strncpy((char *)wifi_config.sta.sae_h2e_identifier,
-                    REDMOLE_H2E_IDENTIFIER,
-                    sizeof(wifi_config.sta.sae_h2e_identifier) - 1);
+            const char *ssid = (s_wifi_ssid[0] != 0) ? s_wifi_ssid : REDMOLE_WIFI_SSID;
+            const char *pass = (s_wifi_pass[0] != 0) ? s_wifi_pass : REDMOLE_WIFI_PASS;
+
+            strlcpy((char *)wifi_config.sta.ssid,     ssid, sizeof(wifi_config.sta.ssid)     - 1);
+            strlcpy((char *)wifi_config.sta.password, pass, sizeof(wifi_config.sta.password) - 1);
 
             if (esp_wifi_set_config(WIFI_IF_STA, &wifi_config) != ESP_OK)
             {
@@ -436,6 +440,7 @@ task_status_t wifi_connect(task_node_t *task_node)
                 wifi_bring_hw_offline(self);
                 return TASK_ERROR;
             }
+            ESP_LOGI(self->tag, "esp_wifi_set_config succeeded with ssid '%s' and pass '%s'", ssid, pass);
 
             /*
              * Set CONNECTING before esp_wifi_start(). The call posts
@@ -521,6 +526,8 @@ task_status_t wifi_connect(task_node_t *task_node)
 static void wifi_disconnect(wifi_ctx_t *self)
 {
     self->state = WIFI_STATE_IDLE;
+    http_client_notify_network_down();
+    ESP_LOGI(self->tag, "Notified http client of incoming disconnect");
     if (wifi_bring_hw_offline(self) != 0)
     {
         ESP_LOGE(self->tag, "Failed to bring WiFi hardware offline");
@@ -636,7 +643,15 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         self->state       = WIFI_STATE_CONNECTED;
         self->retry_count = 0;
 
-        /* TODO: NVS write-back via rm_nvs — see comment block in wifi_connect() */
+        http_client_notify_network_up();
+        ESP_LOGI(self->tag, "Notified http client that we got an IP");
+
+        if (self->saved_to_nvs == 0 && s_wifi_ssid[0] != '\0')
+        {
+            rm_nvs_set_str("wifi_ssid", s_wifi_ssid);
+            rm_nvs_set_str("wifi_pass", s_wifi_pass);
+            self->saved_to_nvs = 1;
+        }
     }
 }
 

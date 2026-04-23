@@ -101,11 +101,12 @@ static esp_err_t start_runtime_modules() {
     }
     ESP_LOGI(TAG, "task_scheduler_init started");
 
+    /*
     if(nac_request_wifi_connect() != ESP_OK) {
         ESP_LOGE(TAG, "nac_request_wifi_connect failed");
         return ESP_FAIL;
     }
-    ESP_LOGI(TAG, "nac_request_wifi_connect started");
+    ESP_LOGI(TAG, "nac_request_wifi_connect started");*/
 
     BaseType_t sensor =
         xTaskCreate(sensor_local_source_task, "sensor_local_source_task", 4096, NULL, 5, NULL);
@@ -139,7 +140,7 @@ void app_main(void) {
         goto fatal_error;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    //vTaskDelay(pdMS_TO_TICKS(5000));
     ESP_LOGI(TAG, "Startup complete");
 
     /* Pump the task scheduler to start tasks, needed to connect wifi in this mock code

@@ -17,6 +17,7 @@
 #define WIFI_SSID_MAX_LENGTH  32
 #define WIFI_PASS_MAX_LENGTH  64
 #define WIFI_SCAN_MAX_RESULT  20
+#define WIFI_CRED_MAX_LENGTH  64
 
 typedef enum
 {
@@ -89,7 +90,7 @@ nac_wifi_status_t nac_get_wifi_status(void);
  * @brief Schedule a WiFi connection attempt.
  * @return ESP_OK on success, an error code on failure.
  */
-esp_err_t nac_request_wifi_connect(void);
+esp_err_t nac_request_wifi_connect(const char *ssid, const char *password);
 
 /**
  * @brief Explicitly disconnect WiFi. Safe to call from any state.
