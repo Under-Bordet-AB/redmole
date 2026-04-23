@@ -79,6 +79,21 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
     return background_enabled != appearance->show_background_image;
 }
 
+static lv_color_t gui_view_wifi_status_color(gui_wifi_state_t state)
+{
+    switch (state) {
+        case GUI_WIFI_STATE_CONNECTED:
+            return lv_color_hex(0x22C55E);
+        case GUI_WIFI_STATE_SCANNED:
+            return lv_color_hex(0xF59E0B);
+        case GUI_WIFI_STATE_FAILED:
+            return lv_color_hex(0xEF4444);
+        case GUI_WIFI_STATE_IDLE:
+        default:
+            return lv_color_hex(0x94A3B8);
+    }
+}
+
 static lv_obj_t *gui_view_create_settings_card(lv_obj_t *parent, const char *title_text,
                                                const char *subtitle_text, lv_coord_t height)
 {
@@ -309,6 +324,16 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
                                                   "Scan to find networks, then choose one to connect.",
                                                   LV_SIZE_CONTENT);
     view->wifi_card = wifi_card;
+
+    view->wifi_status_dot = lv_obj_create(wifi_card);
+    lv_obj_set_size(view->wifi_status_dot, 10, 10);
+    lv_obj_add_flag(view->wifi_status_dot, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_clear_flag(view->wifi_status_dot, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_radius(view->wifi_status_dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(view->wifi_status_dot, 0, 0);
+    lv_obj_set_style_shadow_width(view->wifi_status_dot, 0, 0);
+    lv_obj_set_style_bg_opa(view->wifi_status_dot, LV_OPA_COVER, 0);
+    lv_obj_align(view->wifi_status_dot, LV_ALIGN_TOP_RIGHT, -4, 4);
 
     view->scan_button = gui_view_create_action_button(wifi_card, 0, 0, 120, "Scan",
                                                       LV_EVENT_CLICKED, settings_event_cb,
@@ -581,6 +606,11 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
                 lv_obj_clear_state(view->theme_background_switch, LV_STATE_CHECKED);
             }
         }
+    }
+
+    if (view->wifi_status_dot != NULL) {
+        lv_obj_set_style_bg_color(view->wifi_status_dot,
+                                  gui_view_wifi_status_color(model->wifi.state), 0);
     }
 
     gui_view_set_label_text_if_changed(view->wifi_status_label, "");

@@ -23,6 +23,7 @@ typedef struct {
     lv_obj_t *connectivity_card;
     lv_obj_t *other_settings_card;
     lv_obj_t *wifi_card;
+    lv_obj_t *wifi_status_dot;
     lv_obj_t *bluetooth_card;
     lv_obj_t *bluetooth_status_label;
     lv_obj_t *brightness_card;
