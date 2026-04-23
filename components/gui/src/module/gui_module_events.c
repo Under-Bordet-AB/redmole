@@ -79,6 +79,8 @@ void gui_module_event_nav_cb(lv_event_t *event)
         selected_panel = GUI_PANEL_BME280;
     } else if (target == runtime->view.energy_plan_button) {
         selected_panel = GUI_PANEL_ENERGY_PLAN;
+    } else if (target == runtime->view.forecast_button) {
+        selected_panel = GUI_PANEL_FORECAST;
     } else if (target == runtime->view.settings_button) {
         selected_panel = GUI_PANEL_SETTINGS;
     } else {
@@ -121,7 +123,16 @@ void gui_module_event_settings_cb(lv_event_t *event)
             theme = GUI_VIEW_THEME_HELLO_KITTY;
         }
 
-        gui_view_apply_theme(&runtime->view, theme);
+        runtime->control.appearance.theme = theme;
+        gui_module_apply_model(runtime);
+        return;
+    }
+
+    if ((target == runtime->view.theme_background_switch) &&
+        (event_code == LV_EVENT_VALUE_CHANGED)) {
+        runtime->control.appearance.show_background_image =
+            lv_obj_has_state(runtime->view.theme_background_switch, LV_STATE_CHECKED);
+        gui_module_apply_model(runtime);
         return;
     }
 

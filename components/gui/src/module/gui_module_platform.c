@@ -70,6 +70,9 @@ void gui_module_refresh_timer_cb(lv_timer_t *timer)
     }
 
     runtime = (gui_module_runtime_t *)self->module_state;
+
+    gui_view_update_sidebar_clock_labels(&runtime->view);
+
     if ((runtime->control.active_panel != GUI_PANEL_BME280) &&
         (runtime->control.active_panel != GUI_PANEL_SETTINGS)) {
         return;

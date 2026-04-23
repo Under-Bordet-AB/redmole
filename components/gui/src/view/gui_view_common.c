@@ -203,7 +203,7 @@ lv_obj_t *gui_view_create_metric_card(lv_obj_t *parent, lv_coord_t x, lv_coord_t
 
     *value_label = lv_label_create(card);
     lv_obj_set_style_text_color(*value_label, lv_color_hex(0x0F172A), 0);
-    lv_obj_set_style_text_font(*value_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(*value_label, &lv_font_montserrat_18, 0);
     lv_obj_align(*value_label, LV_ALIGN_TOP_LEFT, 0, 48);
 
     return card;

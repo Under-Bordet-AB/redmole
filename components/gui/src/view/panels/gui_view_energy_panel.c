@@ -4,6 +4,9 @@
 
 #include "../gui_view_common.h"
 
+#define GUI_VIEW_ENERGY_CHART_WIDTH 630
+#define GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE 52
+
 static bool gui_view_energy_plan_changed(gui_view_t *view, const gui_energy_plan_t *energy_plan)
 {
     if ((view == NULL) || (energy_plan == NULL)) {
@@ -49,7 +52,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
                                 "Sell excess");
 
     view->energy_plan_chart = lv_chart_create(view->energy_plan_panel);
-    lv_obj_set_size(view->energy_plan_chart, 662, 232);
+    lv_obj_set_size(view->energy_plan_chart, GUI_VIEW_ENERGY_CHART_WIDTH, 232);
     lv_obj_align(view->energy_plan_chart, LV_ALIGN_TOP_MID, 0, 48);
     lv_obj_set_style_bg_color(view->energy_plan_chart, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(view->energy_plan_chart, LV_OPA_COVER, 0);
@@ -62,7 +65,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_chart_set_point_count(view->energy_plan_chart, GUI_ENERGY_PLAN_POINT_COUNT);
     lv_chart_set_range(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
     lv_chart_set_axis_tick(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_Y, 6, 3, 6, 1, true,
-                           28);
+                           GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE);
     lv_chart_set_axis_tick(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_X, 6, 3, 5, 5, false,
                            20);
 
@@ -76,7 +79,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
                                             LV_CHART_AXIS_PRIMARY_Y);
 
     time_row = lv_obj_create(view->energy_plan_panel);
-    lv_obj_set_size(time_row, 662, 26);
+    lv_obj_set_size(time_row, GUI_VIEW_ENERGY_CHART_WIDTH, 26);
     lv_obj_align(time_row, LV_ALIGN_BOTTOM_MID, 0, -14);
     lv_obj_set_style_bg_opa(time_row, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(time_row, 0, 0);
