@@ -14,6 +14,7 @@ idf_component_register(
 	     "src/control/gui_control_model.c"
 	     "src/view/panels/gui_view_bme280_panel.c"
 	     "src/view/panels/gui_view_energy_panel.c"
+	     "src/view/panels/gui_view_forecast_panel.c"
 	     "src/view/panels/gui_view_settings_panel.c"
 	INCLUDE_DIRS "include"
 	REQUIRES lvgl_port rgb_lcd_port touch io_extension esp_lcd log sensor_data esp_timer

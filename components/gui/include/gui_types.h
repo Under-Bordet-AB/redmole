@@ -7,6 +7,7 @@
 typedef enum {
     GUI_PANEL_BME280 = 0,
     GUI_PANEL_ENERGY_PLAN,
+    GUI_PANEL_FORECAST,
     GUI_PANEL_SETTINGS,
 } gui_panel_id_t;
 

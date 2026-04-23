@@ -6,6 +6,7 @@
 #include "gui_view_common.h"
 #include "panels/gui_view_bme280_panel.h"
 #include "panels/gui_view_energy_panel.h"
+#include "panels/gui_view_forecast_panel.h"
 #include "panels/gui_view_settings_panel.h"
 
 LV_IMG_DECLARE(hk_bg);
@@ -55,6 +56,7 @@ static void gui_view_apply_header(gui_view_t *view, const gui_view_model_t *mode
             "Temperature, humidity, and pressure from the sensor data pipeline.");
         lv_obj_clear_flag(view->bme280_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->energy_plan_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(view->forecast_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->settings_panel, LV_OBJ_FLAG_HIDDEN);
     } else if (model->active_panel == GUI_PANEL_ENERGY_PLAN) {
         gui_view_set_label_text_if_changed(view->header_title, "LEOP Energy Plan");
@@ -63,12 +65,23 @@ static void gui_view_apply_header(gui_view_t *view, const gui_view_model_t *mode
             "Recommendations for grid, solar, battery, and export decisions.");
         lv_obj_add_flag(view->bme280_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(view->energy_plan_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(view->forecast_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(view->settings_panel, LV_OBJ_FLAG_HIDDEN);
+    } else if (model->active_panel == GUI_PANEL_FORECAST) {
+        gui_view_set_label_text_if_changed(view->header_title, "Weather Forecast");
+        gui_view_set_label_text_if_changed(
+            view->header_subtitle,
+            "Today, conditions details, and the next few days at a glance.");
+        lv_obj_add_flag(view->bme280_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(view->energy_plan_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(view->forecast_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->settings_panel, LV_OBJ_FLAG_HIDDEN);
     } else {
         gui_view_set_label_text_if_changed(view->header_title, "");
         gui_view_set_label_text_if_changed(view->header_subtitle, "");
         lv_obj_add_flag(view->bme280_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->energy_plan_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(view->forecast_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(view->settings_panel, LV_OBJ_FLAG_HIDDEN);
     }
 }
@@ -180,6 +193,153 @@ static void gui_view_style_energy_labels(lv_obj_t *parent, lv_color_t text_color
                     lv_obj_set_style_text_font(nested_child, body_font, 0);
                 }
             }
+        }
+    }
+}
+
+static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
+                                             lv_color_t card_border, lv_color_t title_color,
+                                             lv_color_t subtitle_color,
+                                             lv_color_t accent_color,
+                                             gui_view_theme_t theme)
+{
+    lv_obj_t *day_label;
+    lv_obj_t *condition_label;
+    lv_obj_t *temp_label;
+    const lv_font_t *body_font;
+    const lv_font_t *emphasis_font;
+
+    if (card == NULL) {
+        return;
+    }
+
+    body_font = gui_view_body_font(theme);
+    emphasis_font = gui_view_emphasis_font(theme);
+
+    lv_obj_set_style_bg_color(card, card_bg, 0);
+    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(card, card_border, 0);
+    lv_obj_set_style_text_font(card, body_font, 0);
+
+    day_label = lv_obj_get_child(card, 0);
+    condition_label = lv_obj_get_child(card, 1);
+    temp_label = lv_obj_get_child(card, 3);
+
+    if (day_label != NULL) {
+        lv_obj_set_style_text_color(day_label, title_color, 0);
+        lv_obj_set_style_text_font(day_label, body_font, 0);
+    }
+    if (condition_label != NULL) {
+        lv_obj_set_style_text_color(condition_label, subtitle_color, 0);
+        lv_obj_set_style_text_font(condition_label, body_font, 0);
+    }
+    if (temp_label != NULL) {
+        lv_obj_set_style_text_color(temp_label, accent_color, 0);
+        lv_obj_set_style_text_font(temp_label, emphasis_font, 0);
+    }
+}
+
+static void gui_view_style_forecast_card(lv_obj_t *card, lv_color_t card_bg,
+                                         lv_color_t card_border, gui_view_theme_t theme)
+{
+    if (card == NULL) {
+        return;
+    }
+
+    lv_obj_set_style_bg_color(card, card_bg, 0);
+    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(card, card_border, 0);
+    lv_obj_set_style_text_font(card, gui_view_body_font(theme), 0);
+}
+
+static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
+                                          lv_color_t panel_border, lv_opa_t panel_bg_opa,
+                                          lv_color_t card_bg, lv_color_t card_border,
+                                          lv_color_t title_color,
+                                          lv_color_t subtitle_color,
+                                          lv_color_t accent_color,
+                                          gui_view_theme_t theme)
+{
+    lv_obj_t *top_row;
+    lv_obj_t *today_card;
+    lv_obj_t *details_card;
+    lv_obj_t *days_row;
+    lv_obj_t *label;
+    uint32_t day_card_count;
+    const lv_font_t *body_font;
+    const lv_font_t *emphasis_font;
+
+    if ((view == NULL) || (view->forecast_panel == NULL)) {
+        return;
+    }
+
+    body_font = gui_view_body_font(theme);
+    emphasis_font = gui_view_emphasis_font(theme);
+
+    lv_obj_set_style_bg_color(view->forecast_panel, panel_bg, 0);
+    lv_obj_set_style_bg_opa(view->forecast_panel, panel_bg_opa, 0);
+    lv_obj_set_style_border_color(view->forecast_panel, panel_border, 0);
+    lv_obj_set_style_text_font(view->forecast_panel, body_font, 0);
+
+    top_row = lv_obj_get_child(view->forecast_panel, 0);
+    days_row = lv_obj_get_child(view->forecast_panel, 1);
+
+    today_card = (top_row != NULL) ? lv_obj_get_child(top_row, 0) : NULL;
+    details_card = (top_row != NULL) ? lv_obj_get_child(top_row, 1) : NULL;
+
+    gui_view_style_forecast_card(today_card, card_bg, card_border, theme);
+    gui_view_style_forecast_card(details_card, card_bg, card_border, theme);
+
+    if (today_card != NULL) {
+        label = lv_obj_get_child(today_card, 0);
+        if (label != NULL) {
+            lv_obj_set_style_text_color(label, subtitle_color, 0);
+            lv_obj_set_style_text_font(label, body_font, 0);
+        }
+        label = lv_obj_get_child(today_card, 1);
+        if (label != NULL) {
+            lv_obj_set_style_text_color(label, title_color, 0);
+            lv_obj_set_style_text_font(label, emphasis_font, 0);
+        }
+        label = lv_obj_get_child(today_card, 2);
+        if (label != NULL) {
+            lv_obj_set_style_text_color(label, accent_color, 0);
+            lv_obj_set_style_text_font(label, emphasis_font, 0);
+        }
+        label = lv_obj_get_child(today_card, 3);
+        if (label != NULL) {
+            lv_obj_set_style_text_color(label, subtitle_color, 0);
+            lv_obj_set_style_text_font(label, body_font, 0);
+        }
+        label = lv_obj_get_child(today_card, 4);
+        if (label != NULL) {
+            lv_obj_set_style_text_color(label, subtitle_color, 0);
+            lv_obj_set_style_text_font(label, body_font, 0);
+        }
+    }
+
+    if (details_card != NULL) {
+        label = lv_obj_get_child(details_card, 0);
+        if (label != NULL) {
+            lv_obj_set_style_text_color(label, subtitle_color, 0);
+            lv_obj_set_style_text_font(label, body_font, 0);
+        }
+
+        for (uint32_t index = 1; index < lv_obj_get_child_cnt(details_card); index++) {
+            label = lv_obj_get_child(details_card, (int32_t)index);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, title_color, 0);
+                lv_obj_set_style_text_font(label, body_font, 0);
+            }
+        }
+    }
+
+    if (days_row != NULL) {
+        day_card_count = lv_obj_get_child_cnt(days_row);
+        for (uint32_t index = 0; index < day_card_count; index++) {
+            gui_view_style_forecast_day_card(lv_obj_get_child(days_row, (int32_t)index),
+                                             card_bg, card_border, title_color,
+                                             subtitle_color, accent_color, theme);
         }
     }
 }
@@ -505,6 +665,10 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_text_font(view->energy_plan_panel, body_font, 0);
     gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, theme);
 
+    gui_view_style_forecast_panel(view, panel_bg, panel_border, panel_bg_opa, card_bg,
+                                  card_border, title_text, subtitle_text, accent_color,
+                                  theme);
+
     gui_view_style_settings_card(view->connectivity_card, card_bg, card_border, title_text,
                                  subtitle_text, theme);
     gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
@@ -664,6 +828,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                   view->last_active_panel == GUI_PANEL_BME280);
         gui_view_style_nav_button(view->energy_plan_button, view->current_theme,
                                   view->last_active_panel == GUI_PANEL_ENERGY_PLAN);
+        gui_view_style_nav_button(view->forecast_button, view->current_theme,
+                                  view->last_active_panel == GUI_PANEL_FORECAST);
         gui_view_style_nav_button(view->settings_button, view->current_theme,
                                   view->last_active_panel == GUI_PANEL_SETTINGS);
     }
@@ -753,7 +919,9 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
                                                        event_user_data);
     view->energy_plan_button = gui_view_create_nav_button(sidebar, 212, "Energy plan",
                                                           nav_event_cb, event_user_data);
-    view->settings_button = gui_view_create_nav_button(sidebar, 284, "Settings", nav_event_cb,
+    view->forecast_button = gui_view_create_nav_button(sidebar, 284, "Forecast", nav_event_cb,
+                                                       event_user_data);
+    view->settings_button = gui_view_create_nav_button(sidebar, 356, "Settings", nav_event_cb,
                                                        event_user_data);
 
     content = lv_obj_create(view->screen);
@@ -780,6 +948,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     gui_view_init_bme280_panel(view, content);
     gui_view_init_settings_panel(view, settings_event_cb, event_user_data);
     gui_view_init_energy_panel(view, content);
+    gui_view_init_forecast_panel(view, content);
 
     gui_view_apply(view, model);
     gui_view_update_sidebar_clock_impl(view);
@@ -807,6 +976,8 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)
                                   model->active_panel == GUI_PANEL_BME280);
         gui_view_style_nav_button(view->energy_plan_button, view->current_theme,
                                   model->active_panel == GUI_PANEL_ENERGY_PLAN);
+        gui_view_style_nav_button(view->forecast_button, view->current_theme,
+                                  model->active_panel == GUI_PANEL_FORECAST);
         gui_view_style_nav_button(view->settings_button, view->current_theme,
                                   model->active_panel == GUI_PANEL_SETTINGS);
         gui_view_apply_header(view, model);
@@ -823,6 +994,8 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)
         gui_view_apply_bme280_panel(view, model);
     } else if (model->active_panel == GUI_PANEL_ENERGY_PLAN) {
         gui_view_apply_energy_panel(view, model);
+    } else if (model->active_panel == GUI_PANEL_FORECAST) {
+        gui_view_apply_forecast_panel(view, model);
     } else {
         gui_view_apply_settings_panel(view, model);
     }

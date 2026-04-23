@@ -79,6 +79,8 @@ void gui_module_event_nav_cb(lv_event_t *event)
         selected_panel = GUI_PANEL_BME280;
     } else if (target == runtime->view.energy_plan_button) {
         selected_panel = GUI_PANEL_ENERGY_PLAN;
+    } else if (target == runtime->view.forecast_button) {
+        selected_panel = GUI_PANEL_FORECAST;
     } else if (target == runtime->view.settings_button) {
         selected_panel = GUI_PANEL_SETTINGS;
     } else {

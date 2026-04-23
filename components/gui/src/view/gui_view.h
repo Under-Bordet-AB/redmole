@@ -12,6 +12,7 @@ typedef struct {
     lv_obj_t *content;
     lv_obj_t *bme280_button;
     lv_obj_t *energy_plan_button;
+    lv_obj_t *forecast_button;
     lv_obj_t *settings_button;
     lv_obj_t *header_title;
     lv_obj_t *header_subtitle;
@@ -20,6 +21,7 @@ typedef struct {
     lv_obj_t *sidebar_date_label;
     lv_obj_t *bme280_panel;
     lv_obj_t *energy_plan_panel;
+    lv_obj_t *forecast_panel;
     lv_obj_t *settings_panel;
     lv_obj_t *settings_home_panel;
     lv_obj_t *connectivity_card;
