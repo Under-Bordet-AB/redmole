@@ -7,6 +7,4 @@ components/bme280/src/hal_internal/bme280_hal_backend.c
 components/bme280/src/hal_internal/bme280_hal_backend_sim.c
 components/sensor_data/include/sensor_data.h
 components/sensor_data/src/sensor_data.c
-components/gui/include/gui_module.h
-components/gui/src/gui_module.c
 main/main.c
