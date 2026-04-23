@@ -407,7 +407,9 @@ static void lv_btnmatrix_event(const lv_obj_class_t * class_p, lv_event_t * e)
 
     lv_res_t res;
 
-    /*Call the ancestor's event handler*/
+    /* ORIGINAL CODE
+
+    // Call the ancestor's event handler
     res = lv_obj_event_base(MY_CLASS, e);
     if(res != LV_RES_OK) return;
 
@@ -415,6 +417,23 @@ static void lv_btnmatrix_event(const lv_obj_class_t * class_p, lv_event_t * e)
     lv_obj_t * obj = lv_event_get_target(e);
     lv_btnmatrix_t * btnm = (lv_btnmatrix_t *)obj;
     lv_point_t p;
+
+    */
+
+    // BEGIN PATCH
+
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t * obj = lv_event_get_target(e);
+    lv_btnmatrix_t * btnm = (lv_btnmatrix_t *)obj;
+    lv_point_t p;
+
+    if(code != LV_EVENT_PRESSED &&
+    code != LV_EVENT_PRESSING &&
+    code != LV_EVENT_RELEASED &&
+    code != LV_EVENT_PRESS_LOST) {
+        res = lv_obj_event_base(MY_CLASS, e);
+        if(res != LV_RES_OK) return;
+    }
 
     if(code == LV_EVENT_REFR_EXT_DRAW_SIZE) {
         if(has_popovers_in_top_row(obj)) {
@@ -430,6 +449,7 @@ static void lv_btnmatrix_event(const lv_obj_class_t * class_p, lv_event_t * e)
         lv_btnmatrix_set_map(obj, btnm->map_p);
     }
     else if(code == LV_EVENT_PRESSED) {
+        obj->state |= LV_STATE_PRESSED;
         void * param = lv_event_get_param(e);
         invalidate_button_area(obj, btnm->btn_id_sel);
 
@@ -498,6 +518,7 @@ static void lv_btnmatrix_event(const lv_obj_class_t * class_p, lv_event_t * e)
         }
     }
     else if(code == LV_EVENT_RELEASED) {
+        obj->state &= ~LV_STATE_PRESSED;
         if(btnm->btn_id_sel != LV_BTNMATRIX_BTN_NONE) {
             /*Toggle the button if enabled*/
             if(button_is_checkable(btnm->ctrl_bits[btnm->btn_id_sel]) &&
@@ -537,6 +558,7 @@ static void lv_btnmatrix_event(const lv_obj_class_t * class_p, lv_event_t * e)
         }
     }
     else if(code == LV_EVENT_PRESS_LOST) {
+        obj->state &= ~LV_STATE_PRESSED;
         invalidate_button_area(obj, btnm->btn_id_sel);
         btnm->btn_id_sel = LV_BTNMATRIX_BTN_NONE;
     }

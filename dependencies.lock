@@ -6,7 +6,7 @@ dependencies:
   lvgl/lvgl:
     dependencies: []
     source:
-      path: components/lvgl_port/lvgl__lvgl
+      path: components\lvgl_port\lvgl__lvgl
       type: local
     version: 8.4.0
 direct_dependencies:
