@@ -90,7 +90,7 @@ lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t s
             }
 
             if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-                return lv_color_hex(0xF472B6);
+                return lv_color_hex(0xD46A80);
             }
 
             if (theme == GUI_VIEW_THEME_TERMINAL) {
@@ -113,7 +113,7 @@ lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t s
             }
 
             if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-                return lv_color_hex(0xEAB3CC);
+                return lv_color_hex(0x6B6080);
             }
 
             if (theme == GUI_VIEW_THEME_TERMINAL) {
@@ -460,9 +460,9 @@ static void gui_view_style_nav_button(lv_obj_t *button, gui_view_theme_t theme, 
         text_color = is_active ? lv_color_hex(0x8A1D47) : lv_color_hex(0xA13A64);
         border_color = is_active ? lv_color_hex(0xFB7185) : lv_color_hex(0xF4A3BE);
     } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-        bg_color = is_active ? lv_color_hex(0x6D3B4B) : lv_color_hex(0x432A35);
-        text_color = is_active ? lv_color_hex(0xFFF1F6) : lv_color_hex(0xF6C5D8);
-        border_color = is_active ? lv_color_hex(0xFB7185) : lv_color_hex(0x8F5971);
+        bg_color = is_active ? lv_color_hex(0x3A3660) : lv_color_hex(0x2A2744);
+        text_color = is_active ? lv_color_hex(0xE8D8F0) : lv_color_hex(0xA890B8);
+        border_color = is_active ? lv_color_hex(0xD46A80) : lv_color_hex(0x3A3660);
     } else if (theme == GUI_VIEW_THEME_TERMINAL) {
         bg_color = is_active ? lv_color_hex(0x03F5FA) : lv_color_hex(0x0A1B20);
         text_color = is_active ? lv_color_hex(0x031215) : lv_color_hex(0xC9FEFF);
@@ -514,13 +514,13 @@ static void gui_view_style_action_button(lv_obj_t *button, gui_view_theme_t them
         }
     } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
         if (is_primary) {
-            bg_color = lv_color_hex(0xFB7185);
-            text_color = lv_color_hex(0xFFF1F6);
-            border_color = lv_color_hex(0xFB7185);
+            bg_color = lv_color_hex(0xD46A80);
+            text_color = lv_color_hex(0xF0E0F0);
+            border_color = lv_color_hex(0xD46A80);
         } else {
-            bg_color = lv_color_hex(0x432A35);
-            text_color = lv_color_hex(0xFFD9E8);
-            border_color = lv_color_hex(0xA35373);
+            bg_color = lv_color_hex(0x2A2744);
+            text_color = lv_color_hex(0xA890B8);
+            border_color = lv_color_hex(0x3A3660);
         }
     } else if (theme == GUI_VIEW_THEME_TERMINAL) {
         if (is_primary) {
@@ -730,50 +730,50 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         energy_charge_color = lv_color_hex(0xA7F3D0);
         energy_sell_color = lv_color_hex(0xF43F5E);
     } else if (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-        screen_bg = lv_color_hex(0x231820);
-        screen_grad = lv_color_hex(0x3B2330);
+        screen_bg = lv_color_hex(0x1A1830);
+        screen_grad = lv_color_hex(0x16142B);
         screen_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        sidebar_bg = lv_color_hex(0x251821);
-        sidebar_grad = lv_color_hex(0x3D2430);
-        sidebar_shadow = lv_color_hex(0x170E14);
+        sidebar_bg = lv_color_hex(0x1C1A30);
+        sidebar_grad = lv_color_hex(0x16142B);
+        sidebar_shadow = lv_color_hex(0x0D0C1A);
         sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        brand_text = lv_color_hex(0xFFD7E8);
-        content_bg = lv_color_hex(0x2A1C25);
-        content_shadow = lv_color_hex(0x160E14);
+        brand_text = lv_color_hex(0xE8D8F0);
+        content_bg = lv_color_hex(0x1E1C34);
+        content_shadow = lv_color_hex(0x0D0C1A);
         content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_90;
-        title_text = lv_color_hex(0xFFF1F6);
-        subtitle_text = lv_color_hex(0xEAB3CC);
-        panel_bg = lv_color_hex(0x35222C);
-        panel_border = lv_color_hex(0x7C4A60);
+        title_text = lv_color_hex(0xE8D8F0);
+        subtitle_text = lv_color_hex(0xA890B8);
+        panel_bg = lv_color_hex(0x222040);
+        panel_border = lv_color_hex(0x3A3660);
         panel_bg_opa = LV_OPA_COVER;
-        card_bg = lv_color_hex(0x432A35);
-        card_border = lv_color_hex(0x8F5971);
-        item_bg = lv_color_hex(0x4B2E3A);
-        item_border = lv_color_hex(0x9F6680);
-        muted_text = lv_color_hex(0xF3B3CC);
-        value_text = lv_color_hex(0xFFF6F9);
-        keyboard_bg = lv_color_hex(0x3B2430);
-        keyboard_border = lv_color_hex(0x8F5971);
-        keyboard_key_bg = lv_color_hex(0x4A2E3A);
-        keyboard_key_text = lv_color_hex(0xFFF1F6);
-        keyboard_special_bg = lv_color_hex(0xFB7185);
-        keyboard_special_text = lv_color_hex(0xFFF1F6);
-        keyboard_special_border = lv_color_hex(0xF9A8C4);
-        slider_bg = lv_color_hex(0x7C4A60);
-        slider_knob_bg = lv_color_hex(0xFFF1F6);
-        dropdown_bg = lv_color_hex(0x4A2E3A);
-        dropdown_border = lv_color_hex(0x9F6680);
-        dropdown_selected_bg = lv_color_hex(0xFB7185);
-        dropdown_selected_text = lv_color_hex(0xFFF1F6);
-        accent_color = lv_color_hex(0xFB7185);
-        accent_soft_color = lv_color_hex(0xF9A8C4);
-        energy_chart_bg = lv_color_hex(0x432A35);
-        energy_chart_grid = lv_color_hex(0x7C4A60);
-        energy_chart_tick = lv_color_hex(0xEAB3CC);
-        energy_buy_color = lv_color_hex(0xFB7185);
-        energy_solar_color = lv_color_hex(0xFCD34D);
-        energy_charge_color = lv_color_hex(0xA7F3D0);
-        energy_sell_color = lv_color_hex(0xFDA4AF);
+        card_bg = lv_color_hex(0x2A2744);
+        card_border = lv_color_hex(0x3A3660);
+        item_bg = lv_color_hex(0x242240);
+        item_border = lv_color_hex(0x3A3660);
+        muted_text = lv_color_hex(0xA890B8);
+        value_text = lv_color_hex(0xE8D8F0);
+        keyboard_bg = lv_color_hex(0x1E1C34);
+        keyboard_border = lv_color_hex(0x3A3660);
+        keyboard_key_bg = lv_color_hex(0x2A2744);
+        keyboard_key_text = lv_color_hex(0xE8D8F0);
+        keyboard_special_bg = lv_color_hex(0xD46A80);
+        keyboard_special_text = lv_color_hex(0xF0E0F0);
+        keyboard_special_border = lv_color_hex(0xC97090);
+        slider_bg = lv_color_hex(0x3A3660);
+        slider_knob_bg = lv_color_hex(0xE8D8F0);
+        dropdown_bg = lv_color_hex(0x2A2744);
+        dropdown_border = lv_color_hex(0x3A3660);
+        dropdown_selected_bg = lv_color_hex(0xD46A80);
+        dropdown_selected_text = lv_color_hex(0xF0E0F0);
+        accent_color = lv_color_hex(0xD46A80);
+        accent_soft_color = lv_color_hex(0xC97090);
+        energy_chart_bg = lv_color_hex(0x2A2744);
+        energy_chart_grid = lv_color_hex(0x3A3660);
+        energy_chart_tick = lv_color_hex(0xA890B8);
+        energy_buy_color = lv_color_hex(0xC97090);
+        energy_solar_color = lv_color_hex(0xD4965A);
+        energy_charge_color = lv_color_hex(0x8A9BD0);
+        energy_sell_color = lv_color_hex(0xD46A80);
     } else if (effective_theme == GUI_VIEW_THEME_TERMINAL) {
         screen_bg = lv_color_hex(0x051316);
         screen_grad = lv_color_hex(0x0A2024);
