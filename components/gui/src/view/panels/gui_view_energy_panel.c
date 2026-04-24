@@ -4,6 +4,9 @@
 
 #include "../gui_view_common.h"
 
+#define GUI_VIEW_ENERGY_LEGEND_WIDTH 630
+#define GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH 300
+#define GUI_VIEW_ENERGY_LEGEND_ROW_GAP 8
 #define GUI_VIEW_ENERGY_CHART_WIDTH 630
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE 52
 
@@ -20,6 +23,7 @@ static bool gui_view_energy_plan_changed(gui_view_t *view, const gui_energy_plan
 void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
 {
     // lv_obj_t *energy_caption;
+    lv_obj_t *legend_container;
     lv_obj_t *time_row;
     lv_obj_t *time_label;
 
@@ -42,18 +46,30 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     // lv_obj_set_style_text_color(energy_caption, lv_color_hex(0x4D5F7C), 0);
     // lv_obj_align(energy_caption, LV_ALIGN_TOP_LEFT, 24, 18);
 
-    gui_view_create_legend_item(view->energy_plan_panel, 24, 24, lv_color_hex(0x1D4ED8),
-                                "Buy electricity");
-    gui_view_create_legend_item(view->energy_plan_panel, 188, 24, lv_color_hex(0xF59E0B),
-                                "Use solar directly");
-    gui_view_create_legend_item(view->energy_plan_panel, 382, 24, lv_color_hex(0x10B981),
-                                "Charge battery");
-    gui_view_create_legend_item(view->energy_plan_panel, 544, 24, lv_color_hex(0xEF4444),
-                                "Sell excess");
+    legend_container = lv_obj_create(view->energy_plan_panel);
+    lv_obj_set_size(legend_container, GUI_VIEW_ENERGY_LEGEND_WIDTH, 48);
+    lv_obj_align(legend_container, LV_ALIGN_TOP_MID, 0, 20);
+    lv_obj_set_style_bg_opa(legend_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(legend_container, 0, 0);
+    lv_obj_set_style_pad_all(legend_container, 0, 0);
+    lv_obj_clear_flag(legend_container, LV_OBJ_FLAG_SCROLLABLE);
+
+    view->energy_legend_dots[0] = gui_view_create_legend_item(
+        legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x1D4ED8),
+        "Buy electricity");
+    view->energy_legend_dots[1] = gui_view_create_legend_item(
+        legend_container, 320, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xF59E0B),
+        "Use solar directly");
+    view->energy_legend_dots[2] = gui_view_create_legend_item(
+        legend_container, 0, 20 + GUI_VIEW_ENERGY_LEGEND_ROW_GAP,
+        GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x10B981), "Charge battery");
+    view->energy_legend_dots[3] = gui_view_create_legend_item(
+        legend_container, 320, 20 + GUI_VIEW_ENERGY_LEGEND_ROW_GAP,
+        GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xEF4444), "Sell excess");
 
     view->energy_plan_chart = lv_chart_create(view->energy_plan_panel);
     lv_obj_set_size(view->energy_plan_chart, GUI_VIEW_ENERGY_CHART_WIDTH, 232);
-    lv_obj_align(view->energy_plan_chart, LV_ALIGN_TOP_MID, 0, 48);
+    lv_obj_align(view->energy_plan_chart, LV_ALIGN_TOP_MID, 0, 84);
     lv_obj_set_style_bg_color(view->energy_plan_chart, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(view->energy_plan_chart, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->energy_plan_chart, 1, 0);

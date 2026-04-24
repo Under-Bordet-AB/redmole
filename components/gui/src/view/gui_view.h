@@ -60,6 +60,7 @@ typedef struct {
     lv_obj_t *pressure_value;
     lv_obj_t *status_line;
     lv_obj_t *energy_plan_chart;
+    lv_obj_t *energy_legend_dots[4];
     lv_chart_series_t *buy_series;
     lv_chart_series_t *solar_series;
     lv_chart_series_t *charge_series;
@@ -79,6 +80,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
                    lv_event_cb_t settings_event_cb, void *event_user_data);
 void gui_view_apply(gui_view_t *view, const gui_view_model_t *model);
 void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_background_image);
+lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t state);
 void gui_view_update_sidebar_clock_labels(gui_view_t *view);
 void gui_view_hide_wifi_dialogs(gui_view_t *view);
 void gui_view_show_network_dialog(gui_view_t *view);

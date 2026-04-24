@@ -121,6 +121,8 @@ void gui_module_event_settings_cb(lv_event_t *event)
             theme = GUI_VIEW_THEME_DARK;
         } else if (selected_theme == 2U) {
             theme = GUI_VIEW_THEME_HELLO_KITTY;
+        } else if (selected_theme == 3U) {
+            theme = GUI_VIEW_THEME_TERMINAL;
         }
 
         runtime->control.appearance.theme = theme;

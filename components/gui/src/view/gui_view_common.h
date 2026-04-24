@@ -18,7 +18,8 @@ lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord
                                         lv_event_code_t event_code, lv_event_cb_t event_cb,
                                         void *event_user_data);
 lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
-                                      lv_color_t color, const char *text);
+                                      lv_coord_t width, lv_color_t color,
+                                      const char *text);
 lv_obj_t *gui_view_create_metric_card(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
                                       const char *label_text, lv_obj_t **value_label);
 void gui_view_apply_energy_series(lv_obj_t *chart, lv_chart_series_t *series,

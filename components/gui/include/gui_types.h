@@ -15,6 +15,7 @@ typedef enum {
     GUI_VIEW_THEME_LIGHT = 0,
     GUI_VIEW_THEME_DARK,
     GUI_VIEW_THEME_HELLO_KITTY,
+    GUI_VIEW_THEME_TERMINAL,
 } gui_view_theme_t;
 
 #define GUI_ENERGY_PLAN_POINT_COUNT 24

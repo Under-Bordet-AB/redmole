@@ -79,21 +79,6 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
     return background_enabled != appearance->show_background_image;
 }
 
-static lv_color_t gui_view_wifi_status_color(gui_wifi_state_t state)
-{
-    switch (state) {
-        case GUI_WIFI_STATE_CONNECTED:
-            return lv_color_hex(0x22C55E);
-        case GUI_WIFI_STATE_SCANNED:
-            return lv_color_hex(0xF59E0B);
-        case GUI_WIFI_STATE_FAILED:
-            return lv_color_hex(0xEF4444);
-        case GUI_WIFI_STATE_IDLE:
-        default:
-            return lv_color_hex(0x94A3B8);
-    }
-}
-
 static lv_obj_t *gui_view_create_settings_card(lv_obj_t *parent, const char *title_text,
                                                const char *subtitle_text, lv_coord_t height)
 {
@@ -413,7 +398,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     view->theme_dropdown = lv_dropdown_create(theme_card);
     lv_obj_set_size(view->theme_dropdown, LV_PCT(100), 46);
-    lv_dropdown_set_options(view->theme_dropdown, "Light mode\nDark mode\nHello Kitty");
+    lv_dropdown_set_options(view->theme_dropdown,
+                            "Light mode\nDark mode\nHello Kitty\nTerminal");
     lv_dropdown_set_selected(view->theme_dropdown, 0);
     lv_obj_add_event_cb(view->theme_dropdown, settings_event_cb, LV_EVENT_VALUE_CHANGED,
                         event_user_data);
@@ -610,7 +596,9 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
 
     if (view->wifi_status_dot != NULL) {
         lv_obj_set_style_bg_color(view->wifi_status_dot,
-                                  gui_view_wifi_status_color(model->wifi.state), 0);
+                                  gui_view_wifi_status_color(view->current_theme,
+                                                             model->wifi.state),
+                                  0);
     }
 
     gui_view_set_label_text_if_changed(view->wifi_status_label, "");

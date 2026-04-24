@@ -8,8 +8,11 @@ idf_component_register(
 	     "src/view/gui_view.c"
 	     "src/view/gui_view_common.c"
 	     "src/view/assets/hk_bg.c"
+	     src/view/assets/terminal_bg.c
 	     "src/view/assets/fonts/hellokitty18.c"
 	     "src/view/assets/fonts/hellokitty24.c"
+	     src/view/assets/fonts/terminal18.c
+	     src/view/assets/fonts/terminal24.c
 	     "src/control/gui_control_wifi.c"
 	     "src/control/gui_control_model.c"
 	     "src/view/panels/gui_view_bme280_panel.c"
