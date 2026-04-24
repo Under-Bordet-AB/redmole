@@ -62,12 +62,16 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
                                                  const gui_appearance_settings_t *appearance)
 {
     bool background_enabled;
+    bool night_enabled;
+    bool night_switch_disabled;
+    bool should_disable_night_switch;
 
     if ((view == NULL) || (appearance == NULL)) {
         return false;
     }
 
-    if ((view->theme_dropdown == NULL) || (view->theme_background_switch == NULL)) {
+    if ((view->theme_dropdown == NULL) || (view->theme_background_switch == NULL) ||
+        (view->theme_night_switch == NULL)) {
         return true;
     }
 
@@ -76,7 +80,18 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
     }
 
     background_enabled = lv_obj_has_state(view->theme_background_switch, LV_STATE_CHECKED);
-    return background_enabled != appearance->show_background_image;
+    if (background_enabled != appearance->show_background_image) {
+        return true;
+    }
+
+    night_enabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_CHECKED);
+    if (night_enabled != appearance->night_variant_enabled) {
+        return true;
+    }
+
+    night_switch_disabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_DISABLED);
+    should_disable_night_switch = appearance->theme != GUI_VIEW_THEME_HELLO_KITTY;
+    return night_switch_disabled != should_disable_night_switch;
 }
 
 static lv_obj_t *gui_view_create_settings_card(lv_obj_t *parent, const char *title_text,
@@ -452,6 +467,45 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
                               LV_PART_KNOB);
     lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_KNOB);
 
+    lv_obj_t *theme_night_row = lv_obj_create(theme_card);
+    lv_obj_set_width(theme_night_row, LV_PCT(100));
+    lv_obj_set_height(theme_night_row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(theme_night_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(theme_night_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(theme_night_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(theme_night_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(theme_night_row, 0, 0);
+    lv_obj_set_style_shadow_width(theme_night_row, 0, 0);
+    lv_obj_set_style_pad_all(theme_night_row, 0, 0);
+    lv_obj_set_style_pad_column(theme_night_row, 12, 0);
+    lv_obj_clear_flag(theme_night_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    view->theme_night_label = lv_label_create(theme_night_row);
+    lv_label_set_text(view->theme_night_label, "Use night variant");
+    lv_obj_set_width(view->theme_night_label, LV_PCT(100));
+    lv_obj_set_style_text_color(view->theme_night_label, lv_color_hex(0x10213D), 0);
+    lv_obj_set_style_text_align(view->theme_night_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_flex_grow(view->theme_night_label, 1);
+
+    view->theme_night_switch = lv_switch_create(theme_night_row);
+    lv_obj_add_event_cb(view->theme_night_switch, settings_event_cb, LV_EVENT_VALUE_CHANGED,
+                        event_user_data);
+    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0xD9E3F1), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(view->theme_night_switch, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(view->theme_night_switch, lv_color_hex(0xD7E1EE),
+                                  LV_PART_MAIN);
+    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0x1D4ED8),
+                              LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
+                            LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_border_width(view->theme_night_switch, 0,
+                                  LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0xFFFFFF),
+                              LV_PART_KNOB);
+    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_KNOB);
+
     view->dialog_scrim = NULL;
 
     view->network_dialog = gui_view_create_settings_page(view->settings_panel);
@@ -591,6 +645,25 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
             } else {
                 lv_obj_clear_state(view->theme_background_switch, LV_STATE_CHECKED);
             }
+        }
+    }
+
+    if (view->theme_night_switch != NULL) {
+        bool night_enabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_CHECKED);
+        bool should_disable_night_switch = model->appearance.theme != GUI_VIEW_THEME_HELLO_KITTY;
+
+        if (night_enabled != model->appearance.night_variant_enabled) {
+            if (model->appearance.night_variant_enabled) {
+                lv_obj_add_state(view->theme_night_switch, LV_STATE_CHECKED);
+            } else {
+                lv_obj_clear_state(view->theme_night_switch, LV_STATE_CHECKED);
+            }
+        }
+
+        if (should_disable_night_switch) {
+            lv_obj_add_state(view->theme_night_switch, LV_STATE_DISABLED);
+        } else {
+            lv_obj_clear_state(view->theme_night_switch, LV_STATE_DISABLED);
         }
     }
 

@@ -8,6 +8,7 @@ idf_component_register(
 	     "src/view/gui_view.c"
 	     "src/view/gui_view_common.c"
 	     "src/view/assets/hk_bg.c"
+	     "src/view/assets/hk_bg_night.c"
 	     src/view/assets/terminal_bg.c
 	     "src/view/assets/fonts/hellokitty18.c"
 	     "src/view/assets/fonts/hellokitty24.c"

@@ -138,6 +138,14 @@ void gui_module_event_settings_cb(lv_event_t *event)
         return;
     }
 
+    if ((target == runtime->view.theme_night_switch) &&
+        (event_code == LV_EVENT_VALUE_CHANGED)) {
+        runtime->control.appearance.night_variant_enabled =
+            lv_obj_has_state(runtime->view.theme_night_switch, LV_STATE_CHECKED);
+        gui_module_apply_model(runtime);
+        return;
+    }
+
     if ((target == runtime->view.brightness_slider) && (event_code == LV_EVENT_VALUE_CHANGED)) {
         int32_t brightness_percent = lv_slider_get_value(runtime->view.brightness_slider);
 

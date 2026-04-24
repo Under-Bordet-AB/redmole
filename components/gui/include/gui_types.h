@@ -16,6 +16,7 @@ typedef enum {
     GUI_VIEW_THEME_DARK,
     GUI_VIEW_THEME_HELLO_KITTY,
     GUI_VIEW_THEME_TERMINAL,
+    GUI_VIEW_THEME_HELLO_KITTY_NIGHT,
 } gui_view_theme_t;
 
 #define GUI_ENERGY_PLAN_POINT_COUNT 24
@@ -69,6 +70,7 @@ typedef struct {
 typedef struct {
     gui_view_theme_t theme;
     bool show_background_image;
+    bool night_variant_enabled;
 } gui_appearance_settings_t;
 
 typedef struct {

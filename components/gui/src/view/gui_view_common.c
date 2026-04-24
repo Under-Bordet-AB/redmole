@@ -54,6 +54,10 @@ void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme
         bg_color = lv_color_hex(0xFFF7FB);
         border_color = lv_color_hex(0xF9B7CD);
         text_color = lv_color_hex(0x8A284E);
+    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+        bg_color = lv_color_hex(0x432A35);
+        border_color = lv_color_hex(0x8F5971);
+        text_color = lv_color_hex(0xFFD9E8);
     } else if (theme == GUI_VIEW_THEME_TERMINAL) {
         bg_color = lv_color_hex(0x08171B);
         border_color = lv_color_hex(0x12848A);
@@ -73,6 +77,10 @@ void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme
             bg_color = lv_color_hex(0xFFE7EF);
             border_color = lv_color_hex(0xFF6B9A);
             text_color = lv_color_hex(0x8A1D47);
+        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+            bg_color = lv_color_hex(0x4C2E3A);
+            border_color = lv_color_hex(0xFB7185);
+            text_color = lv_color_hex(0xFFE4EE);
         } else if (theme == GUI_VIEW_THEME_TERMINAL) {
             bg_color = lv_color_hex(0x0A1B20);
             border_color = lv_color_hex(0x03F5FA);
@@ -91,6 +99,10 @@ void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme
             bg_color = lv_color_hex(0xFFF0F6);
             border_color = lv_color_hex(0xF9A8C4);
             text_color = lv_color_hex(0x9D174D);
+        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+            bg_color = lv_color_hex(0x3F2937);
+            border_color = lv_color_hex(0xF472B6);
+            text_color = lv_color_hex(0xFFD7E8);
         } else if (theme == GUI_VIEW_THEME_TERMINAL) {
             bg_color = lv_color_hex(0x061419);
             border_color = lv_color_hex(0x0E5E63);
@@ -109,6 +121,10 @@ void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme
             bg_color = lv_color_hex(0xFFE2EC);
             border_color = lv_color_hex(0xFB7185);
             text_color = lv_color_hex(0x881337);
+        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+            bg_color = lv_color_hex(0x5A3241);
+            border_color = lv_color_hex(0xFB7185);
+            text_color = lv_color_hex(0xFFF1F6);
         } else if (theme == GUI_VIEW_THEME_TERMINAL) {
             bg_color = lv_color_hex(0x0B2127);
             border_color = lv_color_hex(0x03F5FA);

@@ -10,15 +10,32 @@
 #include "panels/gui_view_settings_panel.h"
 
 LV_IMG_DECLARE(hk_bg);
+LV_IMG_DECLARE(hk_bg_night);
 LV_IMG_DECLARE(terminal_bg);
 LV_FONT_DECLARE(hellokitty18);
 LV_FONT_DECLARE(hellokitty24);
 LV_FONT_DECLARE(terminal18);
 LV_FONT_DECLARE(terminal24);
 
+static bool gui_view_theme_supports_night_variant(gui_view_theme_t theme)
+{
+    return theme == GUI_VIEW_THEME_HELLO_KITTY;
+}
+
+static gui_view_theme_t gui_view_effective_theme(gui_view_theme_t base_theme,
+                                                 bool night_variant_enabled)
+{
+    if (night_variant_enabled && gui_view_theme_supports_night_variant(base_theme)) {
+        return GUI_VIEW_THEME_HELLO_KITTY_NIGHT;
+    }
+
+    return base_theme;
+}
+
 static const lv_font_t *gui_view_body_font(gui_view_theme_t theme)
 {
-    if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+    if ((theme == GUI_VIEW_THEME_HELLO_KITTY) ||
+        (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT)) {
         return &hellokitty18;
     }
 
@@ -31,7 +48,8 @@ static const lv_font_t *gui_view_body_font(gui_view_theme_t theme)
 
 static const lv_font_t *gui_view_emphasis_font(gui_view_theme_t theme)
 {
-    if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+    if ((theme == GUI_VIEW_THEME_HELLO_KITTY) ||
+        (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT)) {
         return &hellokitty24;
     }
 
@@ -46,6 +64,10 @@ static const lv_img_dsc_t *gui_view_theme_background(gui_view_theme_t theme)
 {
     if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
         return &hk_bg;
+    }
+
+    if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+        return &hk_bg_night;
     }
 
     if (theme == GUI_VIEW_THEME_TERMINAL) {
@@ -67,6 +89,10 @@ lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t s
                 return lv_color_hex(0xFB7185);
             }
 
+            if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+                return lv_color_hex(0xF472B6);
+            }
+
             if (theme == GUI_VIEW_THEME_TERMINAL) {
                 return lv_color_hex(0xFFA206);
             }
@@ -84,6 +110,10 @@ lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t s
 
             if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
                 return lv_color_hex(0xB0597E);
+            }
+
+            if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+                return lv_color_hex(0xEAB3CC);
             }
 
             if (theme == GUI_VIEW_THEME_TERMINAL) {
@@ -429,6 +459,10 @@ static void gui_view_style_nav_button(lv_obj_t *button, gui_view_theme_t theme, 
         bg_color = is_active ? lv_color_hex(0xFFE0EB) : lv_color_hex(0xFFF5F8);
         text_color = is_active ? lv_color_hex(0x8A1D47) : lv_color_hex(0xA13A64);
         border_color = is_active ? lv_color_hex(0xFB7185) : lv_color_hex(0xF4A3BE);
+    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+        bg_color = is_active ? lv_color_hex(0x6D3B4B) : lv_color_hex(0x432A35);
+        text_color = is_active ? lv_color_hex(0xFFF1F6) : lv_color_hex(0xF6C5D8);
+        border_color = is_active ? lv_color_hex(0xFB7185) : lv_color_hex(0x8F5971);
     } else if (theme == GUI_VIEW_THEME_TERMINAL) {
         bg_color = is_active ? lv_color_hex(0x03F5FA) : lv_color_hex(0x0A1B20);
         text_color = is_active ? lv_color_hex(0x031215) : lv_color_hex(0xC9FEFF);
@@ -478,6 +512,16 @@ static void gui_view_style_action_button(lv_obj_t *button, gui_view_theme_t them
             text_color = lv_color_hex(0x8A1D47);
             border_color = lv_color_hex(0xF4A3BE);
         }
+    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+        if (is_primary) {
+            bg_color = lv_color_hex(0xFB7185);
+            text_color = lv_color_hex(0xFFF1F6);
+            border_color = lv_color_hex(0xFB7185);
+        } else {
+            bg_color = lv_color_hex(0x432A35);
+            text_color = lv_color_hex(0xFFD9E8);
+            border_color = lv_color_hex(0xA35373);
+        }
     } else if (theme == GUI_VIEW_THEME_TERMINAL) {
         if (is_primary) {
             bg_color = lv_color_hex(0x03F5FA);
@@ -525,8 +569,10 @@ static lv_obj_t *gui_view_create_nav_button(lv_obj_t *parent, lv_coord_t y, cons
     return button;
 }
 
-void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_background_image)
+void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_background_image,
+                          bool night_variant_enabled)
 {
+    gui_view_theme_t effective_theme;
     lv_color_t screen_bg;
     lv_color_t screen_grad;
     lv_opa_t screen_bg_opa;
@@ -581,16 +627,19 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         return;
     }
 
-    view->current_theme = theme;
+    effective_theme = gui_view_effective_theme(theme, night_variant_enabled);
+    view->current_theme = effective_theme;
     view->current_show_background_image = show_background_image;
+    view->current_night_variant_enabled = night_variant_enabled;
     view->has_current_appearance = true;
-    use_background_image = ((theme == GUI_VIEW_THEME_HELLO_KITTY) ||
-                            (theme == GUI_VIEW_THEME_TERMINAL)) &&
+    use_background_image = ((effective_theme == GUI_VIEW_THEME_HELLO_KITTY) ||
+                            (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) ||
+                            (effective_theme == GUI_VIEW_THEME_TERMINAL)) &&
                            show_background_image;
-    body_font = gui_view_body_font(theme);
-    emphasis_font = gui_view_emphasis_font(theme);
+    body_font = gui_view_body_font(effective_theme);
+    emphasis_font = gui_view_emphasis_font(effective_theme);
 
-    if (theme == GUI_VIEW_THEME_DARK) {
+    if (effective_theme == GUI_VIEW_THEME_DARK) {
         screen_bg = lv_color_hex(0x0B1220);
         screen_grad = lv_color_hex(0x172033);
         screen_bg_opa = LV_OPA_COVER;
@@ -635,7 +684,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         energy_solar_color = lv_color_hex(0xFCD34D);
         energy_charge_color = lv_color_hex(0x34D399);
         energy_sell_color = lv_color_hex(0xF87171);
-    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
+    } else if (effective_theme == GUI_VIEW_THEME_HELLO_KITTY) {
         screen_bg = lv_color_hex(0xFFDDE8);
         screen_grad = lv_color_hex(0xFFF7FB);
         screen_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
@@ -680,7 +729,52 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         energy_solar_color = lv_color_hex(0xFCD34D);
         energy_charge_color = lv_color_hex(0xA7F3D0);
         energy_sell_color = lv_color_hex(0xF43F5E);
-    } else if (theme == GUI_VIEW_THEME_TERMINAL) {
+    } else if (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
+        screen_bg = lv_color_hex(0x231820);
+        screen_grad = lv_color_hex(0x3B2330);
+        screen_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
+        sidebar_bg = lv_color_hex(0x251821);
+        sidebar_grad = lv_color_hex(0x3D2430);
+        sidebar_shadow = lv_color_hex(0x170E14);
+        sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
+        brand_text = lv_color_hex(0xFFD7E8);
+        content_bg = lv_color_hex(0x2A1C25);
+        content_shadow = lv_color_hex(0x160E14);
+        content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_90;
+        title_text = lv_color_hex(0xFFF1F6);
+        subtitle_text = lv_color_hex(0xEAB3CC);
+        panel_bg = lv_color_hex(0x35222C);
+        panel_border = lv_color_hex(0x7C4A60);
+        panel_bg_opa = LV_OPA_COVER;
+        card_bg = lv_color_hex(0x432A35);
+        card_border = lv_color_hex(0x8F5971);
+        item_bg = lv_color_hex(0x4B2E3A);
+        item_border = lv_color_hex(0x9F6680);
+        muted_text = lv_color_hex(0xF3B3CC);
+        value_text = lv_color_hex(0xFFF6F9);
+        keyboard_bg = lv_color_hex(0x3B2430);
+        keyboard_border = lv_color_hex(0x8F5971);
+        keyboard_key_bg = lv_color_hex(0x4A2E3A);
+        keyboard_key_text = lv_color_hex(0xFFF1F6);
+        keyboard_special_bg = lv_color_hex(0xFB7185);
+        keyboard_special_text = lv_color_hex(0xFFF1F6);
+        keyboard_special_border = lv_color_hex(0xF9A8C4);
+        slider_bg = lv_color_hex(0x7C4A60);
+        slider_knob_bg = lv_color_hex(0xFFF1F6);
+        dropdown_bg = lv_color_hex(0x4A2E3A);
+        dropdown_border = lv_color_hex(0x9F6680);
+        dropdown_selected_bg = lv_color_hex(0xFB7185);
+        dropdown_selected_text = lv_color_hex(0xFFF1F6);
+        accent_color = lv_color_hex(0xFB7185);
+        accent_soft_color = lv_color_hex(0xF9A8C4);
+        energy_chart_bg = lv_color_hex(0x432A35);
+        energy_chart_grid = lv_color_hex(0x7C4A60);
+        energy_chart_tick = lv_color_hex(0xEAB3CC);
+        energy_buy_color = lv_color_hex(0xFB7185);
+        energy_solar_color = lv_color_hex(0xFCD34D);
+        energy_charge_color = lv_color_hex(0xA7F3D0);
+        energy_sell_color = lv_color_hex(0xFDA4AF);
+    } else if (effective_theme == GUI_VIEW_THEME_TERMINAL) {
         screen_bg = lv_color_hex(0x051316);
         screen_grad = lv_color_hex(0x0A2024);
         screen_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
@@ -773,7 +867,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     }
 
     if (view->background_image != NULL) {
-        const lv_img_dsc_t *background_src = gui_view_theme_background(theme);
+        const lv_img_dsc_t *background_src = gui_view_theme_background(effective_theme);
 
         if (background_src != NULL) {
             lv_img_set_src(view->background_image, background_src);
@@ -825,7 +919,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_bg_opa(view->bme280_panel, panel_bg_opa, 0);
     lv_obj_set_style_border_color(view->bme280_panel, panel_border, 0);
     lv_obj_set_style_text_font(view->bme280_panel, body_font, 0);
-    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, value_text, theme);
+    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, value_text,
+                                effective_theme);
 
     lv_obj_set_style_bg_color(view->energy_plan_panel, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->energy_plan_panel, panel_bg_opa, 0);
@@ -866,24 +961,24 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_bg_color(view->energy_legend_dots[3], energy_sell_color, 0);
     }
     lv_obj_set_style_text_font(view->energy_plan_panel, body_font, 0);
-    gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, theme);
+    gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, effective_theme);
 
     gui_view_style_forecast_panel(view, panel_bg, panel_border, panel_bg_opa, card_bg,
                                   card_border, title_text, subtitle_text, accent_color,
-                                  theme);
+                                  effective_theme);
 
     gui_view_style_settings_card(view->connectivity_card, card_bg, card_border, title_text,
-                                 subtitle_text, theme);
+                                 subtitle_text, effective_theme);
     gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
-                                 subtitle_text, theme);
+                                 subtitle_text, effective_theme);
     gui_view_style_settings_card(view->wifi_card, item_bg, item_border, title_text,
-                                 subtitle_text, theme);
+                                 subtitle_text, effective_theme);
     gui_view_style_settings_card(view->bluetooth_card, item_bg, item_border, title_text,
-                                 subtitle_text, theme);
+                                 subtitle_text, effective_theme);
     gui_view_style_settings_card(view->brightness_card, item_bg, item_border, title_text,
-                                 subtitle_text, theme);
+                                 subtitle_text, effective_theme);
     gui_view_style_settings_card(view->theme_card, item_bg, item_border, title_text,
-                                 subtitle_text, theme);
+                                 subtitle_text, effective_theme);
     if (view->bluetooth_status_label != NULL) {
         lv_obj_set_style_text_color(view->bluetooth_status_label, muted_text, 0);
         lv_obj_set_style_text_font(view->bluetooth_status_label, body_font, 0);
@@ -939,6 +1034,11 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_font(view->theme_background_label, body_font, 0);
     }
 
+    if (view->theme_night_label != NULL) {
+        lv_obj_set_style_text_color(view->theme_night_label, title_text, 0);
+        lv_obj_set_style_text_font(view->theme_night_label, body_font, 0);
+    }
+
     if (view->sidebar_clock_label != NULL) {
         lv_obj_set_style_text_color(view->sidebar_clock_label, title_text, 0);
         lv_obj_set_style_text_font(view->sidebar_clock_label, emphasis_font, 0);
@@ -969,16 +1069,45 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_border_width(view->theme_background_switch, 0, LV_PART_KNOB);
     }
 
-    gui_view_style_action_button(view->scan_button, theme, true);
-    gui_view_style_action_button(view->network_dialog_cancel_button, theme, false);
-    gui_view_style_action_button(view->password_dialog_cancel_button, theme, false);
-    gui_view_style_action_button(view->password_dialog_connect_button, theme, true);
+    if (view->theme_night_switch != NULL) {
+        lv_obj_set_style_bg_color(view->theme_night_switch, slider_bg, LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_border_color(view->theme_night_switch, dropdown_border, LV_PART_MAIN);
+        lv_obj_set_style_border_width(view->theme_night_switch, 1, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(view->theme_night_switch, slider_bg, LV_PART_INDICATOR);
+        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(view->theme_night_switch, accent_color,
+                                  LV_PART_INDICATOR | LV_STATE_CHECKED);
+        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
+                                LV_PART_INDICATOR | LV_STATE_CHECKED);
+        lv_obj_set_style_border_width(view->theme_night_switch, 0,
+                                      LV_PART_INDICATOR | LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(view->theme_night_switch, slider_knob_bg, LV_PART_KNOB);
+        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_KNOB);
+        lv_obj_set_style_border_width(view->theme_night_switch, 0, LV_PART_KNOB);
+        lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0x6B7280),
+                                  LV_PART_MAIN | LV_STATE_DISABLED);
+        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
+                                LV_PART_MAIN | LV_STATE_DISABLED);
+        lv_obj_set_style_border_color(view->theme_night_switch, lv_color_hex(0x6B7280),
+                                      LV_PART_MAIN | LV_STATE_DISABLED);
+        lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0x9CA3AF),
+                                  LV_PART_INDICATOR | LV_STATE_DISABLED);
+        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
+                                LV_PART_INDICATOR | LV_STATE_DISABLED);
+    }
+
+    gui_view_style_action_button(view->scan_button, effective_theme, true);
+    gui_view_style_action_button(view->network_dialog_cancel_button, effective_theme, false);
+    gui_view_style_action_button(view->password_dialog_cancel_button, effective_theme, false);
+    gui_view_style_action_button(view->password_dialog_connect_button, effective_theme, true);
 
     lv_obj_set_style_bg_color(view->network_dialog, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->network_dialog, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->network_dialog,
-                                  ((theme == GUI_VIEW_THEME_HELLO_KITTY) ||
-                                   (theme == GUI_VIEW_THEME_TERMINAL))
+                                  ((effective_theme == GUI_VIEW_THEME_HELLO_KITTY) ||
+                                   (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) ||
+                                   (effective_theme == GUI_VIEW_THEME_TERMINAL))
                                       ? 1
                                       : 0,
                                   0);
@@ -1004,8 +1133,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_bg_color(view->password_dialog, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->password_dialog, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->password_dialog,
-                                  ((theme == GUI_VIEW_THEME_HELLO_KITTY) ||
-                                   (theme == GUI_VIEW_THEME_TERMINAL))
+                                  ((effective_theme == GUI_VIEW_THEME_HELLO_KITTY) ||
+                                   (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) ||
+                                   (effective_theme == GUI_VIEW_THEME_TERMINAL))
                                       ? 1
                                       : 0,
                                   0);
@@ -1091,6 +1221,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 
     view->current_theme = GUI_VIEW_THEME_LIGHT;
     view->current_show_background_image = true;
+    view->current_night_variant_enabled = false;
     view->has_current_appearance = false;
 
     view->screen = lv_scr_act();
@@ -1188,10 +1319,13 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)
     panel_changed = !view->has_last_active_panel || (view->last_active_panel != model->active_panel);
 
     if (!view->has_current_appearance ||
-        (view->current_theme != model->appearance.theme) ||
-        (view->current_show_background_image != model->appearance.show_background_image)) {
+        (view->current_theme != gui_view_effective_theme(model->appearance.theme,
+                                                         model->appearance.night_variant_enabled)) ||
+        (view->current_show_background_image != model->appearance.show_background_image) ||
+        (view->current_night_variant_enabled != model->appearance.night_variant_enabled)) {
         gui_view_apply_theme(view, model->appearance.theme,
-                             model->appearance.show_background_image);
+                             model->appearance.show_background_image,
+                             model->appearance.night_variant_enabled);
     }
 
     if (panel_changed) {

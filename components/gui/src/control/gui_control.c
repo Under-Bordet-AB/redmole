@@ -14,6 +14,7 @@ void gui_control_init(gui_control_t *control)
     control->active_panel = GUI_PANEL_BME280;
     control->appearance.theme = GUI_VIEW_THEME_HELLO_KITTY;
     control->appearance.show_background_image = true;
+    control->appearance.night_variant_enabled = false;
     control->wifi.selected_network_index = -1;
     control->wifi.selected_known_network_index = -1;
     control->wifi.state = GUI_WIFI_STATE_IDLE;
