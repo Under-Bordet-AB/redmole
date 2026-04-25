@@ -901,6 +901,12 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_color(brand, brand_text, 0);
         lv_obj_set_style_text_font(brand, body_font, 0);
     }
+    if (view->sidebar_wifi_label != NULL) {
+        lv_obj_set_style_text_color(view->sidebar_wifi_label, brand_text, 0);
+    }
+    if (view->sidebar_bluetooth_label != NULL) {
+        lv_obj_set_style_text_color(view->sidebar_bluetooth_label, brand_text, 0);
+    }
 
     lv_obj_set_style_bg_color(view->content, content_bg, 0);
     lv_obj_set_style_bg_opa(view->content, content_bg_opa, 0);
@@ -1290,19 +1296,19 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_obj_set_style_bg_opa(connectivity_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_opa(connectivity_container, LV_OPA_TRANSP, 0);
 
-    lv_obj_t * wifi = lv_label_create(connectivity_container);
-    lv_label_set_text(wifi, LV_SYMBOL_WIFI);
+    view->sidebar_wifi_label = lv_label_create(connectivity_container);
+    lv_label_set_text(view->sidebar_wifi_label, LV_SYMBOL_WIFI);
 
-    lv_obj_align(wifi, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_text_font(wifi, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(wifi, lv_color_white(), 0);
+    lv_obj_align(view->sidebar_wifi_label, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_text_font(view->sidebar_wifi_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(view->sidebar_wifi_label, lv_color_white(), 0);
 
-    lv_obj_t * bt = lv_label_create(connectivity_container);
-    lv_label_set_text(bt, LV_SYMBOL_BLUETOOTH);
+    view->sidebar_bluetooth_label = lv_label_create(connectivity_container);
+    lv_label_set_text(view->sidebar_bluetooth_label, LV_SYMBOL_BLUETOOTH);
 
-    lv_obj_align(bt, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_text_font(bt, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(bt, lv_color_white(), 0);
+    lv_obj_align(view->sidebar_bluetooth_label, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_text_font(view->sidebar_bluetooth_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(view->sidebar_bluetooth_label, lv_color_white(), 0);
 
     content = lv_obj_create(view->screen);
     view->content = content;

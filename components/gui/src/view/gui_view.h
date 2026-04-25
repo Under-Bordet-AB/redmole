@@ -19,6 +19,8 @@ typedef struct {
     lv_obj_t *update_label;
     lv_obj_t *sidebar_clock_label;
     lv_obj_t *sidebar_date_label;
+    lv_obj_t *sidebar_wifi_label;
+    lv_obj_t *sidebar_bluetooth_label;
     lv_obj_t *bme280_panel;
     lv_obj_t *energy_plan_panel;
     lv_obj_t *forecast_panel;
