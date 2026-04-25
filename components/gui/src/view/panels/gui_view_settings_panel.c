@@ -661,6 +661,7 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
         }
 
         if (should_disable_night_switch) {
+            lv_obj_clear_state(view->theme_night_switch, LV_STATE_CHECKED);
             lv_obj_add_state(view->theme_night_switch, LV_STATE_DISABLED);
         } else {
             lv_obj_clear_state(view->theme_night_switch, LV_STATE_DISABLED);

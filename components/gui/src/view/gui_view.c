@@ -1278,6 +1278,32 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     view->settings_button = gui_view_create_nav_button(sidebar, 356, "Settings", nav_event_cb,
                                                        event_user_data);
 
+    // Create horizontal container for Wi-Fi and Bluetooth icons
+    lv_obj_t * connectivity_container = lv_obj_create(sidebar);
+    lv_obj_set_size(connectivity_container, 188, 50);
+    lv_obj_align(connectivity_container, LV_ALIGN_BOTTOM_MID, 0, -15);
+    lv_obj_set_flex_flow(connectivity_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(connectivity_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(connectivity_container, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Make container invisible (for layout purposes only)
+    lv_obj_set_style_bg_opa(connectivity_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_opa(connectivity_container, LV_OPA_TRANSP, 0);
+
+    lv_obj_t * wifi = lv_label_create(connectivity_container);
+    lv_label_set_text(wifi, LV_SYMBOL_WIFI);
+
+    lv_obj_align(wifi, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_text_font(wifi, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(wifi, lv_color_white(), 0);
+
+    lv_obj_t * bt = lv_label_create(connectivity_container);
+    lv_label_set_text(bt, LV_SYMBOL_BLUETOOTH);
+
+    lv_obj_align(bt, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_text_font(bt, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(bt, lv_color_white(), 0);
+
     content = lv_obj_create(view->screen);
     view->content = content;
     lv_obj_set_size(content, 786, 560);
