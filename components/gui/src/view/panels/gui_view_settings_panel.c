@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../gui_view_common.h"
+#include "../gui_theme_defs.h"
 
 static bool gui_view_wifi_network_equals(const gui_wifi_network_t *left,
                                          const gui_wifi_network_t *right)
@@ -90,7 +91,8 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
     }
 
     night_switch_disabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_DISABLED);
-    should_disable_night_switch = appearance->theme != GUI_VIEW_THEME_HELLO_KITTY;
+    should_disable_night_switch = (gui_theme_get(appearance->theme) == NULL) ||
+                                  !gui_theme_get(appearance->theme)->has_night_variant;
     return night_switch_disabled != should_disable_night_switch;
 }
 
@@ -413,8 +415,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     view->theme_dropdown = lv_dropdown_create(theme_card);
     lv_obj_set_size(view->theme_dropdown, LV_PCT(100), 46);
-    lv_dropdown_set_options(view->theme_dropdown,
-                            "Light mode\nDark mode\nHello Kitty\nTerminal");
+    {
+        char theme_options[256] = "";
+        gui_theme_build_dropdown_string(theme_options, sizeof(theme_options));
+        lv_dropdown_set_options(view->theme_dropdown, theme_options);
+    }
     lv_dropdown_set_selected(view->theme_dropdown, 0);
     lv_obj_add_event_cb(view->theme_dropdown, settings_event_cb, LV_EVENT_VALUE_CHANGED,
                         event_user_data);
@@ -650,7 +655,9 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
 
     if (view->theme_night_switch != NULL) {
         bool night_enabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_CHECKED);
-        bool should_disable_night_switch = model->appearance.theme != GUI_VIEW_THEME_HELLO_KITTY;
+        const gui_theme_def_t *theme_def = gui_theme_get(model->appearance.theme);
+        bool should_disable_night_switch = (theme_def == NULL) ||
+                                           !theme_def->has_night_variant;
 
         if (night_enabled != model->appearance.night_variant_enabled) {
             if (model->appearance.night_variant_enabled) {

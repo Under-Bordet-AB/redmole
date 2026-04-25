@@ -3,124 +3,41 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "gui_theme_defs.h"
 #include "gui_view_common.h"
 #include "panels/gui_view_bme280_panel.h"
 #include "panels/gui_view_energy_panel.h"
 #include "panels/gui_view_forecast_panel.h"
 #include "panels/gui_view_settings_panel.h"
 
-LV_IMG_DECLARE(hk_bg);
-LV_IMG_DECLARE(hk_bg_night);
-LV_IMG_DECLARE(terminal_bg);
-LV_FONT_DECLARE(hellokitty18);
-LV_FONT_DECLARE(hellokitty24);
-LV_FONT_DECLARE(terminal18);
-LV_FONT_DECLARE(terminal24);
-
-static bool gui_view_theme_supports_night_variant(gui_view_theme_t theme)
-{
-    return theme == GUI_VIEW_THEME_HELLO_KITTY;
-}
-
 static gui_view_theme_t gui_view_effective_theme(gui_view_theme_t base_theme,
                                                  bool night_variant_enabled)
 {
-    if (night_variant_enabled && gui_view_theme_supports_night_variant(base_theme)) {
-        return GUI_VIEW_THEME_HELLO_KITTY_NIGHT;
+    const gui_theme_def_t *def = gui_theme_get(base_theme);
+
+    if (night_variant_enabled && (def != NULL) && def->has_night_variant) {
+        return def->night_variant;
     }
 
     return base_theme;
 }
 
-static const lv_font_t *gui_view_body_font(gui_view_theme_t theme)
-{
-    if ((theme == GUI_VIEW_THEME_HELLO_KITTY) ||
-        (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT)) {
-        return &hellokitty18;
-    }
-
-    if (theme == GUI_VIEW_THEME_TERMINAL) {
-        return &terminal18;
-    }
-
-    return &lv_font_montserrat_18;
-}
-
-static const lv_font_t *gui_view_emphasis_font(gui_view_theme_t theme)
-{
-    if ((theme == GUI_VIEW_THEME_HELLO_KITTY) ||
-        (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT)) {
-        return &hellokitty24;
-    }
-
-    if (theme == GUI_VIEW_THEME_TERMINAL) {
-        return &terminal24;
-    }
-
-    return &lv_font_montserrat_24;
-}
-
-static const lv_img_dsc_t *gui_view_theme_background(gui_view_theme_t theme)
-{
-    if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-        return &hk_bg;
-    }
-
-    if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-        return &hk_bg_night;
-    }
-
-    if (theme == GUI_VIEW_THEME_TERMINAL) {
-        return &terminal_bg;
-    }
-
-    return NULL;
-}
-
 lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t state)
 {
+    const gui_theme_def_t *def = gui_theme_get(theme);
+
     switch (state) {
         case GUI_WIFI_STATE_CONNECTED:
-            if (theme == GUI_VIEW_THEME_DARK) {
-                return lv_color_hex(0x60A5FA);
-            }
-
-            if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-                return lv_color_hex(0xFB7185);
-            }
-
-            if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-                return lv_color_hex(0xD46A80);
-            }
-
-            if (theme == GUI_VIEW_THEME_TERMINAL) {
-                return lv_color_hex(0xFFA206);
-            }
-
-            return lv_color_hex(0x1D4ED8);
+            return (def != NULL) ? lv_color_hex(def->wifi_connected_color)
+                                 : lv_color_hex(0x1D4ED8);
         case GUI_WIFI_STATE_SCANNED:
             return lv_color_hex(0xF59E0B);
         case GUI_WIFI_STATE_FAILED:
             return lv_color_hex(0xEF4444);
         case GUI_WIFI_STATE_IDLE:
         default:
-            if (theme == GUI_VIEW_THEME_DARK) {
-                return lv_color_hex(0xCBD5E1);
-            }
-
-            if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-                return lv_color_hex(0xB0597E);
-            }
-
-            if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-                return lv_color_hex(0x6B6080);
-            }
-
-            if (theme == GUI_VIEW_THEME_TERMINAL) {
-                return lv_color_hex(0x69DDE0);
-            }
-
-            return lv_color_hex(0x4A5C78);
+            return (def != NULL) ? lv_color_hex(def->wifi_idle_color)
+                                 : lv_color_hex(0x4A5C78);
     }
 }
 
@@ -199,7 +116,7 @@ static void gui_view_style_settings_card(lv_obj_t *card, lv_color_t bg_color,
         return;
     }
 
-    body_font = gui_view_body_font(theme);
+    body_font = gui_theme_get(theme)->body_font;
 
     lv_obj_set_style_bg_color(card, bg_color, 0);
     lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
@@ -230,7 +147,7 @@ static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
         return;
     }
 
-    body_font = gui_view_body_font(theme);
+    body_font = gui_theme_get(theme)->body_font;
 
     child_count = lv_obj_get_child_cnt(view->bme280_panel);
     for (uint32_t index = 0; index < child_count; index++) {
@@ -270,7 +187,7 @@ static void gui_view_style_energy_labels(lv_obj_t *parent, lv_color_t text_color
         return;
     }
 
-    body_font = gui_view_body_font(theme);
+    body_font = gui_theme_get(theme)->body_font;
 
     child_count = lv_obj_get_child_cnt(parent);
     for (uint32_t index = 0; index < child_count; index++) {
@@ -314,8 +231,8 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
         return;
     }
 
-    body_font = gui_view_body_font(theme);
-    emphasis_font = gui_view_emphasis_font(theme);
+    body_font = gui_theme_get(theme)->body_font;
+    emphasis_font = gui_theme_get(theme)->emphasis_font;
 
     lv_obj_set_style_bg_color(card, card_bg, 0);
     lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
@@ -350,7 +267,7 @@ static void gui_view_style_forecast_card(lv_obj_t *card, lv_color_t card_bg,
     lv_obj_set_style_bg_color(card, card_bg, 0);
     lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(card, card_border, 0);
-    lv_obj_set_style_text_font(card, gui_view_body_font(theme), 0);
+    lv_obj_set_style_text_font(card, gui_theme_get(theme)->body_font, 0);
 }
 
 static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
@@ -374,8 +291,8 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
         return;
     }
 
-    body_font = gui_view_body_font(theme);
-    emphasis_font = gui_view_emphasis_font(theme);
+    body_font = gui_theme_get(theme)->body_font;
+    emphasis_font = gui_theme_get(theme)->emphasis_font;
 
     lv_obj_set_style_bg_color(view->forecast_panel, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->forecast_panel, panel_bg_opa, 0);
@@ -447,109 +364,50 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
 
 static void gui_view_style_nav_button(lv_obj_t *button, gui_view_theme_t theme, bool is_active)
 {
+    const gui_theme_def_t *def = gui_theme_get(theme);
     lv_color_t bg_color;
     lv_color_t text_color;
     lv_color_t border_color;
 
-    if (theme == GUI_VIEW_THEME_DARK) {
-        bg_color = is_active ? lv_color_hex(0x1D4ED8) : lv_color_hex(0x0F172A);
-        text_color = is_active ? lv_color_hex(0xF8FAFC) : lv_color_hex(0xCBD5E1);
-        border_color = is_active ? lv_color_hex(0x60A5FA) : lv_color_hex(0x334155);
-    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-        bg_color = is_active ? lv_color_hex(0xFFE0EB) : lv_color_hex(0xFFF5F8);
-        text_color = is_active ? lv_color_hex(0x8A1D47) : lv_color_hex(0xA13A64);
-        border_color = is_active ? lv_color_hex(0xFB7185) : lv_color_hex(0xF4A3BE);
-    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-        bg_color = is_active ? lv_color_hex(0x3A3660) : lv_color_hex(0x2A2744);
-        text_color = is_active ? lv_color_hex(0xE8D8F0) : lv_color_hex(0xA890B8);
-        border_color = is_active ? lv_color_hex(0xD46A80) : lv_color_hex(0x3A3660);
-    } else if (theme == GUI_VIEW_THEME_TERMINAL) {
-        bg_color = is_active ? lv_color_hex(0x03F5FA) : lv_color_hex(0x0A1B20);
-        text_color = is_active ? lv_color_hex(0x031215) : lv_color_hex(0xC9FEFF);
-        border_color = is_active ? lv_color_hex(0x9BFCFF) : lv_color_hex(0x12848A);
-    } else {
-        bg_color = is_active ? lv_color_hex(0xE8F0FF) : lv_color_hex(0x1B2437);
-        text_color = is_active ? lv_color_hex(0x10213D) : lv_color_hex(0xDCE6F5);
-        border_color = is_active ? lv_color_hex(0x8FB3FF) : lv_color_hex(0x2A3954);
+    if (def == NULL) {
+        return;
     }
+
+    bg_color = lv_color_hex(is_active ? def->nav_active_bg : def->nav_inactive_bg);
+    text_color = lv_color_hex(is_active ? def->nav_active_text : def->nav_inactive_text);
+    border_color = lv_color_hex(is_active ? def->nav_active_border : def->nav_inactive_border);
 
     lv_obj_set_style_bg_color(button, bg_color, 0);
     lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(button, border_color, 0);
     lv_obj_set_style_border_width(button, 1, 0);
     lv_obj_set_style_text_color(button, text_color, 0);
-    lv_obj_set_style_text_font(button, gui_view_body_font(theme), 0);
+    lv_obj_set_style_text_font(button, def->body_font, 0);
 }
 
 static void gui_view_style_action_button(lv_obj_t *button, gui_view_theme_t theme,
                                          bool is_primary)
 {
+    const gui_theme_def_t *def = gui_theme_get(theme);
     lv_color_t bg_color;
     lv_color_t text_color;
     lv_color_t border_color;
 
-    if (button == NULL) {
+    if ((button == NULL) || (def == NULL)) {
         return;
     }
 
-    if (theme == GUI_VIEW_THEME_DARK) {
-        if (is_primary) {
-            bg_color = lv_color_hex(0x2563EB);
-            text_color = lv_color_hex(0xF8FAFC);
-            border_color = lv_color_hex(0x60A5FA);
-        } else {
-            bg_color = lv_color_hex(0x172033);
-            text_color = lv_color_hex(0xD7E3F4);
-            border_color = lv_color_hex(0x475569);
-        }
-    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-        if (is_primary) {
-            bg_color = lv_color_hex(0xFB7185);
-            text_color = lv_color_hex(0xFFFDFE);
-            border_color = lv_color_hex(0xF472B6);
-        } else {
-            bg_color = lv_color_hex(0xFFF0F6);
-            text_color = lv_color_hex(0x8A1D47);
-            border_color = lv_color_hex(0xF4A3BE);
-        }
-    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-        if (is_primary) {
-            bg_color = lv_color_hex(0xD46A80);
-            text_color = lv_color_hex(0xF0E0F0);
-            border_color = lv_color_hex(0xD46A80);
-        } else {
-            bg_color = lv_color_hex(0x2A2744);
-            text_color = lv_color_hex(0xA890B8);
-            border_color = lv_color_hex(0x3A3660);
-        }
-    } else if (theme == GUI_VIEW_THEME_TERMINAL) {
-        if (is_primary) {
-            bg_color = lv_color_hex(0x03F5FA);
-            text_color = lv_color_hex(0x031215);
-            border_color = lv_color_hex(0x9BFCFF);
-        } else {
-            bg_color = lv_color_hex(0x0A1B20);
-            text_color = lv_color_hex(0xC9FEFF);
-            border_color = lv_color_hex(0x12848A);
-        }
-    } else {
-        if (is_primary) {
-            bg_color = lv_color_hex(0x1D4ED8);
-            text_color = lv_color_hex(0xFFFFFF);
-            border_color = lv_color_hex(0x1D4ED8);
-        } else {
-            bg_color = lv_color_hex(0xFFFFFF);
-            text_color = lv_color_hex(0x10213D);
-            border_color = lv_color_hex(0xD7E1EE);
-        }
-    }
+    bg_color = lv_color_hex(is_primary ? def->action_primary_bg : def->action_secondary_bg);
+    text_color = lv_color_hex(is_primary ? def->action_primary_text : def->action_secondary_text);
+    border_color = lv_color_hex(is_primary ? def->action_primary_border
+                                           : def->action_secondary_border);
 
     lv_obj_set_style_bg_color(button, bg_color, 0);
     lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(button, border_color, 0);
     lv_obj_set_style_border_width(button, is_primary ? 0 : 1, 0);
     lv_obj_set_style_text_color(button, text_color, 0);
-    lv_obj_set_style_text_font(button, gui_view_body_font(theme), 0);
+    lv_obj_set_style_text_font(button, def->body_font, 0);
 }
 
 static lv_obj_t *gui_view_create_nav_button(lv_obj_t *parent, lv_coord_t y, const char *label_text,
@@ -632,242 +490,76 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     view->current_show_background_image = show_background_image;
     view->current_night_variant_enabled = night_variant_enabled;
     view->has_current_appearance = true;
-    use_background_image = ((effective_theme == GUI_VIEW_THEME_HELLO_KITTY) ||
-                            (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) ||
-                            (effective_theme == GUI_VIEW_THEME_TERMINAL)) &&
-                           show_background_image;
-    body_font = gui_view_body_font(effective_theme);
-    emphasis_font = gui_view_emphasis_font(effective_theme);
 
-    if (effective_theme == GUI_VIEW_THEME_DARK) {
-        screen_bg = lv_color_hex(0x0B1220);
-        screen_grad = lv_color_hex(0x172033);
-        screen_bg_opa = LV_OPA_COVER;
-        sidebar_bg = lv_color_hex(0x020617);
-        sidebar_grad = lv_color_hex(0x111827);
-        sidebar_shadow = lv_color_hex(0x020617);
-        sidebar_bg_opa = LV_OPA_COVER;
-        brand_text = lv_color_hex(0xF8FAFC);
-        content_bg = lv_color_hex(0x111827);
-        content_shadow = lv_color_hex(0x020617);
-        content_bg_opa = LV_OPA_90;
-        title_text = lv_color_hex(0xF8FAFC);
-        subtitle_text = lv_color_hex(0xAAB7C8);
-        panel_bg = lv_color_hex(0x1E293B);
-        panel_border = lv_color_hex(0x334155);
-        panel_bg_opa = LV_OPA_COVER;
-        card_bg = lv_color_hex(0x0F172A);
-        card_border = lv_color_hex(0x334155);
-        item_bg = lv_color_hex(0x172033);
-        item_border = lv_color_hex(0x334155);
-        muted_text = lv_color_hex(0xCBD5E1);
-        value_text = lv_color_hex(0xF8FAFC);
-        keyboard_bg = lv_color_hex(0x243244);
-        keyboard_border = lv_color_hex(0x334155);
-        keyboard_key_bg = lv_color_hex(0x334155);
-        keyboard_key_text = lv_color_hex(0xF8FAFC);
-        keyboard_special_bg = lv_color_hex(0x2563EB);
-        keyboard_special_text = lv_color_hex(0xF8FAFC);
-        keyboard_special_border = lv_color_hex(0x60A5FA);
-        slider_bg = lv_color_hex(0x334155);
-        slider_knob_bg = lv_color_hex(0xE2E8F0);
-        dropdown_bg = lv_color_hex(0x172033);
-        dropdown_border = lv_color_hex(0x475569);
-        dropdown_selected_bg = lv_color_hex(0x2563EB);
-        dropdown_selected_text = lv_color_hex(0xF8FAFC);
-        accent_color = lv_color_hex(0x60A5FA);
-        accent_soft_color = lv_color_hex(0x93C5FD);
-        energy_chart_bg = lv_color_hex(0x0F172A);
-        energy_chart_grid = lv_color_hex(0x334155);
-        energy_chart_tick = lv_color_hex(0xAAB7C8);
-        energy_buy_color = lv_color_hex(0x60A5FA);
-        energy_solar_color = lv_color_hex(0xFCD34D);
-        energy_charge_color = lv_color_hex(0x34D399);
-        energy_sell_color = lv_color_hex(0xF87171);
-    } else if (effective_theme == GUI_VIEW_THEME_HELLO_KITTY) {
-        screen_bg = lv_color_hex(0xFFDDE8);
-        screen_grad = lv_color_hex(0xFFF7FB);
+    {
+        const gui_theme_def_t *def = gui_theme_get(effective_theme);
+
+        if (def == NULL) {
+            return;
+        }
+
+        use_background_image = (def->background_image != NULL) && show_background_image;
+        body_font     = def->body_font;
+        emphasis_font = def->emphasis_font;
+
+        screen_bg  = lv_color_hex(def->screen_bg);
+        screen_grad = lv_color_hex(def->screen_grad);
         screen_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        sidebar_bg = lv_color_hex(0xFFF0F5);
-        sidebar_grad = lv_color_hex(0xFFE3EC);
-        sidebar_shadow = lv_color_hex(0xF4A3BE);
+
+        sidebar_bg     = lv_color_hex(def->sidebar_bg);
+        sidebar_grad   = lv_color_hex(def->sidebar_grad);
+        sidebar_shadow = lv_color_hex(def->sidebar_shadow);
         sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        brand_text = lv_color_hex(0xC2185B);
-        content_bg = lv_color_hex(0xFFFDFE);
-        content_shadow = lv_color_hex(0xF6B8CC);
+        brand_text     = lv_color_hex(def->brand_text);
+
+        content_bg     = lv_color_hex(def->content_bg);
+        content_shadow = lv_color_hex(def->content_shadow);
         content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_90;
-        title_text = lv_color_hex(0x8A1D47);
-        subtitle_text = lv_color_hex(0xA65374);
-        panel_bg = lv_color_hex(0xFFF5F8);
-        panel_border = lv_color_hex(0xF6BDD0);
-        panel_bg_opa = LV_OPA_COVER;
-        card_bg = lv_color_hex(0xFFFFFF);
-        card_border = lv_color_hex(0xF7C9D8);
-        item_bg = lv_color_hex(0xFFF8FB);
-        item_border = lv_color_hex(0xF7C9D8);
-        muted_text = lv_color_hex(0xB0597E);
-        value_text = lv_color_hex(0x8A1D47);
-        keyboard_bg = lv_color_hex(0xFFD8E6);
-        keyboard_border = lv_color_hex(0xF4A3BE);
-        keyboard_key_bg = lv_color_hex(0xFFF5F8);
-        keyboard_key_text = lv_color_hex(0x8A1D47);
-        keyboard_special_bg = lv_color_hex(0xFB7185);
-        keyboard_special_text = lv_color_hex(0xFFFDFE);
-        keyboard_special_border = lv_color_hex(0xF472B6);
-        slider_bg = lv_color_hex(0xF6C1D4);
-        slider_knob_bg = lv_color_hex(0xFFFFFF);
-        dropdown_bg = lv_color_hex(0xFFF8FB);
-        dropdown_border = lv_color_hex(0xF4A3BE);
-        dropdown_selected_bg = lv_color_hex(0xFB7185);
-        dropdown_selected_text = lv_color_hex(0xFFFDFE);
-        accent_color = lv_color_hex(0xFB7185);
-        accent_soft_color = lv_color_hex(0xF472B6);
-        energy_chart_bg = lv_color_hex(0xFFFFFF);
-        energy_chart_grid = lv_color_hex(0xF6BDD0);
-        energy_chart_tick = lv_color_hex(0xA65374);
-        energy_buy_color = lv_color_hex(0xEC4899);
-        energy_solar_color = lv_color_hex(0xFCD34D);
-        energy_charge_color = lv_color_hex(0xA7F3D0);
-        energy_sell_color = lv_color_hex(0xF43F5E);
-    } else if (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-        screen_bg = lv_color_hex(0x1A1830);
-        screen_grad = lv_color_hex(0x16142B);
-        screen_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        sidebar_bg = lv_color_hex(0x1C1A30);
-        sidebar_grad = lv_color_hex(0x16142B);
-        sidebar_shadow = lv_color_hex(0x0D0C1A);
-        sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        brand_text = lv_color_hex(0xE8D8F0);
-        content_bg = lv_color_hex(0x1E1C34);
-        content_shadow = lv_color_hex(0x0D0C1A);
-        content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_90;
-        title_text = lv_color_hex(0xE8D8F0);
-        subtitle_text = lv_color_hex(0xA890B8);
-        panel_bg = lv_color_hex(0x222040);
-        panel_border = lv_color_hex(0x3A3660);
-        panel_bg_opa = LV_OPA_COVER;
-        card_bg = lv_color_hex(0x2A2744);
-        card_border = lv_color_hex(0x3A3660);
-        item_bg = lv_color_hex(0x242240);
-        item_border = lv_color_hex(0x3A3660);
-        muted_text = lv_color_hex(0xA890B8);
-        value_text = lv_color_hex(0xE8D8F0);
-        keyboard_bg = lv_color_hex(0x1E1C34);
-        keyboard_border = lv_color_hex(0x3A3660);
-        keyboard_key_bg = lv_color_hex(0x2A2744);
-        keyboard_key_text = lv_color_hex(0xE8D8F0);
-        keyboard_special_bg = lv_color_hex(0xD46A80);
-        keyboard_special_text = lv_color_hex(0xF0E0F0);
-        keyboard_special_border = lv_color_hex(0xC97090);
-        slider_bg = lv_color_hex(0x3A3660);
-        slider_knob_bg = lv_color_hex(0xE8D8F0);
-        dropdown_bg = lv_color_hex(0x2A2744);
-        dropdown_border = lv_color_hex(0x3A3660);
-        dropdown_selected_bg = lv_color_hex(0xD46A80);
-        dropdown_selected_text = lv_color_hex(0xF0E0F0);
-        accent_color = lv_color_hex(0xD46A80);
-        accent_soft_color = lv_color_hex(0xC97090);
-        energy_chart_bg = lv_color_hex(0x2A2744);
-        energy_chart_grid = lv_color_hex(0x3A3660);
-        energy_chart_tick = lv_color_hex(0xA890B8);
-        energy_buy_color = lv_color_hex(0xC97090);
-        energy_solar_color = lv_color_hex(0xD4965A);
-        energy_charge_color = lv_color_hex(0x8A9BD0);
-        energy_sell_color = lv_color_hex(0xD46A80);
-    } else if (effective_theme == GUI_VIEW_THEME_TERMINAL) {
-        screen_bg = lv_color_hex(0x051316);
-        screen_grad = lv_color_hex(0x0A2024);
-        screen_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        sidebar_bg = lv_color_hex(0x041014);
-        sidebar_grad = lv_color_hex(0x0A2329);
-        sidebar_shadow = lv_color_hex(0x0D7B80);
-        sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        brand_text = lv_color_hex(0x03F5FA);
-        content_bg = lv_color_hex(0x08171B);
-        content_shadow = lv_color_hex(0x0E6A70);
-        content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_90;
-        title_text = lv_color_hex(0x03F5FA);
-        subtitle_text = lv_color_hex(0x7CEBED);
-        panel_bg = lv_color_hex(0x0A1B20);
-        panel_border = lv_color_hex(0x12848A);
-        panel_bg_opa = LV_OPA_COVER;
-        card_bg = lv_color_hex(0x061419);
-        card_border = lv_color_hex(0x0E5E63);
-        item_bg = lv_color_hex(0x0B2127);
-        item_border = lv_color_hex(0x12848A);
-        muted_text = lv_color_hex(0x69DDE0);
-        value_text = lv_color_hex(0xD8FEFF);
-        keyboard_bg = lv_color_hex(0x08171B);
-        keyboard_border = lv_color_hex(0x0E5E63);
-        keyboard_key_bg = lv_color_hex(0x0A1B20);
-        keyboard_key_text = lv_color_hex(0x9BFCFF);
-        keyboard_special_bg = lv_color_hex(0x03F5FA);
-        keyboard_special_text = lv_color_hex(0x031215);
-        keyboard_special_border = lv_color_hex(0x9BFCFF);
-        slider_bg = lv_color_hex(0x16434A);
-        slider_knob_bg = lv_color_hex(0x03F5FA);
-        dropdown_bg = lv_color_hex(0x08171B);
-        dropdown_border = lv_color_hex(0x12848A);
-        dropdown_selected_bg = lv_color_hex(0x03F5FA);
-        dropdown_selected_text = lv_color_hex(0x031215);
-        accent_color = lv_color_hex(0x03F5FA);
-        accent_soft_color = lv_color_hex(0x9BFCFF);
-        energy_chart_bg = lv_color_hex(0x061419);
-        energy_chart_grid = lv_color_hex(0x0E5E63);
-        energy_chart_tick = lv_color_hex(0x69DDE0);
-        energy_buy_color = lv_color_hex(0x03F5FA);
-        energy_solar_color = lv_color_hex(0xB7FF5A);
-        energy_charge_color = lv_color_hex(0x3CFFE4);
-        energy_sell_color = lv_color_hex(0xFF6B8B);
-    } else {
-        screen_bg = lv_color_hex(0xDCE8F5);
-        screen_grad = lv_color_hex(0xF5F9FF);
-        screen_bg_opa = LV_OPA_COVER;
-        sidebar_bg = lv_color_hex(0x111827);
-        sidebar_grad = lv_color_hex(0x1E293B);
-        sidebar_shadow = lv_color_hex(0x94A3B8);
-        sidebar_bg_opa = LV_OPA_COVER;
-        brand_text = lv_color_hex(0xF8FAFC);
-        content_bg = lv_color_hex(0xFFFFFF);
-        content_shadow = lv_color_hex(0xB8C7DB);
-        content_bg_opa = LV_OPA_90;
-        title_text = lv_color_hex(0x10213D);
-        subtitle_text = lv_color_hex(0x607089);
-        panel_bg = lv_color_hex(0xF8FBFF);
-        panel_border = lv_color_hex(0xD9E3F1);
-        panel_bg_opa = LV_OPA_COVER;
-        card_bg = lv_color_hex(0xFFFFFF);
-        card_border = lv_color_hex(0xD7E1EE);
-        item_bg = lv_color_hex(0xF8FBFF);
-        item_border = lv_color_hex(0xD9E3F1);
-        muted_text = lv_color_hex(0x4A5C78);
-        value_text = lv_color_hex(0x0F172A);
-        keyboard_bg = lv_color_hex(0xE7EDF5);
-        keyboard_border = lv_color_hex(0xD7E1EE);
-        keyboard_key_bg = lv_color_hex(0xFFFFFF);
-        keyboard_key_text = lv_color_hex(0x10213D);
-        keyboard_special_bg = lv_color_hex(0x1D4ED8);
-        keyboard_special_text = lv_color_hex(0xFFFFFF);
-        keyboard_special_border = lv_color_hex(0x1D4ED8);
-        slider_bg = lv_color_hex(0xD9E3F1);
-        slider_knob_bg = lv_color_hex(0xFFFFFF);
-        dropdown_bg = lv_color_hex(0xFFFFFF);
-        dropdown_border = lv_color_hex(0xD7E1EE);
-        dropdown_selected_bg = lv_color_hex(0x1D4ED8);
-        dropdown_selected_text = lv_color_hex(0xFFFFFF);
-        accent_color = lv_color_hex(0x1D4ED8);
-        accent_soft_color = lv_color_hex(0x1D4ED8);
-        energy_chart_bg = lv_color_hex(0xFFFFFF);
-        energy_chart_grid = lv_color_hex(0xD9E3F1);
-        energy_chart_tick = lv_color_hex(0x607089);
-        energy_buy_color = lv_color_hex(0x1D4ED8);
-        energy_solar_color = lv_color_hex(0xF59E0B);
-        energy_charge_color = lv_color_hex(0x10B981);
-        energy_sell_color = lv_color_hex(0xEF4444);
+
+        title_text    = lv_color_hex(def->title_text);
+        subtitle_text = lv_color_hex(def->subtitle_text);
+        panel_bg      = lv_color_hex(def->panel_bg);
+        panel_border  = lv_color_hex(def->panel_border);
+        panel_bg_opa  = LV_OPA_COVER;
+        card_bg       = lv_color_hex(def->card_bg);
+        card_border   = lv_color_hex(def->card_border);
+        item_bg       = lv_color_hex(def->item_bg);
+        item_border   = lv_color_hex(def->item_border);
+        muted_text    = lv_color_hex(def->muted_text);
+        value_text    = lv_color_hex(def->value_text);
+
+        keyboard_bg             = lv_color_hex(def->keyboard_bg);
+        keyboard_border         = lv_color_hex(def->keyboard_border);
+        keyboard_key_bg         = lv_color_hex(def->keyboard_key_bg);
+        keyboard_key_text       = lv_color_hex(def->keyboard_key_text);
+        keyboard_special_bg     = lv_color_hex(def->keyboard_special_bg);
+        keyboard_special_text   = lv_color_hex(def->keyboard_special_text);
+        keyboard_special_border = lv_color_hex(def->keyboard_special_border);
+
+        slider_bg      = lv_color_hex(def->slider_bg);
+        slider_knob_bg = lv_color_hex(def->slider_knob_bg);
+
+        dropdown_bg            = lv_color_hex(def->dropdown_bg);
+        dropdown_border        = lv_color_hex(def->dropdown_border);
+        dropdown_selected_bg   = lv_color_hex(def->dropdown_selected_bg);
+        dropdown_selected_text = lv_color_hex(def->dropdown_selected_text);
+
+        accent_color      = lv_color_hex(def->accent_color);
+        accent_soft_color = lv_color_hex(def->accent_soft_color);
+
+        energy_chart_bg     = lv_color_hex(def->energy_chart_bg);
+        energy_chart_grid   = lv_color_hex(def->energy_chart_grid);
+        energy_chart_tick   = lv_color_hex(def->energy_chart_tick);
+        energy_buy_color    = lv_color_hex(def->energy_buy_color);
+        energy_solar_color  = lv_color_hex(def->energy_solar_color);
+        energy_charge_color = lv_color_hex(def->energy_charge_color);
+        energy_sell_color   = lv_color_hex(def->energy_sell_color);
     }
 
     if (view->background_image != NULL) {
-        const lv_img_dsc_t *background_src = gui_view_theme_background(effective_theme);
+        const lv_img_dsc_t *background_src = gui_theme_get(effective_theme) != NULL
+                             ? gui_theme_get(effective_theme)->background_image
+                             : NULL;
 
         if (background_src != NULL) {
             lv_img_set_src(view->background_image, background_src);
@@ -1111,11 +803,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_bg_color(view->network_dialog, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->network_dialog, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->network_dialog,
-                                  ((effective_theme == GUI_VIEW_THEME_HELLO_KITTY) ||
-                                   (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) ||
-                                   (effective_theme == GUI_VIEW_THEME_TERMINAL))
-                                      ? 1
-                                      : 0,
+                                  (gui_theme_get(effective_theme) != NULL &&
+                                   gui_theme_get(effective_theme)->dialog_has_border) ? 1 : 0,
                                   0);
     lv_obj_set_style_border_color(view->network_dialog, panel_border, 0);
     if (view->network_dialog_title != NULL) {
@@ -1139,11 +828,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_bg_color(view->password_dialog, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->password_dialog, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->password_dialog,
-                                  ((effective_theme == GUI_VIEW_THEME_HELLO_KITTY) ||
-                                   (effective_theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) ||
-                                   (effective_theme == GUI_VIEW_THEME_TERMINAL))
-                                      ? 1
-                                      : 0,
+                                  (gui_theme_get(effective_theme) != NULL &&
+                                   gui_theme_get(effective_theme)->dialog_has_border) ? 1 : 0,
                                   0);
     lv_obj_set_style_border_color(view->password_dialog, panel_border, 0);
     if (view->password_dialog_title != NULL) {
@@ -1239,7 +925,12 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_obj_set_style_bg_opa(view->screen, LV_OPA_COVER, 0);
 
     view->background_image = lv_img_create(view->screen);
-    lv_img_set_src(view->background_image, &hk_bg);
+    {
+        const gui_theme_def_t *default_theme = gui_theme_get(GUI_VIEW_THEME_HELLO_KITTY);
+        if ((default_theme != NULL) && (default_theme->background_image != NULL)) {
+            lv_img_set_src(view->background_image, default_theme->background_image);
+        }
+    }
     lv_obj_center(view->background_image);
     lv_obj_add_flag(view->background_image, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(view->background_image, LV_OBJ_FLAG_SCROLLABLE);

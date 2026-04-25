@@ -123,6 +123,10 @@ void gui_module_event_settings_cb(lv_event_t *event)
             theme = GUI_VIEW_THEME_HELLO_KITTY;
         } else if (selected_theme == 3U) {
             theme = GUI_VIEW_THEME_TERMINAL;
+        } else if (selected_theme == 4U) {
+            theme = GUI_VIEW_THEME_DEATH_NOTE;
+        } else if (selected_theme == 5U) {
+            theme = GUI_VIEW_THEME_SPONGEBOB;
         }
 
         runtime->control.appearance.theme = theme;

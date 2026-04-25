@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "gui_theme_defs.h"
+
 int32_t gui_view_abs_i32(int32_t value)
 {
     return (value < 0) ? -value : value;
@@ -42,98 +44,31 @@ void gui_view_set_textarea_text_if_changed(lv_obj_t *textarea, const char *text)
 void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme,
                                         bool is_selected, bool is_known, bool is_connected)
 {
+    const gui_theme_def_t *def = gui_theme_get(theme);
     lv_color_t bg_color;
     lv_color_t border_color;
     lv_color_t text_color;
 
-    if (theme == GUI_VIEW_THEME_DARK) {
-        bg_color = lv_color_hex(0x182334);
-        border_color = lv_color_hex(0x314155);
-        text_color = lv_color_hex(0xD7E3F4);
-    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-        bg_color = lv_color_hex(0xFFF7FB);
-        border_color = lv_color_hex(0xF9B7CD);
-        text_color = lv_color_hex(0x8A284E);
-    } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-        bg_color = lv_color_hex(0x2A2744);
-        border_color = lv_color_hex(0x3A3660);
-        text_color = lv_color_hex(0xA890B8);
-    } else if (theme == GUI_VIEW_THEME_TERMINAL) {
-        bg_color = lv_color_hex(0x08171B);
-        border_color = lv_color_hex(0x12848A);
-        text_color = lv_color_hex(0x9BFCFF);
-    } else {
-        bg_color = lv_color_hex(0xFFFFFF);
-        border_color = lv_color_hex(0xD7E1EE);
-        text_color = lv_color_hex(0x334155);
+    if (def == NULL) {
+        return;
     }
 
+    bg_color     = lv_color_hex(def->wifi_btn_bg);
+    border_color = lv_color_hex(def->wifi_btn_border);
+    text_color   = lv_color_hex(def->wifi_btn_text);
+
     if (is_connected) {
-        if (theme == GUI_VIEW_THEME_DARK) {
-            bg_color = lv_color_hex(0x153528);
-            border_color = lv_color_hex(0x4ADE80);
-            text_color = lv_color_hex(0xBBF7D0);
-        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-            bg_color = lv_color_hex(0xFFE7EF);
-            border_color = lv_color_hex(0xFF6B9A);
-            text_color = lv_color_hex(0x8A1D47);
-        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-            bg_color = lv_color_hex(0x222040);
-            border_color = lv_color_hex(0xD46A80);
-            text_color = lv_color_hex(0xE8D8F0);
-        } else if (theme == GUI_VIEW_THEME_TERMINAL) {
-            bg_color = lv_color_hex(0x0A1B20);
-            border_color = lv_color_hex(0x03F5FA);
-            text_color = lv_color_hex(0xD8FEFF);
-        } else {
-            bg_color = lv_color_hex(0xDCFCE7);
-            border_color = lv_color_hex(0x22C55E);
-            text_color = lv_color_hex(0x14532D);
-        }
+        bg_color     = lv_color_hex(def->wifi_btn_connected_bg);
+        border_color = lv_color_hex(def->wifi_btn_connected_border);
+        text_color   = lv_color_hex(def->wifi_btn_connected_text);
     } else if (is_known) {
-        if (theme == GUI_VIEW_THEME_DARK) {
-            bg_color = lv_color_hex(0x162D22);
-            border_color = lv_color_hex(0x86EFAC);
-            text_color = lv_color_hex(0xD1FAE5);
-        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-            bg_color = lv_color_hex(0xFFF0F6);
-            border_color = lv_color_hex(0xF9A8C4);
-            text_color = lv_color_hex(0x9D174D);
-        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-            bg_color = lv_color_hex(0x222040);
-            border_color = lv_color_hex(0xC97090);
-            text_color = lv_color_hex(0xE8D8F0);
-        } else if (theme == GUI_VIEW_THEME_TERMINAL) {
-            bg_color = lv_color_hex(0x061419);
-            border_color = lv_color_hex(0x0E5E63);
-            text_color = lv_color_hex(0x9BFCFF);
-        } else {
-            bg_color = lv_color_hex(0xF0FDF4);
-            border_color = lv_color_hex(0x86EFAC);
-            text_color = lv_color_hex(0x166534);
-        }
+        bg_color     = lv_color_hex(def->wifi_btn_known_bg);
+        border_color = lv_color_hex(def->wifi_btn_known_border);
+        text_color   = lv_color_hex(def->wifi_btn_known_text);
     } else if (is_selected) {
-        if (theme == GUI_VIEW_THEME_DARK) {
-            bg_color = lv_color_hex(0x1A2B45);
-            border_color = lv_color_hex(0x60A5FA);
-            text_color = lv_color_hex(0xBFDBFE);
-        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY) {
-            bg_color = lv_color_hex(0xFFE2EC);
-            border_color = lv_color_hex(0xFB7185);
-            text_color = lv_color_hex(0x881337);
-        } else if (theme == GUI_VIEW_THEME_HELLO_KITTY_NIGHT) {
-            bg_color = lv_color_hex(0x2A2744);
-            border_color = lv_color_hex(0xD46A80);
-            text_color = lv_color_hex(0xE8D8F0);
-        } else if (theme == GUI_VIEW_THEME_TERMINAL) {
-            bg_color = lv_color_hex(0x0B2127);
-            border_color = lv_color_hex(0x03F5FA);
-            text_color = lv_color_hex(0xD8FEFF);
-        } else {
-            bg_color = lv_color_hex(0xE6F0FF);
-            border_color = lv_color_hex(0x7CA6F8);
-            text_color = lv_color_hex(0x123364);
-        }
+        bg_color     = lv_color_hex(def->wifi_btn_selected_bg);
+        border_color = lv_color_hex(def->wifi_btn_selected_border);
+        text_color   = lv_color_hex(def->wifi_btn_selected_text);
     }
 
     lv_obj_set_style_radius(button, 14, 0);
