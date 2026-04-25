@@ -30,6 +30,8 @@ lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t s
         case GUI_WIFI_STATE_CONNECTED:
             return (def != NULL) ? lv_color_hex(def->wifi_connected_color)
                                  : lv_color_hex(0x1D4ED8);
+        case GUI_WIFI_STATE_CONNECTING:
+            return lv_color_hex(0xF59E0B);
         case GUI_WIFI_STATE_SCANNED:
             return lv_color_hex(0xF59E0B);
         case GUI_WIFI_STATE_FAILED:
@@ -686,9 +688,11 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_font(view->brightness_value_label, emphasis_font, 0);
     }
     if (view->wifi_status_label != NULL) {
+        lv_obj_set_style_text_color(view->wifi_status_label, muted_text, 0);
         lv_obj_set_style_text_font(view->wifi_status_label, body_font, 0);
     }
     if (view->wifi_selected_label != NULL) {
+        lv_obj_set_style_text_color(view->wifi_selected_label, subtitle_text, 0);
         lv_obj_set_style_text_font(view->wifi_selected_label, body_font, 0);
     }
     if (view->brightness_slider != NULL) {
@@ -796,9 +800,11 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     }
 
     gui_view_style_action_button(view->scan_button, effective_theme, true);
+    gui_view_style_action_button(view->disconnect_button, effective_theme, false);
     gui_view_style_action_button(view->network_dialog_cancel_button, effective_theme, false);
     gui_view_style_action_button(view->password_dialog_cancel_button, effective_theme, false);
     gui_view_style_action_button(view->password_dialog_connect_button, effective_theme, true);
+    gui_view_style_action_button(view->password_dialog_disconnect_button, effective_theme, false);
 
     lv_obj_set_style_bg_color(view->network_dialog, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->network_dialog, LV_OPA_COVER, 0);
@@ -839,6 +845,10 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     if (view->password_dialog_network_label != NULL) {
         lv_obj_set_style_text_color(view->password_dialog_network_label, subtitle_text, 0);
         lv_obj_set_style_text_font(view->password_dialog_network_label, body_font, 0);
+    }
+    if (view->password_dialog_status_label != NULL) {
+        lv_obj_set_style_text_color(view->password_dialog_status_label, muted_text, 0);
+        lv_obj_set_style_text_font(view->password_dialog_status_label, body_font, 0);
     }
 
     lv_obj_set_style_bg_color(view->wifi_password_textarea, dropdown_bg, 0);

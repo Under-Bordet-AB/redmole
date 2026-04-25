@@ -37,6 +37,8 @@ static bool gui_view_wifi_settings_changed(gui_view_t *view, const gui_wifi_sett
         (last_wifi->selected_network_index != wifi->selected_network_index) ||
         (last_wifi->selected_known_network_index != wifi->selected_known_network_index) ||
         (last_wifi->state != wifi->state) ||
+        (last_wifi->connect_requested != wifi->connect_requested) ||
+        (last_wifi->can_disconnect != wifi->can_disconnect) ||
         (strcmp(last_wifi->selected_ssid, wifi->selected_ssid) != 0) ||
         (strcmp(last_wifi->password, wifi->password) != 0) ||
         (strcmp(last_wifi->status_text, wifi->status_text) != 0)) {
@@ -340,6 +342,22 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->scan_button = gui_view_create_action_button(wifi_card, 0, 0, 120, "Scan",
                                                       LV_EVENT_CLICKED, settings_event_cb,
                                                       event_user_data);
+    view->disconnect_button = gui_view_create_action_button(
+        wifi_card, 0, 0, 120, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
+    lv_obj_add_flag(view->disconnect_button, LV_OBJ_FLAG_HIDDEN);
+
+    view->wifi_status_label = lv_label_create(wifi_card);
+    lv_label_set_text(view->wifi_status_label, "Press Scan to search for Wi-Fi networks.");
+    lv_obj_set_width(view->wifi_status_label, LV_PCT(100));
+    lv_label_set_long_mode(view->wifi_status_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_color(view->wifi_status_label, lv_color_hex(0x607089), 0);
+
+    view->wifi_selected_label = lv_label_create(wifi_card);
+    lv_label_set_text(view->wifi_selected_label, "");
+    lv_obj_set_width(view->wifi_selected_label, LV_PCT(100));
+    lv_label_set_long_mode(view->wifi_selected_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_color(view->wifi_selected_label, lv_color_hex(0x10213D), 0);
 
     bluetooth_card = gui_view_create_setting_item_card(
         connectivity_stack, "Bluetooth",
@@ -586,9 +604,17 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_align(view->password_dialog_network_label, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_align(view->password_dialog_network_label, LV_ALIGN_TOP_MID, 0, 34);
 
+    view->password_dialog_status_label = lv_label_create(view->password_dialog);
+    lv_obj_set_width(view->password_dialog_status_label, 662);
+    lv_label_set_long_mode(view->password_dialog_status_label, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(view->password_dialog_status_label, "");
+    lv_obj_set_style_text_color(view->password_dialog_status_label, lv_color_hex(0x607089), 0);
+    lv_obj_set_style_text_align(view->password_dialog_status_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_align(view->password_dialog_status_label, LV_ALIGN_TOP_MID, 0, 56);
+
     view->wifi_password_textarea = lv_textarea_create(view->password_dialog);
     lv_obj_set_size(view->wifi_password_textarea, 662, 52);
-    lv_obj_align(view->wifi_password_textarea, LV_ALIGN_TOP_MID, 0, 78);
+    lv_obj_align(view->wifi_password_textarea, LV_ALIGN_TOP_MID, 0, 96);
     lv_textarea_set_one_line(view->wifi_password_textarea, true);
     lv_textarea_set_password_mode(view->wifi_password_textarea, true);
     lv_textarea_set_placeholder_text(view->wifi_password_textarea, "Enter Wi-Fi password");
@@ -607,10 +633,14 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
 
     view->password_dialog_cancel_button = gui_view_create_action_button(
-        view->password_dialog, 426, 146, 128, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 282, 164, 128, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
+    view->password_dialog_disconnect_button = gui_view_create_action_button(
+        view->password_dialog, 426, 164, 128, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
+    lv_obj_add_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
     view->password_dialog_connect_button = gui_view_create_action_button(
-        view->password_dialog, 570, 146, 132, "Connect", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 570, 164, 132, "Connect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     lv_obj_set_style_bg_color(view->password_dialog_connect_button, lv_color_hex(0x1D4ED8), 0);
     lv_obj_set_style_text_color(view->password_dialog_connect_button, lv_color_hex(0xFFFFFF), 0);
@@ -624,6 +654,8 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
 {
     char wifi_text[72];
     const char *network_empty_text = "No networks found yet.";
+    bool can_disconnect;
+    bool is_connecting;
     bool wifi_changed;
     uint8_t network_index;
 
@@ -682,7 +714,52 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
                                   0);
     }
 
-    gui_view_set_label_text_if_changed(view->wifi_status_label, "");
+    can_disconnect = model->wifi.can_disconnect;
+    is_connecting = model->wifi.state == GUI_WIFI_STATE_CONNECTING;
+
+    if (view->disconnect_button != NULL) {
+        if (can_disconnect) {
+            lv_obj_clear_flag(view->disconnect_button, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->disconnect_button, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (view->scan_button != NULL) {
+        if (is_connecting) {
+            lv_obj_add_state(view->scan_button, LV_STATE_DISABLED);
+        } else {
+            lv_obj_clear_state(view->scan_button, LV_STATE_DISABLED);
+        }
+    }
+
+    if (view->password_dialog_connect_button != NULL) {
+        if (is_connecting) {
+            lv_obj_add_state(view->password_dialog_connect_button, LV_STATE_DISABLED);
+        } else {
+            lv_obj_clear_state(view->password_dialog_connect_button, LV_STATE_DISABLED);
+        }
+    }
+
+    if (view->password_dialog_disconnect_button != NULL) {
+        if (can_disconnect) {
+            lv_obj_clear_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    gui_view_set_label_text_if_changed(view->wifi_status_label, model->wifi.status_text);
+    gui_view_set_label_text_if_changed(view->password_dialog_status_label, model->wifi.status_text);
+    if ((model->wifi.selected_ssid[0] != '\0') &&
+        ((model->wifi.state == GUI_WIFI_STATE_CONNECTING) ||
+         (model->wifi.state == GUI_WIFI_STATE_CONNECTED))) {
+        snprintf(wifi_text, sizeof(wifi_text), "Network: %s", model->wifi.selected_ssid);
+    } else {
+        wifi_text[0] = '\0';
+    }
+    gui_view_set_label_text_if_changed(view->wifi_selected_label, wifi_text);
+
     if (model->wifi.selected_ssid[0] != '\0') {
         gui_view_set_label_text_if_changed(view->password_dialog_network_label,
                                            model->wifi.selected_ssid);

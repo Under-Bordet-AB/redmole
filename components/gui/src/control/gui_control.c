@@ -17,6 +17,8 @@ void gui_control_init(gui_control_t *control)
     control->appearance.night_variant_enabled = false;
     control->wifi.selected_network_index = -1;
     control->wifi.selected_known_network_index = -1;
+    control->wifi.connect_requested = false;
+    control->wifi.can_disconnect = false;
     control->wifi.state = GUI_WIFI_STATE_IDLE;
     gui_control_reset_wifi_scan(control);
     gui_control_copy_status(&control->wifi, "Press Scan to search for Wi-Fi networks.");

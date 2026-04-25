@@ -19,6 +19,7 @@ typedef struct {
     void (*on_wifi_network_selected)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data);
     bool (*on_wifi_known_network_requested)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data);
     bool (*on_wifi_connect_requested)(gui_ctx_t *self, const char *ssid, const char *password, void *user_data);
+    bool (*on_wifi_disconnect_requested)(gui_ctx_t *self, void *user_data);
 } gui_module_bindings_t;
 
 void gui_init(gui_ctx_t *self);

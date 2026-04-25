@@ -34,6 +34,7 @@ typedef struct {
     lv_obj_t *bluetooth_status_label;
     lv_obj_t *brightness_card;
     lv_obj_t *scan_button;
+    lv_obj_t *disconnect_button;
     lv_obj_t *theme_card;
     lv_obj_t *theme_dropdown;
     lv_obj_t *theme_background_label;
@@ -55,10 +56,12 @@ typedef struct {
     lv_obj_t *password_dialog;
     lv_obj_t *password_dialog_title;
     lv_obj_t *password_dialog_network_label;
+    lv_obj_t *password_dialog_status_label;
     lv_obj_t *wifi_password_textarea;
     lv_obj_t *wifi_keyboard;
     lv_obj_t *password_dialog_cancel_button;
     lv_obj_t *password_dialog_connect_button;
+    lv_obj_t *password_dialog_disconnect_button;
     lv_obj_t *temperature_value;
     lv_obj_t *humidity_value;
     lv_obj_t *pressure_value;

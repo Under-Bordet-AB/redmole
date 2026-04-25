@@ -14,6 +14,8 @@ typedef struct {
     gui_ctx_t *gui;
     bool wifi_connect_requested;
     bool wifi_scan_requested;
+    bool wifi_disconnect_requested;
+    char requested_ssid[GUI_WIFI_SSID_MAX_LEN];
 } app_gui_bindings_ctx_t;
 
 static app_gui_bindings_ctx_t s_bindings;
@@ -22,6 +24,7 @@ static app_gui_bindings_ctx_t s_bindings;
 //////////////////////////
 
 static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password, void *user_data);
+static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data);
 
 // Function definitions
 //////////////////////////
@@ -47,7 +50,9 @@ static gui_wifi_state_t map_wifi_state(nac_wifi_status_t status)
         case NAC_WIFI_ERROR:
             return GUI_WIFI_STATE_FAILED;
         case NAC_WIFI_SCANNING:
+            return GUI_WIFI_STATE_SCANNED;
         case NAC_WIFI_CONNECTING:
+            return GUI_WIFI_STATE_CONNECTING;
         case NAC_WIFI_DISCONNECTED:
         default:
             return GUI_WIFI_STATE_IDLE;
@@ -131,11 +136,18 @@ static void sync_wifi(gui_ctx_t *gui)
 
     nac_status = nac_get_wifi_status();
     wifi.state = map_wifi_state(nac_status);
+    wifi.connect_requested = s_bindings.wifi_connect_requested;
+    wifi.can_disconnect = nac_status == NAC_WIFI_CONNECTED;
+
+    if ((wifi.selected_ssid[0] == '\0') && (s_bindings.requested_ssid[0] != '\0')) {
+        snprintf(wifi.selected_ssid, sizeof(wifi.selected_ssid), "%s", s_bindings.requested_ssid);
+    }
 
     if (nac_status == NAC_WIFI_SCANNING) {
         snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
                  "Scanning for Wi-Fi networks...");
     } else if (s_bindings.wifi_scan_requested && nac_scan_is_complete()) {
+        s_bindings.wifi_scan_requested = false;
         copy_scan_results(&wifi);
         if (wifi.network_count > 0U) {
             wifi.state = GUI_WIFI_STATE_SCANNED;
@@ -146,16 +158,60 @@ static void sync_wifi(gui_ctx_t *gui)
                      "Scan complete. No Wi-Fi networks found.");
         }
     } else if (nac_status == NAC_WIFI_CONNECTING) {
-        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Connecting to Wi-Fi...");
+        if (wifi.selected_ssid[0] != '\0') {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connecting to %s...",
+                     wifi.selected_ssid);
+        } else {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Connecting to Wi-Fi...");
+        }
     } else if (nac_status == NAC_WIFI_CONNECTED) {
         s_bindings.wifi_connect_requested = false;
-        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi connected.");
+        s_bindings.wifi_disconnect_requested = false;
+        wifi.connect_requested = false;
+        wifi.can_disconnect = true;
+        if (wifi.selected_ssid[0] != '\0') {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connected to %s.",
+                     wifi.selected_ssid);
+        } else {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi connected.");
+        }
+        gui_set_wifi_settings(gui, &wifi);
+        gui_hide_wifi_dialogs(gui);
+        return;
     } else if (nac_status == NAC_WIFI_ERROR) {
         s_bindings.wifi_connect_requested = false;
-        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi error.");
+        s_bindings.wifi_disconnect_requested = false;
+        wifi.connect_requested = false;
+        wifi.can_disconnect = false;
+        if (wifi.selected_ssid[0] != '\0') {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "Failed to connect to %s.",
+                     wifi.selected_ssid);
+        } else {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi connection failed.");
+        }
     } else if (s_bindings.wifi_connect_requested) {
-        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                 "Connection requested. NAC uses configured Wi-Fi credentials.");
+        wifi.state = GUI_WIFI_STATE_CONNECTING;
+        wifi.connect_requested = true;
+        if (wifi.selected_ssid[0] != '\0') {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connecting to %s...",
+                     wifi.selected_ssid);
+        } else {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
+                     "Connecting to Wi-Fi...");
+        }
+    } else if (s_bindings.wifi_disconnect_requested) {
+        s_bindings.wifi_disconnect_requested = false;
+        wifi.connect_requested = false;
+        wifi.can_disconnect = false;
+        wifi.state = GUI_WIFI_STATE_IDLE;
+        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Disconnected.");
+    } else {
+        wifi.connect_requested = false;
+        wifi.can_disconnect = false;
+        if (wifi.status_text[0] == '\0') {
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
+                     "Press Scan to search for Wi-Fi networks.");
+        }
     }
 
     gui_set_wifi_settings(gui, &wifi);
@@ -184,7 +240,7 @@ static bool on_wifi_scan_requested(gui_ctx_t *gui, void *user_data)
     }
 
     s_bindings.wifi_scan_requested = true;
-    set_wifi_status(gui, "Scanning for Wi-Fi networks...", GUI_WIFI_STATE_IDLE);
+    set_wifi_status(gui, "Scanning for Wi-Fi networks...", GUI_WIFI_STATE_SCANNED);
     return true;
 }
 
@@ -215,8 +271,7 @@ static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const ch
 {
     esp_err_t result;
 
-    //(void)password;
-    //(void)user_data;
+    (void)user_data;
 
     result = nac_request_wifi_connect(ssid, password);
     if (result != ESP_OK) {
@@ -226,9 +281,41 @@ static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const ch
     }
 
     s_bindings.wifi_connect_requested = true;
+    s_bindings.wifi_disconnect_requested = false;
+    if (ssid != NULL) {
+        snprintf(s_bindings.requested_ssid, sizeof(s_bindings.requested_ssid), "%s", ssid);
+    } else {
+        s_bindings.requested_ssid[0] = '\0';
+    }
     ESP_LOGI(TAG, "GUI requested Wi-Fi connection for %s", (ssid != NULL) ? ssid : "<none>");
-    set_wifi_status(gui, "Connection requested. NAC uses configured Wi-Fi credentials.",
-                    GUI_WIFI_STATE_IDLE);
+    if ((ssid != NULL) && (ssid[0] != '\0')) {
+        char status_text[GUI_WIFI_STATUS_TEXT_MAX_LEN];
+
+        snprintf(status_text, sizeof(status_text), "Connecting to %s...", ssid);
+        set_wifi_status(gui, status_text, GUI_WIFI_STATE_CONNECTING);
+    } else {
+        set_wifi_status(gui, "Connecting to Wi-Fi...", GUI_WIFI_STATE_CONNECTING);
+    }
+    return true;
+}
+
+static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data)
+{
+    esp_err_t result;
+
+    (void)user_data;
+
+    result = nac_request_wifi_disconnect();
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "nac_request_wifi_disconnect failed: %s", esp_err_to_name(result));
+        set_wifi_status(gui, "Failed to disconnect Wi-Fi.", GUI_WIFI_STATE_FAILED);
+        return true;
+    }
+
+    s_bindings.wifi_connect_requested = false;
+    s_bindings.wifi_disconnect_requested = true;
+    ESP_LOGI(TAG, "GUI requested Wi-Fi disconnect");
+    set_wifi_status(gui, "Disconnected.", GUI_WIFI_STATE_IDLE);
     return true;
 }
 
@@ -252,6 +339,7 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
     bindings.on_wifi_network_selected = on_wifi_network_selected;
     bindings.on_wifi_known_network_requested = on_wifi_known_network_requested;
     bindings.on_wifi_connect_requested = on_wifi_connect_requested;
+    bindings.on_wifi_disconnect_requested = on_wifi_disconnect_requested;
     gui_set_bindings(gui, &bindings);
 
     app_gui_bindings_sync(gui);

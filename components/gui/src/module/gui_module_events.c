@@ -59,6 +59,17 @@ static bool gui_module_handle_wifi_connect_request(gui_module_runtime_t *runtime
                                                        runtime->bindings.user_data);
 }
 
+static bool gui_module_handle_wifi_disconnect_request(gui_module_runtime_t *runtime)
+{
+    if ((runtime == NULL) || (runtime->owner == NULL) ||
+        (runtime->bindings.on_wifi_disconnect_requested == NULL)) {
+        return false;
+    }
+
+    return runtime->bindings.on_wifi_disconnect_requested(runtime->owner,
+                                                          runtime->bindings.user_data);
+}
+
 void gui_module_event_nav_cb(lv_event_t *event)
 {
     gui_module_runtime_t *runtime;
@@ -197,9 +208,16 @@ void gui_module_event_settings_cb(lv_event_t *event)
             gui_control_connect_wifi(&runtime->control);
         }
         gui_module_apply_model(runtime);
-        if (runtime->control.wifi.state == GUI_WIFI_STATE_CONNECTED) {
-            gui_view_hide_wifi_dialogs(&runtime->view);
+        return;
+    }
+
+    if (((target == runtime->view.disconnect_button) ||
+         (target == runtime->view.password_dialog_disconnect_button)) &&
+        (event_code == LV_EVENT_CLICKED)) {
+        if (!gui_module_handle_wifi_disconnect_request(runtime)) {
+            gui_control_disconnect_wifi(&runtime->control);
         }
+        gui_module_apply_model(runtime);
         return;
     }
 
@@ -233,9 +251,6 @@ void gui_module_event_settings_cb(lv_event_t *event)
                         runtime, &runtime->control.wifi.known_networks[(uint8_t)known_network_index])) {
                     gui_control_connect_known_wifi(&runtime->control, (uint8_t)known_network_index);
                     gui_module_apply_model(runtime);
-                    if (runtime->control.wifi.state == GUI_WIFI_STATE_CONNECTED) {
-                        gui_view_hide_wifi_dialogs(&runtime->view);
-                    }
                 }
             } else {
                 gui_control_select_wifi_network(&runtime->control, network_index);

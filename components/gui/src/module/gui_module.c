@@ -48,6 +48,8 @@ static bool gui_module_wifi_settings_equals(const gui_wifi_settings_t *left,
         (left->selected_network_index != right->selected_network_index) ||
         (left->selected_known_network_index != right->selected_known_network_index) ||
         (left->state != right->state) ||
+        (left->connect_requested != right->connect_requested) ||
+        (left->can_disconnect != right->can_disconnect) ||
         (strcmp(left->selected_ssid, right->selected_ssid) != 0) ||
         (strcmp(left->password, right->password) != 0) ||
         (strcmp(left->status_text, right->status_text) != 0)) {

@@ -46,6 +46,7 @@ typedef struct {
 typedef enum {
     GUI_WIFI_STATE_IDLE = 0,
     GUI_WIFI_STATE_SCANNED,
+    GUI_WIFI_STATE_CONNECTING,
     GUI_WIFI_STATE_CONNECTED,
     GUI_WIFI_STATE_FAILED,
 } gui_wifi_state_t;
@@ -67,6 +68,8 @@ typedef struct {
     char password[GUI_WIFI_PASSWORD_MAX_LEN + 1];
     char status_text[GUI_WIFI_STATUS_TEXT_MAX_LEN];
     gui_wifi_state_t state;
+    bool connect_requested;
+    bool can_disconnect;
 } gui_wifi_settings_t;
 
 typedef struct {
