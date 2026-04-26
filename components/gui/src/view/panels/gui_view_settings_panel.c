@@ -376,15 +376,15 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     }
 
     connectivity_card = gui_view_create_settings_card(settings_grid, "Connectivity",
-                                                      "Manage how Redmole connects to nearby devices and networks.",
+                                                      "Manage connections to devices and networks.",
                                                       LV_SIZE_CONTENT);
     view->connectivity_card = connectivity_card;
     lv_obj_set_grid_cell(connectivity_card, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0,
                          1);
 
     other_settings_card = gui_view_create_settings_card(
-        settings_grid, "Other settings",
-        "Display and system controls for the device.", LV_SIZE_CONTENT);
+        settings_grid, "Display settings",
+        "Control brightness and interface appearance.", LV_SIZE_CONTENT);
     view->other_settings_card = other_settings_card;
     lv_obj_set_grid_cell(other_settings_card, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START,
                          0, 1);
@@ -435,7 +435,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     view->wifi_subtitle_label = lv_label_create(wifi_card);
     lv_label_set_text(view->wifi_subtitle_label,
-                      "Scan to find networks, then choose one to connect.");
+                      "Scan for networks and connect.");
     lv_obj_set_width(view->wifi_subtitle_label, LV_PCT(100));
     lv_label_set_long_mode(view->wifi_subtitle_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_color(view->wifi_subtitle_label, lv_color_hex(0x607089), 0);
@@ -464,7 +464,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     bluetooth_card = gui_view_create_setting_item_card(
         connectivity_stack, "Bluetooth",
-        "Reserved for nearby device discovery and pairing.", LV_SIZE_CONTENT);
+        "Connect to nearby devices.", LV_SIZE_CONTENT);
     view->bluetooth_card = bluetooth_card;
 
     bluetooth_status = lv_label_create(bluetooth_card);
@@ -488,7 +488,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     brightness_card = gui_view_create_setting_item_card(
         other_settings_stack, "Screen brightness",
-        "Adjust the display backlight level for readability and power use.",
+        "Adjust the backlight level.",
         LV_SIZE_CONTENT);
     view->brightness_card = brightness_card;
 
@@ -531,7 +531,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     theme_card = gui_view_create_setting_item_card(
         other_settings_stack, "Theme",
-        "Choose how the interface should look.", LV_SIZE_CONTENT);
+        "Choose interface style.", LV_SIZE_CONTENT);
     view->theme_card = theme_card;
 
     view->theme_dropdown = lv_dropdown_create(theme_card);
