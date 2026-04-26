@@ -130,11 +130,14 @@ lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t
                                       lv_coord_t width, lv_color_t color,
                                       const char *text)
 {
+    (void)x;
+    (void)y;
+
     lv_obj_t *item = lv_obj_create(parent);
     lv_obj_set_size(item, width, 20);
-    lv_obj_set_pos(item, x, y);
     lv_obj_set_style_bg_opa(item, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(item, 0, 0);
+    lv_obj_set_style_shadow_width(item, 0, 0);
     lv_obj_set_style_pad_all(item, 0, 0);
     lv_obj_clear_flag(item, LV_OBJ_FLAG_SCROLLABLE);
 

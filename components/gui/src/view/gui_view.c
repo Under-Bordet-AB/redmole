@@ -108,33 +108,35 @@ static void gui_view_update_sidebar_clock_impl(gui_view_t *view)
 static void gui_view_apply_header(gui_view_t *view, const gui_view_model_t *model)
 {
     if (model->active_panel == GUI_PANEL_BME280) {
-        gui_view_set_label_text_if_changed(view->header_title, "BME280 Overview");
-        gui_view_set_label_text_if_changed(
-            view->header_subtitle,
-            "Temperature, humidity, and pressure from the sensor data pipeline.");
+        lv_obj_add_flag(view->header_title, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(view->header_subtitle, LV_OBJ_FLAG_HIDDEN);
+        gui_view_set_label_text_if_changed(view->header_title, "");
+        gui_view_set_label_text_if_changed(view->header_subtitle, "");
         lv_obj_clear_flag(view->bme280_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->energy_plan_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->forecast_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->settings_panel, LV_OBJ_FLAG_HIDDEN);
     } else if (model->active_panel == GUI_PANEL_ENERGY_PLAN) {
-        gui_view_set_label_text_if_changed(view->header_title, "LEOP Energy Plan");
-        gui_view_set_label_text_if_changed(
-            view->header_subtitle,
-            "Recommendations for grid, solar, battery, and export decisions.");
+        lv_obj_add_flag(view->header_title, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(view->header_subtitle, LV_OBJ_FLAG_HIDDEN);
+        gui_view_set_label_text_if_changed(view->header_title, "");
+        gui_view_set_label_text_if_changed(view->header_subtitle, "");
         lv_obj_add_flag(view->bme280_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(view->energy_plan_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->forecast_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->settings_panel, LV_OBJ_FLAG_HIDDEN);
     } else if (model->active_panel == GUI_PANEL_FORECAST) {
-        gui_view_set_label_text_if_changed(view->header_title, "Weather Forecast");
-        gui_view_set_label_text_if_changed(
-            view->header_subtitle,
-            "Today, conditions details, and the next few days at a glance.");
+        lv_obj_add_flag(view->header_title, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(view->header_subtitle, LV_OBJ_FLAG_HIDDEN);
+        gui_view_set_label_text_if_changed(view->header_title, "");
+        gui_view_set_label_text_if_changed(view->header_subtitle, "");
         lv_obj_add_flag(view->bme280_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->energy_plan_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(view->forecast_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->settings_panel, LV_OBJ_FLAG_HIDDEN);
     } else {
+        lv_obj_clear_flag(view->header_title, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(view->header_subtitle, LV_OBJ_FLAG_HIDDEN);
         gui_view_set_label_text_if_changed(view->header_title, "");
         gui_view_set_label_text_if_changed(view->header_subtitle, "");
         lv_obj_add_flag(view->bme280_panel, LV_OBJ_FLAG_HIDDEN);

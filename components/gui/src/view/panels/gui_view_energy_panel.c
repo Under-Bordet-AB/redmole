@@ -4,11 +4,48 @@
 
 #include "../gui_view_common.h"
 
-#define GUI_VIEW_ENERGY_LEGEND_WIDTH 630
+#define GUI_VIEW_ENERGY_PANEL_MARGIN 24
 #define GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH 300
 #define GUI_VIEW_ENERGY_LEGEND_ROW_GAP 8
-#define GUI_VIEW_ENERGY_CHART_WIDTH 630
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE 52
+
+static void gui_view_layout_energy_panel(gui_view_t *view)
+{
+    lv_obj_t *legend_container;
+    lv_obj_t *time_row;
+    lv_coord_t panel_width;
+    lv_coord_t panel_height;
+
+    if ((view == NULL) || (view->content == NULL) || (view->energy_plan_panel == NULL)) {
+        return;
+    }
+
+    panel_width = lv_obj_get_content_width(view->content) - (GUI_VIEW_ENERGY_PANEL_MARGIN * 2);
+    panel_height =
+        lv_obj_get_content_height(view->content) - (GUI_VIEW_ENERGY_PANEL_MARGIN * 2);
+
+    if ((panel_width <= 0) || (panel_height <= 0)) {
+        return;
+    }
+
+    lv_obj_set_size(view->energy_plan_panel, panel_width, panel_height);
+    lv_obj_align(view->energy_plan_panel, LV_ALIGN_CENTER, 0, 0);
+
+    legend_container = lv_obj_get_child(view->energy_plan_panel, 0);
+    time_row = lv_obj_get_child(view->energy_plan_panel, 2);
+
+    if (legend_container != NULL) {
+        lv_obj_set_width(legend_container, LV_PCT(100));
+    }
+
+    if (view->energy_plan_chart != NULL) {
+        lv_obj_set_width(view->energy_plan_chart, LV_PCT(100));
+    }
+
+    if (time_row != NULL) {
+        lv_obj_set_width(time_row, LV_PCT(100));
+    }
+}
 
 static bool gui_view_energy_plan_changed(gui_view_t *view, const gui_energy_plan_t *energy_plan)
 {
@@ -22,7 +59,6 @@ static bool gui_view_energy_plan_changed(gui_view_t *view, const gui_energy_plan
 
 void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
 {
-    // lv_obj_t *energy_caption;
     lv_obj_t *legend_container;
     lv_obj_t *time_row;
     lv_obj_t *time_label;
@@ -33,43 +69,49 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
 
     view->energy_plan_panel = lv_obj_create(content);
     lv_obj_set_size(view->energy_plan_panel, 746, 378);
-    lv_obj_align(view->energy_plan_panel, LV_ALIGN_BOTTOM_MID, 0, -24);
+    lv_obj_align(view->energy_plan_panel, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_radius(view->energy_plan_panel, 26, 0);
     lv_obj_set_style_bg_color(view->energy_plan_panel, lv_color_hex(0xF8FBFF), 0);
     lv_obj_set_style_bg_opa(view->energy_plan_panel, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->energy_plan_panel, 1, 0);
     lv_obj_set_style_border_color(view->energy_plan_panel, lv_color_hex(0xD9E3F1), 0);
+    lv_obj_set_style_pad_all(view->energy_plan_panel, 24, 0);
+    lv_obj_set_style_pad_row(view->energy_plan_panel, 18, 0);
     lv_obj_clear_flag(view->energy_plan_panel, LV_OBJ_FLAG_SCROLLABLE);
-
-    // energy_caption = lv_label_create(view->energy_plan_panel);
-    // lv_label_set_text(energy_caption, "LEOP recommendation split for the next 24 hours.");
-    // lv_obj_set_style_text_color(energy_caption, lv_color_hex(0x4D5F7C), 0);
-    // lv_obj_align(energy_caption, LV_ALIGN_TOP_LEFT, 24, 18);
+    lv_obj_set_layout(view->energy_plan_panel, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(view->energy_plan_panel, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(view->energy_plan_panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
 
     legend_container = lv_obj_create(view->energy_plan_panel);
-    lv_obj_set_size(legend_container, GUI_VIEW_ENERGY_LEGEND_WIDTH, 48);
-    lv_obj_align(legend_container, LV_ALIGN_TOP_MID, 0, 20);
+    lv_obj_set_size(legend_container, LV_PCT(100), 48);
     lv_obj_set_style_bg_opa(legend_container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(legend_container, 0, 0);
+    lv_obj_set_style_shadow_width(legend_container, 0, 0);
     lv_obj_set_style_pad_all(legend_container, 0, 0);
+    lv_obj_set_style_pad_column(legend_container, 20, 0);
+    lv_obj_set_style_pad_row(legend_container, GUI_VIEW_ENERGY_LEGEND_ROW_GAP, 0);
     lv_obj_clear_flag(legend_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_layout(legend_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(legend_container, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(legend_container, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                          LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
     view->energy_legend_dots[0] = gui_view_create_legend_item(
         legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x1D4ED8),
         "Buy electricity");
     view->energy_legend_dots[1] = gui_view_create_legend_item(
-        legend_container, 320, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xF59E0B),
+        legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xF59E0B),
         "Use solar directly");
     view->energy_legend_dots[2] = gui_view_create_legend_item(
-        legend_container, 0, 20 + GUI_VIEW_ENERGY_LEGEND_ROW_GAP,
+        legend_container, 0, 0,
         GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x10B981), "Charge battery");
     view->energy_legend_dots[3] = gui_view_create_legend_item(
-        legend_container, 320, 20 + GUI_VIEW_ENERGY_LEGEND_ROW_GAP,
-        GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xEF4444), "Sell excess");
+        legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xEF4444),
+        "Sell excess");
 
     view->energy_plan_chart = lv_chart_create(view->energy_plan_panel);
-    lv_obj_set_size(view->energy_plan_chart, GUI_VIEW_ENERGY_CHART_WIDTH, 232);
-    lv_obj_align(view->energy_plan_chart, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_set_size(view->energy_plan_chart, LV_PCT(100), 0);
     lv_obj_set_style_bg_color(view->energy_plan_chart, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(view->energy_plan_chart, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->energy_plan_chart, 1, 0);
@@ -84,6 +126,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
                            GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE);
     lv_chart_set_axis_tick(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_X, 6, 3, 5, 5, false,
                            20);
+    lv_obj_set_flex_grow(view->energy_plan_chart, 1);
 
     view->buy_series = lv_chart_add_series(view->energy_plan_chart, lv_color_hex(0x1D4ED8),
                                            LV_CHART_AXIS_PRIMARY_Y);
@@ -95,37 +138,38 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
                                             LV_CHART_AXIS_PRIMARY_Y);
 
     time_row = lv_obj_create(view->energy_plan_panel);
-    lv_obj_set_size(time_row, GUI_VIEW_ENERGY_CHART_WIDTH, 26);
-    lv_obj_align(time_row, LV_ALIGN_BOTTOM_MID, 0, -14);
+    lv_obj_set_size(time_row, LV_PCT(100), 26);
     lv_obj_set_style_bg_opa(time_row, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(time_row, 0, 0);
+    lv_obj_set_style_shadow_width(time_row, 0, 0);
     lv_obj_set_style_pad_all(time_row, 0, 0);
     lv_obj_clear_flag(time_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_layout(time_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(time_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(time_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
 
     time_label = lv_label_create(time_row);
     lv_label_set_text(time_label, "00 h");
     lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-    lv_obj_align(time_label, LV_ALIGN_LEFT_MID, 0, 0);
 
     time_label = lv_label_create(time_row);
     lv_label_set_text(time_label, "06 h");
     lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-    lv_obj_align(time_label, LV_ALIGN_LEFT_MID, 164, 0);
 
     time_label = lv_label_create(time_row);
     lv_label_set_text(time_label, "12 h");
     lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-    lv_obj_align(time_label, LV_ALIGN_CENTER, 0, 0);
 
     time_label = lv_label_create(time_row);
     lv_label_set_text(time_label, "18 h");
     lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-    lv_obj_align(time_label, LV_ALIGN_RIGHT_MID, -154, 0);
 
     time_label = lv_label_create(time_row);
     lv_label_set_text(time_label, "24 h");
     lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-    lv_obj_align(time_label, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    gui_view_layout_energy_panel(view);
 }
 
 void gui_view_apply_energy_panel(gui_view_t *view, const gui_view_model_t *model)
@@ -133,6 +177,8 @@ void gui_view_apply_energy_panel(gui_view_t *view, const gui_view_model_t *model
     if ((view == NULL) || (model == NULL)) {
         return;
     }
+
+    gui_view_layout_energy_panel(view);
 
     if (!gui_view_energy_plan_changed(view, &model->energy_plan)) {
         return;
