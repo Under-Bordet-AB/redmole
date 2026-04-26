@@ -180,6 +180,37 @@ static void gui_view_style_settings_card(lv_obj_t *card, lv_color_t bg_color,
     }
 }
 
+static void gui_view_style_wifi_card(gui_view_t *view, lv_color_t bg_color,
+                                     lv_color_t border_color, lv_color_t title_color,
+                                     lv_color_t subtitle_color, gui_view_theme_t theme)
+{
+    const lv_font_t *body_font;
+
+    if ((view == NULL) || (view->wifi_card == NULL)) {
+        return;
+    }
+
+    body_font = gui_theme_get(theme)->body_font;
+
+    lv_obj_set_style_bg_color(view->wifi_card, bg_color, 0);
+    lv_obj_set_style_bg_opa(view->wifi_card, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(view->wifi_card, 1, 0);
+    lv_obj_set_style_border_color(view->wifi_card, border_color, 0);
+    lv_obj_set_style_text_font(view->wifi_card, body_font, 0);
+
+    if (view->wifi_header_row != NULL) {
+        lv_obj_set_style_text_font(view->wifi_header_row, body_font, 0);
+    }
+    if (view->wifi_title_label != NULL) {
+        lv_obj_set_style_text_color(view->wifi_title_label, title_color, 0);
+        lv_obj_set_style_text_font(view->wifi_title_label, body_font, 0);
+    }
+    if (view->wifi_subtitle_label != NULL) {
+        lv_obj_set_style_text_color(view->wifi_subtitle_label, subtitle_color, 0);
+        lv_obj_set_style_text_font(view->wifi_subtitle_label, body_font, 0);
+    }
+}
+
 static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
                                         lv_color_t card_border, lv_color_t label_color,
                                         lv_color_t value_color, gui_view_theme_t theme)
@@ -707,14 +738,25 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                  subtitle_text, effective_theme);
     gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
                                  subtitle_text, effective_theme);
-    gui_view_style_settings_card(view->wifi_card, item_bg, item_border, title_text,
-                                 subtitle_text, effective_theme);
+    gui_view_style_wifi_card(view, item_bg, item_border, title_text, subtitle_text,
+                             effective_theme);
     gui_view_style_settings_card(view->bluetooth_card, item_bg, item_border, title_text,
                                  subtitle_text, effective_theme);
     gui_view_style_settings_card(view->brightness_card, item_bg, item_border, title_text,
                                  subtitle_text, effective_theme);
     gui_view_style_settings_card(view->theme_card, item_bg, item_border, title_text,
                                  subtitle_text, effective_theme);
+    if (view->wifi_status_label != NULL) {
+        gui_wifi_state_t wifi_state = view->has_last_wifi_settings
+                                      ? view->last_wifi_settings.state
+                                      : GUI_WIFI_STATE_IDLE;
+
+        lv_obj_set_style_text_color(view->wifi_status_label,
+                                    gui_view_wifi_status_color(view->current_theme,
+                                                               wifi_state),
+                                    0);
+        lv_obj_set_style_text_font(view->wifi_status_label, body_font, 0);
+    }
     if (view->bluetooth_status_label != NULL) {
         lv_obj_set_style_text_color(view->bluetooth_status_label, muted_text, 0);
         lv_obj_set_style_text_font(view->bluetooth_status_label, body_font, 0);

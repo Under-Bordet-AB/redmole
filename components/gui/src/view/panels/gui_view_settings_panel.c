@@ -98,6 +98,29 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
     return night_switch_disabled != should_disable_night_switch;
 }
 
+static const char *gui_view_wifi_card_status_text(const gui_wifi_settings_t *wifi)
+{
+    if (wifi == NULL) {
+        return "Not connected";
+    }
+
+    switch (wifi->state) {
+        case GUI_WIFI_STATE_CONNECTED:
+            if (wifi->selected_ssid[0] != '\0') {
+                return wifi->selected_ssid;
+            }
+            return "Not connected";
+        case GUI_WIFI_STATE_CONNECTING:
+            return "Connecting";
+        case GUI_WIFI_STATE_FAILED:
+            return "Failed";
+        case GUI_WIFI_STATE_IDLE:
+        case GUI_WIFI_STATE_SCANNED:
+        default:
+            return "Not connected";
+    }
+}
+
 static lv_obj_t *gui_view_create_settings_card(lv_obj_t *parent, const char *title_text,
                                                const char *subtitle_text, lv_coord_t height)
 {
@@ -171,6 +194,32 @@ static lv_obj_t *gui_view_create_setting_item_card(lv_obj_t *parent, const char 
     lv_obj_set_width(subtitle, LV_PCT(100));
     lv_label_set_long_mode(subtitle, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_color(subtitle, lv_color_hex(0x607089), 0);
+
+    return card;
+}
+
+static lv_obj_t *gui_view_create_setting_item_card_shell(lv_obj_t *parent, lv_coord_t height)
+{
+    lv_obj_t *card = lv_obj_create(parent);
+
+    lv_obj_set_width(card, LV_PCT(100));
+    lv_obj_set_height(card, height);
+    lv_obj_set_layout(card, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_radius(card, 18, 0);
+    lv_obj_set_style_bg_color(card, lv_color_hex(0xF8FBFF), 0);
+    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(0xD9E3F1), 0);
+    lv_obj_set_style_shadow_width(card, 0, 0);
+    lv_obj_set_style_pad_top(card, 14, 0);
+    lv_obj_set_style_pad_left(card, 14, 0);
+    lv_obj_set_style_pad_right(card, 14, 0);
+    lv_obj_set_style_pad_bottom(card, 14, 0);
+    lv_obj_set_style_pad_row(card, 10, 0);
+    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
     return card;
 }
@@ -325,20 +374,43 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_row(connectivity_stack, 12, 0);
     lv_obj_clear_flag(connectivity_stack, LV_OBJ_FLAG_SCROLLABLE);
 
-    wifi_card = gui_view_create_setting_item_card(connectivity_stack, "Wi-Fi",
-                                                  "Scan to find networks, then choose one to connect.",
-                                                  LV_SIZE_CONTENT);
+    wifi_card = gui_view_create_setting_item_card_shell(connectivity_stack, LV_SIZE_CONTENT);
     view->wifi_card = wifi_card;
 
-    view->wifi_status_dot = lv_obj_create(wifi_card);
-    lv_obj_set_size(view->wifi_status_dot, 10, 10);
-    lv_obj_add_flag(view->wifi_status_dot, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_clear_flag(view->wifi_status_dot, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(view->wifi_status_dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(view->wifi_status_dot, 0, 0);
-    lv_obj_set_style_shadow_width(view->wifi_status_dot, 0, 0);
-    lv_obj_set_style_bg_opa(view->wifi_status_dot, LV_OPA_COVER, 0);
-    lv_obj_align(view->wifi_status_dot, LV_ALIGN_TOP_RIGHT, -4, 4);
+    view->wifi_header_row = lv_obj_create(wifi_card);
+    lv_obj_set_width(view->wifi_header_row, LV_PCT(100));
+    lv_obj_set_height(view->wifi_header_row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(view->wifi_header_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(view->wifi_header_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(view->wifi_header_row, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_opa(view->wifi_header_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(view->wifi_header_row, 0, 0);
+    lv_obj_set_style_shadow_width(view->wifi_header_row, 0, 0);
+    lv_obj_set_style_pad_all(view->wifi_header_row, 0, 0);
+    lv_obj_set_style_pad_column(view->wifi_header_row, 12, 0);
+    lv_obj_clear_flag(view->wifi_header_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    view->wifi_title_label = lv_label_create(view->wifi_header_row);
+    lv_label_set_text(view->wifi_title_label, "Wi-Fi");
+    lv_obj_set_flex_grow(view->wifi_title_label, 1);
+    lv_obj_set_style_text_color(view->wifi_title_label, lv_color_hex(0x10213D), 0);
+
+    view->wifi_status_label = lv_label_create(view->wifi_header_row);
+    lv_obj_set_width(view->wifi_status_label, 220);
+    lv_label_set_long_mode(view->wifi_status_label, LV_LABEL_LONG_DOT);
+    lv_label_set_text(view->wifi_status_label, "Not connected");
+    lv_obj_set_style_text_color(view->wifi_status_label, lv_color_hex(0x607089), 0);
+    lv_obj_set_style_text_font(view->wifi_status_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_align(view->wifi_status_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_align(view->wifi_status_label, LV_ALIGN_RIGHT_MID, 0);
+
+    view->wifi_subtitle_label = lv_label_create(wifi_card);
+    lv_label_set_text(view->wifi_subtitle_label,
+                      "Scan to find networks, then choose one to connect.");
+    lv_obj_set_width(view->wifi_subtitle_label, LV_PCT(100));
+    lv_label_set_long_mode(view->wifi_subtitle_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_color(view->wifi_subtitle_label, lv_color_hex(0x607089), 0);
 
     wifi_button_row = lv_obj_create(wifi_card);
     lv_obj_set_width(wifi_button_row, LV_PCT(100));
@@ -702,11 +774,13 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
         }
     }
 
-    if (view->wifi_status_dot != NULL) {
-        lv_obj_set_style_bg_color(view->wifi_status_dot,
-                                  gui_view_wifi_status_color(view->current_theme,
-                                                             model->wifi.state),
-                                  0);
+    if (view->wifi_status_label != NULL) {
+        lv_obj_set_style_text_color(view->wifi_status_label,
+                                    gui_view_wifi_status_color(view->current_theme,
+                                                               model->wifi.state),
+                                    0);
+        gui_view_set_label_text_if_changed(view->wifi_status_label,
+                                           gui_view_wifi_card_status_text(&model->wifi));
     }
 
     can_disconnect = model->wifi.can_disconnect;
