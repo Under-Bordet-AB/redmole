@@ -17,6 +17,8 @@ typedef struct {
     bool wifi_disconnect_requested;
     bool has_last_wifi_state;
     gui_wifi_state_t last_wifi_state;
+    bool has_last_sd_card_state;
+    gui_sd_card_state_t last_sd_card_state;
     char requested_ssid[GUI_WIFI_SSID_MAX_LEN];
 } app_gui_bindings_ctx_t;
 
@@ -127,6 +129,11 @@ static void sync_sensor(gui_ctx_t *gui)
     gui_set_sensor_state(gui, &sensor);
 }
 
+static gui_sd_card_state_t get_sd_card_state(void)
+{
+    return GUI_SD_CARD_STATE_IDLE;
+}
+
 static bool sync_wifi_state(gui_ctx_t *gui)
 {
     gui_wifi_state_t wifi_state;
@@ -143,6 +150,26 @@ static bool sync_wifi_state(gui_ctx_t *gui)
     gui_set_wifi_state(gui, wifi_state);
     s_bindings.last_wifi_state = wifi_state;
     s_bindings.has_last_wifi_state = true;
+    return true;
+}
+
+static bool sync_sd_card_state(gui_ctx_t *gui)
+{
+    gui_sd_card_state_t sd_card_state;
+
+    if (gui == NULL) {
+        return false;
+    }
+
+    sd_card_state = get_sd_card_state();
+    if (s_bindings.has_last_sd_card_state &&
+        (s_bindings.last_sd_card_state == sd_card_state)) {
+        return false;
+    }
+
+    gui_set_sd_card_state(gui, sd_card_state);
+    s_bindings.last_sd_card_state = sd_card_state;
+    s_bindings.has_last_sd_card_state = true;
     return true;
 }
 
@@ -377,6 +404,7 @@ void app_gui_bindings_sync(gui_ctx_t *gui)
 
     sync_sensor(gui);
     wifi_state_changed = sync_wifi_state(gui);
+    sync_sd_card_state(gui);
     if (wifi_state_changed || s_bindings.wifi_scan_requested ||
         s_bindings.wifi_connect_requested || s_bindings.wifi_disconnect_requested) {
         sync_wifi(gui);

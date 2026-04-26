@@ -63,6 +63,23 @@ lv_color_t gui_view_bluetooth_status_color(gui_view_theme_t theme,
     }
 }
 
+lv_color_t gui_view_sd_card_status_color(gui_view_theme_t theme,
+                                         gui_sd_card_state_t state)
+{
+    const gui_theme_def_t *def = gui_theme_get(theme);
+
+    switch (state) {
+        case GUI_SD_CARD_STATE_CONNECTED:
+            return (def != NULL) ? lv_color_hex(def->wifi_connected_color)
+                                 : lv_color_hex(0x1D4ED8);
+        case GUI_SD_CARD_STATE_UNAVAILABLE:
+        case GUI_SD_CARD_STATE_IDLE:
+        default:
+            return (def != NULL) ? lv_color_hex(def->wifi_idle_color)
+                                 : lv_color_hex(0x4A5C78);
+    }
+}
+
 static void gui_view_update_sidebar_clock_impl(gui_view_t *view)
 {
     time_t now;
@@ -144,6 +161,13 @@ static void gui_view_apply_connectivity_icon_colors(gui_view_t *view,
         lv_obj_set_style_text_color(view->sidebar_bluetooth_label,
                                     gui_view_bluetooth_status_color(view->current_theme,
                                                                     model->bluetooth_state),
+                                    0);
+    }
+
+    if (view->sidebar_sd_card_label != NULL) {
+        lv_obj_set_style_text_color(view->sidebar_sd_card_label,
+                                    gui_view_sd_card_status_color(view->current_theme,
+                                                                  model->sd_card_state),
                                     0);
     }
 }
@@ -1051,7 +1075,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     view->settings_button = gui_view_create_nav_button(sidebar, 356, "Settings", nav_event_cb,
                                                        event_user_data);
 
-    // Create horizontal container for Wi-Fi and Bluetooth icons
+    // Create horizontal container for connectivity icons
     lv_obj_t * connectivity_container = lv_obj_create(sidebar);
     lv_obj_set_size(connectivity_container, 188, 50);
     lv_obj_align(connectivity_container, LV_ALIGN_BOTTOM_MID, 0, -15);
@@ -1076,6 +1100,13 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_obj_align(view->sidebar_bluetooth_label, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_text_font(view->sidebar_bluetooth_label, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(view->sidebar_bluetooth_label, lv_color_white(), 0);
+
+    view->sidebar_sd_card_label = lv_label_create(connectivity_container);
+    lv_label_set_text(view->sidebar_sd_card_label, LV_SYMBOL_SD_CARD);
+
+    lv_obj_align(view->sidebar_sd_card_label, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_text_font(view->sidebar_sd_card_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(view->sidebar_sd_card_label, lv_color_white(), 0);
 
     content = lv_obj_create(view->screen);
     view->content = content;

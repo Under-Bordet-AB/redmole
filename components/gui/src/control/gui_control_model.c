@@ -12,5 +12,6 @@ void gui_control_build_model(gui_control_t *control, gui_view_model_t *model)
     model->wifi = control->wifi;
     model->wifi_state = control->wifi_state;
     model->bluetooth_state = control->bluetooth_state;
+    model->sd_card_state = control->sd_card_state;
     model->appearance = control->appearance;
 }

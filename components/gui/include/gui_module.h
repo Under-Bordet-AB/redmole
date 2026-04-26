@@ -37,6 +37,8 @@ void gui_set_wifi_state(gui_ctx_t *self, gui_wifi_state_t state);
 bool gui_get_wifi_state(gui_ctx_t *self, gui_wifi_state_t *state);
 void gui_set_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t state);
 bool gui_get_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t *state);
+void gui_set_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t state);
+bool gui_get_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t *state);
 void gui_show_wifi_network_dialog(gui_ctx_t *self);
 void gui_show_wifi_password_dialog(gui_ctx_t *self);
 void gui_hide_wifi_dialogs(gui_ctx_t *self);

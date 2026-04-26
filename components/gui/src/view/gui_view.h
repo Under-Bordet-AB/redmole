@@ -21,6 +21,7 @@ typedef struct {
     lv_obj_t *sidebar_date_label;
     lv_obj_t *sidebar_wifi_label;
     lv_obj_t *sidebar_bluetooth_label;
+    lv_obj_t *sidebar_sd_card_label;
     lv_obj_t *bme280_panel;
     lv_obj_t *energy_plan_panel;
     lv_obj_t *forecast_panel;
@@ -92,6 +93,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
 lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t state);
 lv_color_t gui_view_bluetooth_status_color(gui_view_theme_t theme,
                                            gui_bluetooth_state_t state);
+lv_color_t gui_view_sd_card_status_color(gui_view_theme_t theme, gui_sd_card_state_t state);
 void gui_view_update_sidebar_clock_labels(gui_view_t *view);
 void gui_view_hide_wifi_dialogs(gui_view_t *view);
 void gui_view_show_network_dialog(gui_view_t *view);

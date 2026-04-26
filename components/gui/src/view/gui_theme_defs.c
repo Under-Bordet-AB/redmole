@@ -11,8 +11,8 @@ LV_IMG_DECLARE(deathnote_bg);
 LV_IMG_DECLARE(spongebob_bg);
 LV_FONT_DECLARE(hellokitty18);
 LV_FONT_DECLARE(hellokitty24);
-LV_FONT_DECLARE(terminal18);
-LV_FONT_DECLARE(terminal24);
+LV_FONT_DECLARE(terminal20);
+LV_FONT_DECLARE(terminal26);
 LV_FONT_DECLARE(deathnote20);
 LV_FONT_DECLARE(deathnote26);
 LV_FONT_DECLARE(spongebob18);
@@ -281,8 +281,8 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
         .has_night_variant   = false,
         .night_variant       = GUI_VIEW_THEME_TERMINAL,
         .dialog_has_border   = true,
-        .body_font           = &terminal18,
-        .emphasis_font       = &terminal24,
+        .body_font           = &terminal20,
+        .emphasis_font       = &terminal26,
         .background_image    = &terminal_bg,
 
         .screen_bg           = 0x051316,

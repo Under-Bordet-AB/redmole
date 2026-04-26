@@ -242,6 +242,25 @@ static lv_obj_t *gui_view_create_settings_page(lv_obj_t *parent)
     return page;
 }
 
+static void gui_view_layout_password_dialog_buttons(gui_view_t *view, bool show_disconnect)
+{
+    if ((view == NULL) || (view->password_dialog_cancel_button == NULL) ||
+        (view->password_dialog_connect_button == NULL) ||
+        (view->password_dialog_disconnect_button == NULL)) {
+        return;
+    }
+
+    lv_obj_set_pos(view->password_dialog_connect_button, 570, 148);
+
+    if (show_disconnect) {
+        lv_obj_set_pos(view->password_dialog_cancel_button, 282, 148);
+        lv_obj_set_pos(view->password_dialog_disconnect_button, 426, 148);
+    } else {
+        lv_obj_set_pos(view->password_dialog_cancel_button, 426, 148);
+        lv_obj_set_pos(view->password_dialog_disconnect_button, 426, 148);
+    }
+}
+
 void gui_view_hide_wifi_dialogs_impl(gui_view_t *view)
 {
     if (view == NULL) {
@@ -715,6 +734,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_color(view->password_dialog_connect_button, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(view->password_dialog_connect_button, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->password_dialog_connect_button, 0, 0);
+    gui_view_layout_password_dialog_buttons(view, false);
 
     gui_view_hide_wifi_dialogs_impl(view);
 }
@@ -823,6 +843,7 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
             lv_obj_add_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
         }
     }
+    gui_view_layout_password_dialog_buttons(view, can_disconnect);
 
     if (model->wifi.selected_ssid[0] != '\0') {
         gui_view_set_label_text_if_changed(view->password_dialog_network_label,

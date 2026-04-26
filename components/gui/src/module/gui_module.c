@@ -78,6 +78,12 @@ static bool gui_module_bluetooth_state_equals(gui_bluetooth_state_t left,
     return left == right;
 }
 
+static bool gui_module_sd_card_state_equals(gui_sd_card_state_t left,
+                                            gui_sd_card_state_t right)
+{
+    return left == right;
+}
+
 void gui_init(gui_ctx_t *self)
 {
     gui_view_model_t model = { 0 };
@@ -299,6 +305,36 @@ bool gui_get_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t *state)
     }
 
     *state = runtime->control.bluetooth_state;
+    return true;
+}
+
+void gui_set_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t state)
+{
+    gui_module_runtime_t *runtime = gui_module_get_runtime(self);
+
+    if ((runtime == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    if (gui_module_sd_card_state_equals(runtime->control.sd_card_state, state)) {
+        lvgl_port_unlock();
+        return;
+    }
+
+    runtime->control.sd_card_state = state;
+    gui_module_apply_model(runtime);
+    lvgl_port_unlock();
+}
+
+bool gui_get_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t *state)
+{
+    gui_module_runtime_t *runtime = gui_module_get_runtime(self);
+
+    if ((runtime == NULL) || (state == NULL)) {
+        return false;
+    }
+
+    *state = runtime->control.sd_card_state;
     return true;
 }
 

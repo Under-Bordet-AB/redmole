@@ -15,8 +15,8 @@ idf_component_register(
 		"src/view/assets/deathnote_bg.c"
 	     "src/view/assets/fonts/hellokitty18.c"
 	     "src/view/assets/fonts/hellokitty24.c"
-	     src/view/assets/fonts/terminal18.c
-	     src/view/assets/fonts/terminal24.c
+		 src/view/assets/fonts/terminal20.c
+	     src/view/assets/fonts/terminal26.c
 	     "src/view/assets/fonts/spongebob18.c"
 	     "src/view/assets/fonts/spongebob24.c"
 		 "src/view/assets/fonts/deathnote20.c"
