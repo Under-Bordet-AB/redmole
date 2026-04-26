@@ -959,6 +959,16 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_border_color(view->wifi_keyboard, keyboard_border, LV_PART_ITEMS);
     lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_key_text, LV_PART_ITEMS);
     lv_obj_set_style_text_font(view->wifi_keyboard, emphasis_font, LV_PART_ITEMS);
+    lv_obj_set_style_bg_color(view->wifi_keyboard,
+                              lv_color_darken(keyboard_key_bg, LV_OPA_40),
+                              LV_PART_ITEMS | LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER,
+                            LV_PART_ITEMS | LV_STATE_PRESSED);
+    lv_obj_set_style_border_color(view->wifi_keyboard,
+                                  lv_color_darken(keyboard_border, LV_OPA_40),
+                                  LV_PART_ITEMS | LV_STATE_PRESSED);
+    lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_key_text,
+                                LV_PART_ITEMS | LV_STATE_PRESSED);
     lv_obj_set_style_bg_color(view->wifi_keyboard, keyboard_special_bg,
                               LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER,
@@ -967,6 +977,16 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                   LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_special_text,
                                 LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(view->wifi_keyboard,
+                              lv_color_darken(keyboard_special_bg, LV_OPA_40),
+                              LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER,
+                            LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+    lv_obj_set_style_border_color(view->wifi_keyboard,
+                                  lv_color_darken(keyboard_special_border, LV_OPA_40),
+                                  LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+    lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_special_text,
+                                LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
 
     if (view->has_last_active_panel) {
         gui_view_style_nav_button(view->bme280_button, view->current_theme,
