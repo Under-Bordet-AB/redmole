@@ -176,7 +176,7 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
 
     label = lv_label_create(today_card);
-    lv_label_set_text(label, "Cool morning, brighter afternoon, light wind late in the day.");
+    lv_label_set_text(label, "Cool morning, brighter later, light winds.");
     lv_obj_set_width(label, LV_PCT(100));
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);

@@ -3636,6 +3636,16 @@ CONFIG_WL_SECTOR_SIZE=4096
 # end of Wear Levelling
 
 #
+# RedMole GUI Configuration
+#
+# default:
+CONFIG_REDMOLE_GUI_THEME_HELLO_KITTY=y
+CONFIG_REDMOLE_GUI_THEME_TERMINAL=y
+CONFIG_REDMOLE_GUI_THEME_DEATH_NOTE=y
+# CONFIG_REDMOLE_GUI_THEME_SPONGEBOB is not set
+# end of RedMole GUI Configuration
+
+#
 # RedMole WiFi Configuration
 #
 # default:
