@@ -142,6 +142,8 @@ typedef struct {
  * out of range.
  */
 const gui_theme_def_t *gui_theme_get(gui_view_theme_t theme);
+gui_view_theme_t gui_theme_default(void);
+gui_view_theme_t gui_theme_resolve_available(gui_view_theme_t theme);
 
 /*
  * Writes a newline-delimited string of user-selectable theme names into buf.

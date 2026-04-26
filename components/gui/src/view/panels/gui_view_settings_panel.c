@@ -65,9 +65,12 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
                                                  const gui_appearance_settings_t *appearance)
 {
     bool background_enabled;
+    bool desired_night_enabled;
     bool night_enabled;
     bool night_switch_disabled;
     bool should_disable_night_switch;
+    const gui_theme_def_t *theme_def;
+    gui_view_theme_t resolved_theme;
     uint16_t theme_dropdown_index;
 
     if ((view == NULL) || (appearance == NULL)) {
@@ -79,7 +82,10 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
         return true;
     }
 
-    if (gui_theme_theme_to_dropdown_index(appearance->theme, &theme_dropdown_index) &&
+    resolved_theme = gui_theme_resolve_available(appearance->theme);
+    theme_def = gui_theme_get(resolved_theme);
+
+    if (gui_theme_theme_to_dropdown_index(resolved_theme, &theme_dropdown_index) &&
         (lv_dropdown_get_selected(view->theme_dropdown) != theme_dropdown_index)) {
         return true;
     }
@@ -89,14 +95,15 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
         return true;
     }
 
+    desired_night_enabled = appearance->night_variant_enabled && (theme_def != NULL) &&
+                            theme_def->has_night_variant;
     night_enabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_CHECKED);
-    if (night_enabled != appearance->night_variant_enabled) {
+    if (night_enabled != desired_night_enabled) {
         return true;
     }
 
     night_switch_disabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_DISABLED);
-    should_disable_night_switch = (gui_theme_get(appearance->theme) == NULL) ||
-                                  !gui_theme_get(appearance->theme)->has_night_variant;
+    should_disable_night_switch = (theme_def == NULL) || !theme_def->has_night_variant;
     return night_switch_disabled != should_disable_night_switch;
 }
 
@@ -758,9 +765,10 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     }
 
     if (view->theme_dropdown != NULL) {
+        gui_view_theme_t resolved_theme = gui_theme_resolve_available(model->appearance.theme);
         uint16_t theme_dropdown_index;
 
-        if (gui_theme_theme_to_dropdown_index(model->appearance.theme, &theme_dropdown_index) &&
+        if (gui_theme_theme_to_dropdown_index(resolved_theme, &theme_dropdown_index) &&
             (lv_dropdown_get_selected(view->theme_dropdown) != theme_dropdown_index)) {
             lv_dropdown_set_selected(view->theme_dropdown, theme_dropdown_index);
         }
@@ -779,13 +787,18 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     }
 
     if (view->theme_night_switch != NULL) {
+        gui_view_theme_t resolved_theme = gui_theme_resolve_available(model->appearance.theme);
+        bool desired_night_enabled;
         bool night_enabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_CHECKED);
-        const gui_theme_def_t *theme_def = gui_theme_get(model->appearance.theme);
+        const gui_theme_def_t *theme_def = gui_theme_get(resolved_theme);
         bool should_disable_night_switch = (theme_def == NULL) ||
                                            !theme_def->has_night_variant;
 
-        if (night_enabled != model->appearance.night_variant_enabled) {
-            if (model->appearance.night_variant_enabled) {
+        desired_night_enabled = model->appearance.night_variant_enabled &&
+                                !should_disable_night_switch;
+
+        if (night_enabled != desired_night_enabled) {
+            if (desired_night_enabled) {
                 lv_obj_add_state(view->theme_night_switch, LV_STATE_CHECKED);
             } else {
                 lv_obj_clear_state(view->theme_night_switch, LV_STATE_CHECKED);

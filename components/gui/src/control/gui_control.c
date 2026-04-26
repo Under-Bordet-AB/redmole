@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "gui_control_internal.h"
+#include "../view/gui_theme_defs.h"
 
 void gui_control_init(gui_control_t *control)
 {
@@ -12,7 +13,7 @@ void gui_control_init(gui_control_t *control)
 
     memset(control, 0, sizeof(*control));
     control->active_panel = GUI_PANEL_BME280;
-    control->appearance.theme = GUI_VIEW_THEME_HELLO_KITTY;
+    control->appearance.theme = gui_theme_default();
     control->appearance.show_background_image = true;
     control->appearance.night_variant_enabled = false;
     control->wifi.selected_network_index = -1;

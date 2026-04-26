@@ -13,6 +13,7 @@ Theme behavior is driven by these files:
 - `components/gui/include/gui_types.h`: theme enum (`gui_view_theme_t`) and appearance model fields.
 - `components/gui/src/view/gui_theme_defs.h`: theme descriptor (`gui_theme_def_t`) and `GUI_THEME_COUNT`.
 - `components/gui/src/view/gui_theme_defs.c`: canonical theme table, optional assets/fonts declarations, and dropdown option generation.
+- `components/gui/Kconfig`: compile-time theme enablement toggles.
 - `components/gui/src/view/gui_view.c`: runtime application logic and night-variant resolution.
 - `components/gui/src/view/panels/gui_view_settings_panel.c`: settings panel dropdown and switches.
 - `components/gui/src/module/gui_module_events.c`: maps settings dropdown selection to enum values.
@@ -66,6 +67,16 @@ Suggested workflow:
 
 4. If the theme should appear in Settings dropdown, keep it user-selectable.
 
+5. Add a Kconfig toggle for the new optional theme.
+
+File:
+- `components/gui/Kconfig`
+
+Rules:
+- `Light mode` and `Dark mode` remain core themes and are always built.
+- Optional branded themes must have a `CONFIG_REDMOLE_GUI_THEME_*` toggle.
+- Internal variants such as night themes should follow the base theme’s toggle instead of adding a second user-facing Kconfig option.
+
 The dropdown options string is generated from entries where:
 
 - `is_user_selectable == true`
@@ -110,6 +121,8 @@ If your theme uses custom image/font assets:
 
 File:
 - `components/gui/CMakeLists.txt`
+
+Theme assets must be wrapped in the same Kconfig condition as the theme definition so disabled themes do not compile or declare missing assets.
 
 3. Declare assets in `gui_theme_defs.c` and reference them from your theme entry.
 
@@ -168,6 +181,7 @@ After adding a theme, verify:
 - Marking internal variants as selectable by mistake.
 - Adding selectable themes without updating dropdown index mapping in `gui_module_events.c`.
 - Adding image/font files but forgetting to register them in `components/gui/CMakeLists.txt`.
+- Adding a new optional theme without a matching `components/gui/Kconfig` symbol.
 
 ## Recommended Future Hardening
 

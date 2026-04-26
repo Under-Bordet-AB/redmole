@@ -13,13 +13,14 @@
 static gui_view_theme_t gui_view_effective_theme(gui_view_theme_t base_theme,
                                                  bool night_variant_enabled)
 {
-    const gui_theme_def_t *def = gui_theme_get(base_theme);
+    gui_view_theme_t resolved_theme = gui_theme_resolve_available(base_theme);
+    const gui_theme_def_t *def = gui_theme_get(resolved_theme);
 
     if (night_variant_enabled && (def != NULL) && def->has_night_variant) {
-        return def->night_variant;
+        return gui_theme_resolve_available(def->night_variant);
     }
 
-    return base_theme;
+    return resolved_theme;
 }
 
 lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t state)
@@ -585,10 +586,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     }
 
     effective_theme = gui_view_effective_theme(theme, night_variant_enabled);
-    view->current_theme = effective_theme;
-    view->current_show_background_image = show_background_image;
-    view->current_night_variant_enabled = night_variant_enabled;
-    view->has_current_appearance = true;
 
     {
         const gui_theme_def_t *def = gui_theme_get(effective_theme);
@@ -596,6 +593,11 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         if (def == NULL) {
             return;
         }
+
+        view->current_theme = effective_theme;
+        view->current_show_background_image = show_background_image;
+        view->current_night_variant_enabled = night_variant_enabled;
+        view->has_current_appearance = true;
 
         use_background_image = (def->background_image != NULL) && show_background_image;
         body_font     = def->body_font;
@@ -1046,7 +1048,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 
     view->background_image = lv_img_create(view->screen);
     {
-        const gui_theme_def_t *default_theme = gui_theme_get(GUI_VIEW_THEME_HELLO_KITTY);
+        const gui_theme_def_t *default_theme = gui_theme_get(gui_theme_default());
         if ((default_theme != NULL) && (default_theme->background_image != NULL)) {
             lv_img_set_src(view->background_image, default_theme->background_image);
         }

@@ -1,0 +1,27 @@
+menu "RedMole GUI Configuration"
+
+    config REDMOLE_GUI_THEME_HELLO_KITTY
+        bool "Enable Hello Kitty theme"
+        default y
+        help
+            Build the Hello Kitty theme assets and expose the theme in the UI.
+
+    config REDMOLE_GUI_THEME_TERMINAL
+        bool "Enable Terminal theme"
+        default y
+        help
+            Build the Terminal theme assets and expose the theme in the UI.
+
+    config REDMOLE_GUI_THEME_DEATH_NOTE
+        bool "Enable Death Note theme"
+        default y
+        help
+            Build the Death Note theme assets and expose the theme in the UI.
+
+    config REDMOLE_GUI_THEME_SPONGEBOB
+        bool "Enable SpongeBob theme"
+        default y
+        help
+            Build the SpongeBob theme assets and expose the theme in the UI.
+
+endmenu

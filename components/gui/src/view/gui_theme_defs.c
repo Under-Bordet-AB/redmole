@@ -4,19 +4,40 @@
 
 #include "lvgl.h"
 
+#if CONFIG_REDMOLE_GUI_THEME_HELLO_KITTY
 LV_IMG_DECLARE(hk_bg);
 LV_IMG_DECLARE(hk_bg_night);
+#endif
+
+#if CONFIG_REDMOLE_GUI_THEME_TERMINAL
 LV_IMG_DECLARE(terminal_bg);
-LV_IMG_DECLARE(deathnote_bg);
-LV_IMG_DECLARE(spongebob_bg);
-LV_FONT_DECLARE(hellokitty18);
-LV_FONT_DECLARE(hellokitty24);
 LV_FONT_DECLARE(terminal20);
 LV_FONT_DECLARE(terminal26);
+#endif
+
+#if CONFIG_REDMOLE_GUI_THEME_DEATH_NOTE
+LV_IMG_DECLARE(deathnote_bg);
 LV_FONT_DECLARE(deathnote20);
 LV_FONT_DECLARE(deathnote26);
+#endif
+
+#if CONFIG_REDMOLE_GUI_THEME_SPONGEBOB
+LV_IMG_DECLARE(spongebob_bg);
 LV_FONT_DECLARE(spongebob18);
 LV_FONT_DECLARE(spongebob24);
+#endif
+
+#if CONFIG_REDMOLE_GUI_THEME_HELLO_KITTY
+LV_FONT_DECLARE(hellokitty18);
+LV_FONT_DECLARE(hellokitty24);
+#endif
+
+#define GUI_THEME_DISABLED_ENTRY(theme_value)                                                  \
+    {                                                                                          \
+        .display_name = "", .is_user_selectable = false, .has_night_variant = false,          \
+        .night_variant = theme_value, .dialog_has_border = false, .body_font = NULL,          \
+        .emphasis_font = NULL, .background_image = NULL,                                       \
+    }
 
 /*
  * Theme table indexed by gui_view_theme_t enum value.
@@ -194,6 +215,7 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
     /* ------------------------------------------------------------------ */
     /* [2] GUI_VIEW_THEME_HELLO_KITTY                                      */
     /* ------------------------------------------------------------------ */
+#if CONFIG_REDMOLE_GUI_THEME_HELLO_KITTY
     {
         .display_name        = "Hello Kitty",
         .is_user_selectable  = true,
@@ -271,10 +293,14 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
         .wifi_btn_selected_border = 0xFB7185,
         .wifi_btn_selected_text   = 0x881337,
     },
+#else
+    GUI_THEME_DISABLED_ENTRY(GUI_VIEW_THEME_HELLO_KITTY),
+#endif
 
     /* ------------------------------------------------------------------ */
     /* [3] GUI_VIEW_THEME_TERMINAL                                         */
     /* ------------------------------------------------------------------ */
+#if CONFIG_REDMOLE_GUI_THEME_TERMINAL
     {
         .display_name        = "Terminal",
         .is_user_selectable  = true,
@@ -352,12 +378,16 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
         .wifi_btn_selected_border = 0x03F5FA,
         .wifi_btn_selected_text   = 0xD8FEFF,
     },
+#else
+    GUI_THEME_DISABLED_ENTRY(GUI_VIEW_THEME_TERMINAL),
+#endif
 
     /* ------------------------------------------------------------------ */
     /* [4] GUI_VIEW_THEME_HELLO_KITTY_NIGHT                                */
     /* Internal variant — not shown directly in the settings dropdown.     */
     /* Activated by the night-mode toggle when Hello Kitty is selected.    */
     /* ------------------------------------------------------------------ */
+#if CONFIG_REDMOLE_GUI_THEME_HELLO_KITTY
     {
         .display_name        = "Hello Kitty Night",
         .is_user_selectable  = false,
@@ -435,10 +465,14 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
         .wifi_btn_selected_border = 0xD46A80,
         .wifi_btn_selected_text   = 0xE8D8F0,
     },
+#else
+    GUI_THEME_DISABLED_ENTRY(GUI_VIEW_THEME_HELLO_KITTY_NIGHT),
+#endif
 
     /* ------------------------------------------------------------------ */
     /* [5] GUI_VIEW_THEME_DEATH_NOTE                                       */
     /* ------------------------------------------------------------------ */
+#if CONFIG_REDMOLE_GUI_THEME_DEATH_NOTE
     {
         .display_name        = "Death Note",
         .is_user_selectable  = true,
@@ -516,10 +550,14 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
         .wifi_btn_selected_border = 0xB33A45,
         .wifi_btn_selected_text   = 0xF6F1F2,
     },
+#else
+    GUI_THEME_DISABLED_ENTRY(GUI_VIEW_THEME_DEATH_NOTE),
+#endif
 
     /* ------------------------------------------------------------------ */
     /* [6] GUI_VIEW_THEME_SPONGEBOB                                        */
     /* ------------------------------------------------------------------ */
+#if CONFIG_REDMOLE_GUI_THEME_SPONGEBOB
     {
         .display_name        = "Spongebob",
         .is_user_selectable  = true,
@@ -597,15 +635,68 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
         .wifi_btn_selected_border = 0x00AEEF,
         .wifi_btn_selected_text   = 0x0A4F74,
     },
+#else
+    GUI_THEME_DISABLED_ENTRY(GUI_VIEW_THEME_SPONGEBOB),
+#endif
 };
+
+static bool gui_theme_is_enabled(gui_view_theme_t theme)
+{
+    switch (theme) {
+        case GUI_VIEW_THEME_LIGHT:
+        case GUI_VIEW_THEME_DARK:
+            return true;
+        case GUI_VIEW_THEME_HELLO_KITTY:
+        case GUI_VIEW_THEME_HELLO_KITTY_NIGHT:
+#if CONFIG_REDMOLE_GUI_THEME_HELLO_KITTY
+            return true;
+#else
+            return false;
+#endif
+        case GUI_VIEW_THEME_TERMINAL:
+#if CONFIG_REDMOLE_GUI_THEME_TERMINAL
+            return true;
+#else
+            return false;
+#endif
+        case GUI_VIEW_THEME_DEATH_NOTE:
+#if CONFIG_REDMOLE_GUI_THEME_DEATH_NOTE
+            return true;
+#else
+            return false;
+#endif
+        case GUI_VIEW_THEME_SPONGEBOB:
+#if CONFIG_REDMOLE_GUI_THEME_SPONGEBOB
+            return true;
+#else
+            return false;
+#endif
+        default:
+            return false;
+    }
+}
 
 const gui_theme_def_t *gui_theme_get(gui_view_theme_t theme)
 {
-    if (((int)theme < 0) || ((uint32_t)theme >= GUI_THEME_COUNT)) {
+    if (((int)theme < 0) || ((uint32_t)theme >= GUI_THEME_COUNT) || !gui_theme_is_enabled(theme)) {
         return NULL;
     }
 
     return &gui_themes[(uint32_t)theme];
+}
+
+gui_view_theme_t gui_theme_default(void)
+{
+    return GUI_VIEW_THEME_LIGHT;
+}
+
+gui_view_theme_t gui_theme_resolve_available(gui_view_theme_t theme)
+{
+    if (gui_theme_get(theme) != NULL) {
+        return theme;
+    }
+
+    return gui_theme_default();
 }
 
 void gui_theme_build_dropdown_string(char *buf, size_t buf_size)
@@ -620,7 +711,9 @@ void gui_theme_build_dropdown_string(char *buf, size_t buf_size)
     buf[0] = '\0';
 
     for (index = 0; index < GUI_THEME_COUNT; index++) {
-        if (!gui_themes[index].is_user_selectable) {
+        const gui_theme_def_t *theme_def = gui_theme_get((gui_view_theme_t)index);
+
+        if ((theme_def == NULL) || !theme_def->is_user_selectable) {
             continue;
         }
 
@@ -628,7 +721,7 @@ void gui_theme_build_dropdown_string(char *buf, size_t buf_size)
             strncat(buf, "\n", buf_size - strlen(buf) - 1);
         }
 
-        strncat(buf, gui_themes[index].display_name, buf_size - strlen(buf) - 1);
+        strncat(buf, theme_def->display_name, buf_size - strlen(buf) - 1);
         first = false;
     }
 }
@@ -643,7 +736,9 @@ bool gui_theme_dropdown_index_to_theme(uint16_t index, gui_view_theme_t *theme_o
     }
 
     for (theme_index = 0; theme_index < GUI_THEME_COUNT; theme_index++) {
-        if (!gui_themes[theme_index].is_user_selectable) {
+        const gui_theme_def_t *theme_def = gui_theme_get((gui_view_theme_t)theme_index);
+
+        if ((theme_def == NULL) || !theme_def->is_user_selectable) {
             continue;
         }
 
@@ -662,14 +757,17 @@ bool gui_theme_theme_to_dropdown_index(gui_view_theme_t theme, uint16_t *index_o
 {
     uint16_t selectable_index = 0;
     uint32_t theme_index;
+    const gui_theme_def_t *selected_theme_def;
 
-    if ((index_out == NULL) || ((int)theme < 0) || ((uint32_t)theme >= GUI_THEME_COUNT) ||
-        !gui_themes[(uint32_t)theme].is_user_selectable) {
+    selected_theme_def = gui_theme_get(theme);
+    if ((index_out == NULL) || (selected_theme_def == NULL) || !selected_theme_def->is_user_selectable) {
         return false;
     }
 
     for (theme_index = 0; theme_index < GUI_THEME_COUNT; theme_index++) {
-        if (!gui_themes[theme_index].is_user_selectable) {
+        const gui_theme_def_t *theme_def = gui_theme_get((gui_view_theme_t)theme_index);
+
+        if ((theme_def == NULL) || !theme_def->is_user_selectable) {
             continue;
         }
 
