@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "gui_control_internal.h"
+#include "../view/gui_theme_defs.h"
 
 void gui_control_init(gui_control_t *control)
 {
@@ -12,11 +13,17 @@ void gui_control_init(gui_control_t *control)
 
     memset(control, 0, sizeof(*control));
     control->active_panel = GUI_PANEL_BME280;
-    control->appearance.theme = GUI_VIEW_THEME_HELLO_KITTY;
+    control->appearance.theme = gui_theme_default();
     control->appearance.show_background_image = true;
+    control->appearance.night_variant_enabled = false;
     control->wifi.selected_network_index = -1;
     control->wifi.selected_known_network_index = -1;
+    control->wifi.connect_requested = false;
+    control->wifi.can_disconnect = false;
     control->wifi.state = GUI_WIFI_STATE_IDLE;
+    control->wifi_state = GUI_WIFI_STATE_IDLE;
+    control->bluetooth_state = GUI_BLUETOOTH_STATE_IDLE;
+    control->sd_card_state = GUI_SD_CARD_STATE_IDLE;
     gui_control_reset_wifi_scan(control);
     gui_control_copy_status(&control->wifi, "Press Scan to search for Wi-Fi networks.");
 }

@@ -15,6 +15,10 @@ typedef enum {
     GUI_VIEW_THEME_LIGHT = 0,
     GUI_VIEW_THEME_DARK,
     GUI_VIEW_THEME_HELLO_KITTY,
+    GUI_VIEW_THEME_TERMINAL,
+    GUI_VIEW_THEME_HELLO_KITTY_NIGHT,
+    GUI_VIEW_THEME_DEATH_NOTE,
+    GUI_VIEW_THEME_SPONGEBOB,
 } gui_view_theme_t;
 
 #define GUI_ENERGY_PLAN_POINT_COUNT 24
@@ -42,9 +46,23 @@ typedef struct {
 typedef enum {
     GUI_WIFI_STATE_IDLE = 0,
     GUI_WIFI_STATE_SCANNED,
+    GUI_WIFI_STATE_CONNECTING,
     GUI_WIFI_STATE_CONNECTED,
     GUI_WIFI_STATE_FAILED,
 } gui_wifi_state_t;
+
+typedef enum {
+    GUI_BLUETOOTH_STATE_IDLE = 0,
+    GUI_BLUETOOTH_STATE_CONNECTING,
+    GUI_BLUETOOTH_STATE_CONNECTED,
+    GUI_BLUETOOTH_STATE_UNAVAILABLE,
+} gui_bluetooth_state_t;
+
+typedef enum {
+    GUI_SD_CARD_STATE_IDLE = 0,
+    GUI_SD_CARD_STATE_CONNECTED,
+    GUI_SD_CARD_STATE_UNAVAILABLE,
+} gui_sd_card_state_t;
 
 typedef struct {
     char ssid[GUI_WIFI_SSID_MAX_LEN];
@@ -63,11 +81,14 @@ typedef struct {
     char password[GUI_WIFI_PASSWORD_MAX_LEN + 1];
     char status_text[GUI_WIFI_STATUS_TEXT_MAX_LEN];
     gui_wifi_state_t state;
+    bool connect_requested;
+    bool can_disconnect;
 } gui_wifi_settings_t;
 
 typedef struct {
     gui_view_theme_t theme;
     bool show_background_image;
+    bool night_variant_enabled;
 } gui_appearance_settings_t;
 
 typedef struct {
@@ -75,6 +96,9 @@ typedef struct {
     gui_sensor_state_t sensor;
     gui_energy_plan_t energy_plan;
     gui_wifi_settings_t wifi;
+    gui_wifi_state_t wifi_state;
+    gui_bluetooth_state_t bluetooth_state;
+    gui_sd_card_state_t sd_card_state;
     gui_appearance_settings_t appearance;
 } gui_view_model_t;
 

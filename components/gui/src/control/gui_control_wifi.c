@@ -14,6 +14,8 @@ void gui_control_scan_wifi(gui_control_t *control)
     control->wifi.selected_known_network_index = -1;
     control->wifi.selected_ssid[0] = '\0';
     control->wifi.password[0] = '\0';
+    control->wifi.connect_requested = false;
+    control->wifi.can_disconnect = false;
     control->wifi.state = GUI_WIFI_STATE_IDLE;
     gui_control_copy_status(&control->wifi, "Scan requested. No Wi-Fi results are available yet.");
 }
@@ -28,6 +30,8 @@ void gui_control_select_wifi_network(gui_control_t *control, uint8_t network_ind
     control->wifi.selected_known_network_index = -1;
     snprintf(control->wifi.selected_ssid, sizeof(control->wifi.selected_ssid), "%s",
              control->wifi.networks[network_index].ssid);
+    control->wifi.connect_requested = false;
+    control->wifi.can_disconnect = false;
     control->wifi.state = GUI_WIFI_STATE_SCANNED;
     snprintf(control->wifi.status_text, sizeof(control->wifi.status_text),
              "Selected %s. Enter a password and press Connect.",
@@ -44,10 +48,12 @@ void gui_control_connect_known_wifi(gui_control_t *control, uint8_t network_inde
     control->wifi.selected_known_network_index = (int8_t)network_index;
     snprintf(control->wifi.selected_ssid, sizeof(control->wifi.selected_ssid), "%s",
              control->wifi.known_networks[network_index].ssid);
-    snprintf(control->wifi.password, sizeof(control->wifi.password), "%s", "saved-password");
-    control->wifi.state = GUI_WIFI_STATE_SCANNED;
+    control->wifi.password[0] = '\0';
+    control->wifi.connect_requested = true;
+    control->wifi.can_disconnect = false;
+    control->wifi.state = GUI_WIFI_STATE_CONNECTING;
     snprintf(control->wifi.status_text, sizeof(control->wifi.status_text),
-             "Saved network %s selected. Connection is pending.",
+             "Connecting to %s...",
              control->wifi.known_networks[network_index].ssid);
 }
 
@@ -87,7 +93,23 @@ void gui_control_connect_wifi(gui_control_t *control)
         return;
     }
 
-    control->wifi.state = GUI_WIFI_STATE_IDLE;
+    control->wifi.connect_requested = true;
+    control->wifi.can_disconnect = false;
+    control->wifi.state = GUI_WIFI_STATE_CONNECTING;
     snprintf(control->wifi.status_text, sizeof(control->wifi.status_text),
-             "Connection requested for %s.", selected_network->ssid);
+             "Connecting to %s.", selected_network->ssid);
+}
+
+void gui_control_disconnect_wifi(gui_control_t *control)
+{
+    if (control == NULL) {
+        return;
+    }
+
+    control->wifi.selected_network_index = -1;
+    control->wifi.selected_known_network_index = -1;
+    control->wifi.connect_requested = false;
+    control->wifi.can_disconnect = false;
+    control->wifi.state = GUI_WIFI_STATE_IDLE;
+    gui_control_copy_status(&control->wifi, "Disconnected.");
 }

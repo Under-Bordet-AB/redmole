@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../gui_view_common.h"
+#include "../gui_theme_defs.h"
 
 static bool gui_view_wifi_network_equals(const gui_wifi_network_t *left,
                                          const gui_wifi_network_t *right)
@@ -36,6 +37,8 @@ static bool gui_view_wifi_settings_changed(gui_view_t *view, const gui_wifi_sett
         (last_wifi->selected_network_index != wifi->selected_network_index) ||
         (last_wifi->selected_known_network_index != wifi->selected_known_network_index) ||
         (last_wifi->state != wifi->state) ||
+        (last_wifi->connect_requested != wifi->connect_requested) ||
+        (last_wifi->can_disconnect != wifi->can_disconnect) ||
         (strcmp(last_wifi->selected_ssid, wifi->selected_ssid) != 0) ||
         (strcmp(last_wifi->password, wifi->password) != 0) ||
         (strcmp(last_wifi->status_text, wifi->status_text) != 0)) {
@@ -62,35 +65,68 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
                                                  const gui_appearance_settings_t *appearance)
 {
     bool background_enabled;
+    bool desired_night_enabled;
+    bool night_enabled;
+    bool night_switch_disabled;
+    bool should_disable_night_switch;
+    const gui_theme_def_t *theme_def;
+    gui_view_theme_t resolved_theme;
+    uint16_t theme_dropdown_index;
 
     if ((view == NULL) || (appearance == NULL)) {
         return false;
     }
 
-    if ((view->theme_dropdown == NULL) || (view->theme_background_switch == NULL)) {
+    if ((view->theme_dropdown == NULL) || (view->theme_background_switch == NULL) ||
+        (view->theme_night_switch == NULL)) {
         return true;
     }
 
-    if (lv_dropdown_get_selected(view->theme_dropdown) != (uint16_t)appearance->theme) {
+    resolved_theme = gui_theme_resolve_available(appearance->theme);
+    theme_def = gui_theme_get(resolved_theme);
+
+    if (gui_theme_theme_to_dropdown_index(resolved_theme, &theme_dropdown_index) &&
+        (lv_dropdown_get_selected(view->theme_dropdown) != theme_dropdown_index)) {
         return true;
     }
 
     background_enabled = lv_obj_has_state(view->theme_background_switch, LV_STATE_CHECKED);
-    return background_enabled != appearance->show_background_image;
+    if (background_enabled != appearance->show_background_image) {
+        return true;
+    }
+
+    desired_night_enabled = appearance->night_variant_enabled && (theme_def != NULL) &&
+                            theme_def->has_night_variant;
+    night_enabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_CHECKED);
+    if (night_enabled != desired_night_enabled) {
+        return true;
+    }
+
+    night_switch_disabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_DISABLED);
+    should_disable_night_switch = (theme_def == NULL) || !theme_def->has_night_variant;
+    return night_switch_disabled != should_disable_night_switch;
 }
 
-static lv_color_t gui_view_wifi_status_color(gui_wifi_state_t state)
+static const char *gui_view_wifi_card_status_text(const gui_wifi_settings_t *wifi)
 {
-    switch (state) {
+    if (wifi == NULL) {
+        return "Not connected";
+    }
+
+    switch (wifi->state) {
         case GUI_WIFI_STATE_CONNECTED:
-            return lv_color_hex(0x22C55E);
-        case GUI_WIFI_STATE_SCANNED:
-            return lv_color_hex(0xF59E0B);
+            if (wifi->selected_ssid[0] != '\0') {
+                return wifi->selected_ssid;
+            }
+            return "Not connected";
+        case GUI_WIFI_STATE_CONNECTING:
+            return "Connecting";
         case GUI_WIFI_STATE_FAILED:
-            return lv_color_hex(0xEF4444);
+            return "Failed";
         case GUI_WIFI_STATE_IDLE:
+        case GUI_WIFI_STATE_SCANNED:
         default:
-            return lv_color_hex(0x94A3B8);
+            return "Not connected";
     }
 }
 
@@ -171,6 +207,32 @@ static lv_obj_t *gui_view_create_setting_item_card(lv_obj_t *parent, const char 
     return card;
 }
 
+static lv_obj_t *gui_view_create_setting_item_card_shell(lv_obj_t *parent, lv_coord_t height)
+{
+    lv_obj_t *card = lv_obj_create(parent);
+
+    lv_obj_set_width(card, LV_PCT(100));
+    lv_obj_set_height(card, height);
+    lv_obj_set_layout(card, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_radius(card, 18, 0);
+    lv_obj_set_style_bg_color(card, lv_color_hex(0xF8FBFF), 0);
+    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(card, 1, 0);
+    lv_obj_set_style_border_color(card, lv_color_hex(0xD9E3F1), 0);
+    lv_obj_set_style_shadow_width(card, 0, 0);
+    lv_obj_set_style_pad_top(card, 14, 0);
+    lv_obj_set_style_pad_left(card, 14, 0);
+    lv_obj_set_style_pad_right(card, 14, 0);
+    lv_obj_set_style_pad_bottom(card, 14, 0);
+    lv_obj_set_style_pad_row(card, 10, 0);
+    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+
+    return card;
+}
+
 static lv_obj_t *gui_view_create_settings_page(lv_obj_t *parent)
 {
     lv_obj_t *page = lv_obj_create(parent);
@@ -185,6 +247,25 @@ static lv_obj_t *gui_view_create_settings_page(lv_obj_t *parent)
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
 
     return page;
+}
+
+static void gui_view_layout_password_dialog_buttons(gui_view_t *view, bool show_disconnect)
+{
+    if ((view == NULL) || (view->password_dialog_cancel_button == NULL) ||
+        (view->password_dialog_connect_button == NULL) ||
+        (view->password_dialog_disconnect_button == NULL)) {
+        return;
+    }
+
+    lv_obj_set_pos(view->password_dialog_connect_button, 570, 148);
+
+    if (show_disconnect) {
+        lv_obj_set_pos(view->password_dialog_cancel_button, 282, 148);
+        lv_obj_set_pos(view->password_dialog_disconnect_button, 426, 148);
+    } else {
+        lv_obj_set_pos(view->password_dialog_cancel_button, 426, 148);
+        lv_obj_set_pos(view->password_dialog_disconnect_button, 426, 148);
+    }
 }
 
 void gui_view_hide_wifi_dialogs_impl(gui_view_t *view)
@@ -248,6 +329,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_t *other_settings_card;
     lv_obj_t *other_settings_stack;
     lv_obj_t *wifi_card;
+    lv_obj_t *wifi_button_row;
     lv_obj_t *bluetooth_card;
     lv_obj_t *brightness_card;
     lv_obj_t *theme_card;
@@ -294,15 +376,15 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     }
 
     connectivity_card = gui_view_create_settings_card(settings_grid, "Connectivity",
-                                                      "Manage how Redmole connects to nearby devices and networks.",
+                                                      "Manage connections to devices and networks.",
                                                       LV_SIZE_CONTENT);
     view->connectivity_card = connectivity_card;
     lv_obj_set_grid_cell(connectivity_card, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0,
                          1);
 
     other_settings_card = gui_view_create_settings_card(
-        settings_grid, "Other settings",
-        "Display and system controls for the device.", LV_SIZE_CONTENT);
+        settings_grid, "Display settings",
+        "Control brightness and interface appearance.", LV_SIZE_CONTENT);
     view->other_settings_card = other_settings_card;
     lv_obj_set_grid_cell(other_settings_card, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START,
                          0, 1);
@@ -320,33 +402,74 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_row(connectivity_stack, 12, 0);
     lv_obj_clear_flag(connectivity_stack, LV_OBJ_FLAG_SCROLLABLE);
 
-    wifi_card = gui_view_create_setting_item_card(connectivity_stack, "Wi-Fi",
-                                                  "Scan to find networks, then choose one to connect.",
-                                                  LV_SIZE_CONTENT);
+    wifi_card = gui_view_create_setting_item_card_shell(connectivity_stack, LV_SIZE_CONTENT);
     view->wifi_card = wifi_card;
 
-    view->wifi_status_dot = lv_obj_create(wifi_card);
-    lv_obj_set_size(view->wifi_status_dot, 10, 10);
-    lv_obj_add_flag(view->wifi_status_dot, LV_OBJ_FLAG_IGNORE_LAYOUT);
-    lv_obj_clear_flag(view->wifi_status_dot, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(view->wifi_status_dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_width(view->wifi_status_dot, 0, 0);
-    lv_obj_set_style_shadow_width(view->wifi_status_dot, 0, 0);
-    lv_obj_set_style_bg_opa(view->wifi_status_dot, LV_OPA_COVER, 0);
-    lv_obj_align(view->wifi_status_dot, LV_ALIGN_TOP_RIGHT, -4, 4);
+    view->wifi_header_row = lv_obj_create(wifi_card);
+    lv_obj_set_width(view->wifi_header_row, LV_PCT(100));
+    lv_obj_set_height(view->wifi_header_row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(view->wifi_header_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(view->wifi_header_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(view->wifi_header_row, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_opa(view->wifi_header_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(view->wifi_header_row, 0, 0);
+    lv_obj_set_style_shadow_width(view->wifi_header_row, 0, 0);
+    lv_obj_set_style_pad_all(view->wifi_header_row, 0, 0);
+    lv_obj_set_style_pad_column(view->wifi_header_row, 12, 0);
+    lv_obj_clear_flag(view->wifi_header_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    view->scan_button = gui_view_create_action_button(wifi_card, 0, 0, 120, "Scan",
+    view->wifi_title_label = lv_label_create(view->wifi_header_row);
+    lv_label_set_text(view->wifi_title_label, "Wi-Fi");
+    lv_obj_set_flex_grow(view->wifi_title_label, 1);
+    lv_obj_set_style_text_color(view->wifi_title_label, lv_color_hex(0x10213D), 0);
+
+    view->wifi_status_label = lv_label_create(view->wifi_header_row);
+    lv_obj_set_width(view->wifi_status_label, 220);
+    lv_label_set_long_mode(view->wifi_status_label, LV_LABEL_LONG_DOT);
+    lv_label_set_text(view->wifi_status_label, "Not connected");
+    lv_obj_set_style_text_color(view->wifi_status_label, lv_color_hex(0x607089), 0);
+    lv_obj_set_style_text_font(view->wifi_status_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_align(view->wifi_status_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_align(view->wifi_status_label, LV_ALIGN_RIGHT_MID, 0);
+
+    view->wifi_subtitle_label = lv_label_create(wifi_card);
+    lv_label_set_text(view->wifi_subtitle_label,
+                      "Scan for networks and connect.");
+    lv_obj_set_width(view->wifi_subtitle_label, LV_PCT(100));
+    lv_label_set_long_mode(view->wifi_subtitle_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_color(view->wifi_subtitle_label, lv_color_hex(0x607089), 0);
+
+    wifi_button_row = lv_obj_create(wifi_card);
+    lv_obj_set_width(wifi_button_row, LV_PCT(100));
+    lv_obj_set_height(wifi_button_row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(wifi_button_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(wifi_button_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(wifi_button_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(wifi_button_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(wifi_button_row, 0, 0);
+    lv_obj_set_style_shadow_width(wifi_button_row, 0, 0);
+    lv_obj_set_style_pad_all(wifi_button_row, 0, 0);
+    lv_obj_set_style_pad_column(wifi_button_row, 12, 0);
+    lv_obj_clear_flag(wifi_button_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    view->scan_button = gui_view_create_action_button(wifi_button_row, 0, 0, 120, "Scan",
                                                       LV_EVENT_CLICKED, settings_event_cb,
                                                       event_user_data);
+    view->disconnect_button = gui_view_create_action_button(
+        wifi_button_row, 0, 0, 120, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
+    lv_obj_add_flag(view->disconnect_button, LV_OBJ_FLAG_HIDDEN);
 
     bluetooth_card = gui_view_create_setting_item_card(
         connectivity_stack, "Bluetooth",
-        "Reserved for nearby device discovery and pairing.", LV_SIZE_CONTENT);
+        "Connect to nearby devices.", LV_SIZE_CONTENT);
     view->bluetooth_card = bluetooth_card;
 
     bluetooth_status = lv_label_create(bluetooth_card);
     view->bluetooth_status_label = bluetooth_status;
-    lv_label_set_text(bluetooth_status, "Coming later.");
+    lv_label_set_text(bluetooth_status, "Not connected.");
     lv_obj_set_width(bluetooth_status, LV_PCT(100));
     lv_obj_set_style_text_color(bluetooth_status, lv_color_hex(0x4A5C78), 0);
 
@@ -365,7 +488,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     brightness_card = gui_view_create_setting_item_card(
         other_settings_stack, "Screen brightness",
-        "Adjust the display backlight level for readability and power use.",
+        "Adjust the backlight level.",
         LV_SIZE_CONTENT);
     view->brightness_card = brightness_card;
 
@@ -408,12 +531,16 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     theme_card = gui_view_create_setting_item_card(
         other_settings_stack, "Theme",
-        "Choose how the interface should look.", LV_SIZE_CONTENT);
+        "Choose interface style.", LV_SIZE_CONTENT);
     view->theme_card = theme_card;
 
     view->theme_dropdown = lv_dropdown_create(theme_card);
     lv_obj_set_size(view->theme_dropdown, LV_PCT(100), 46);
-    lv_dropdown_set_options(view->theme_dropdown, "Light mode\nDark mode\nHello Kitty");
+    {
+        char theme_options[256] = "";
+        gui_theme_build_dropdown_string(theme_options, sizeof(theme_options));
+        lv_dropdown_set_options(view->theme_dropdown, theme_options);
+    }
     lv_dropdown_set_selected(view->theme_dropdown, 0);
     lv_obj_add_event_cb(view->theme_dropdown, settings_event_cb, LV_EVENT_VALUE_CHANGED,
                         event_user_data);
@@ -465,6 +592,45 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_bg_color(view->theme_background_switch, lv_color_hex(0xFFFFFF),
                               LV_PART_KNOB);
     lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_KNOB);
+
+    lv_obj_t *theme_night_row = lv_obj_create(theme_card);
+    lv_obj_set_width(theme_night_row, LV_PCT(100));
+    lv_obj_set_height(theme_night_row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(theme_night_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(theme_night_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(theme_night_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(theme_night_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(theme_night_row, 0, 0);
+    lv_obj_set_style_shadow_width(theme_night_row, 0, 0);
+    lv_obj_set_style_pad_all(theme_night_row, 0, 0);
+    lv_obj_set_style_pad_column(theme_night_row, 12, 0);
+    lv_obj_clear_flag(theme_night_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    view->theme_night_label = lv_label_create(theme_night_row);
+    lv_label_set_text(view->theme_night_label, "Use night variant");
+    lv_obj_set_width(view->theme_night_label, LV_PCT(100));
+    lv_obj_set_style_text_color(view->theme_night_label, lv_color_hex(0x10213D), 0);
+    lv_obj_set_style_text_align(view->theme_night_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_flex_grow(view->theme_night_label, 1);
+
+    view->theme_night_switch = lv_switch_create(theme_night_row);
+    lv_obj_add_event_cb(view->theme_night_switch, settings_event_cb, LV_EVENT_VALUE_CHANGED,
+                        event_user_data);
+    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0xD9E3F1), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(view->theme_night_switch, 1, LV_PART_MAIN);
+    lv_obj_set_style_border_color(view->theme_night_switch, lv_color_hex(0xD7E1EE),
+                                  LV_PART_MAIN);
+    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0x1D4ED8),
+                              LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
+                            LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_border_width(view->theme_night_switch, 0,
+                                  LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0xFFFFFF),
+                              LV_PART_KNOB);
+    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_KNOB);
 
     view->dialog_scrim = NULL;
 
@@ -543,7 +709,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     view->wifi_password_textarea = lv_textarea_create(view->password_dialog);
     lv_obj_set_size(view->wifi_password_textarea, 662, 52);
-    lv_obj_align(view->wifi_password_textarea, LV_ALIGN_TOP_MID, 0, 78);
+    lv_obj_align(view->wifi_password_textarea, LV_ALIGN_TOP_MID, 0, 80);
     lv_textarea_set_one_line(view->wifi_password_textarea, true);
     lv_textarea_set_password_mode(view->wifi_password_textarea, true);
     lv_textarea_set_placeholder_text(view->wifi_password_textarea, "Enter Wi-Fi password");
@@ -562,15 +728,20 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
 
     view->password_dialog_cancel_button = gui_view_create_action_button(
-        view->password_dialog, 426, 146, 128, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 282, 148, 128, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
+    view->password_dialog_disconnect_button = gui_view_create_action_button(
+        view->password_dialog, 426, 148, 128, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
+    lv_obj_add_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
     view->password_dialog_connect_button = gui_view_create_action_button(
-        view->password_dialog, 570, 146, 132, "Connect", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 570, 148, 132, "Connect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     lv_obj_set_style_bg_color(view->password_dialog_connect_button, lv_color_hex(0x1D4ED8), 0);
     lv_obj_set_style_text_color(view->password_dialog_connect_button, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(view->password_dialog_connect_button, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->password_dialog_connect_button, 0, 0);
+    gui_view_layout_password_dialog_buttons(view, false);
 
     gui_view_hide_wifi_dialogs_impl(view);
 }
@@ -579,6 +750,8 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
 {
     char wifi_text[72];
     const char *network_empty_text = "No networks found yet.";
+    bool can_disconnect;
+    bool is_connecting;
     bool wifi_changed;
     uint8_t network_index;
 
@@ -591,9 +764,14 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
         return;
     }
 
-    if ((view->theme_dropdown != NULL) &&
-        (lv_dropdown_get_selected(view->theme_dropdown) != (uint16_t)model->appearance.theme)) {
-        lv_dropdown_set_selected(view->theme_dropdown, (uint16_t)model->appearance.theme);
+    if (view->theme_dropdown != NULL) {
+        gui_view_theme_t resolved_theme = gui_theme_resolve_available(model->appearance.theme);
+        uint16_t theme_dropdown_index;
+
+        if (gui_theme_theme_to_dropdown_index(resolved_theme, &theme_dropdown_index) &&
+            (lv_dropdown_get_selected(view->theme_dropdown) != theme_dropdown_index)) {
+            lv_dropdown_set_selected(view->theme_dropdown, theme_dropdown_index);
+        }
     }
 
     if (view->theme_background_switch != NULL) {
@@ -608,12 +786,78 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
         }
     }
 
-    if (view->wifi_status_dot != NULL) {
-        lv_obj_set_style_bg_color(view->wifi_status_dot,
-                                  gui_view_wifi_status_color(model->wifi.state), 0);
+    if (view->theme_night_switch != NULL) {
+        gui_view_theme_t resolved_theme = gui_theme_resolve_available(model->appearance.theme);
+        bool desired_night_enabled;
+        bool night_enabled = lv_obj_has_state(view->theme_night_switch, LV_STATE_CHECKED);
+        const gui_theme_def_t *theme_def = gui_theme_get(resolved_theme);
+        bool should_disable_night_switch = (theme_def == NULL) ||
+                                           !theme_def->has_night_variant;
+
+        desired_night_enabled = model->appearance.night_variant_enabled &&
+                                !should_disable_night_switch;
+
+        if (night_enabled != desired_night_enabled) {
+            if (desired_night_enabled) {
+                lv_obj_add_state(view->theme_night_switch, LV_STATE_CHECKED);
+            } else {
+                lv_obj_clear_state(view->theme_night_switch, LV_STATE_CHECKED);
+            }
+        }
+
+        if (should_disable_night_switch) {
+            lv_obj_clear_state(view->theme_night_switch, LV_STATE_CHECKED);
+            lv_obj_add_state(view->theme_night_switch, LV_STATE_DISABLED);
+        } else {
+            lv_obj_clear_state(view->theme_night_switch, LV_STATE_DISABLED);
+        }
     }
 
-    gui_view_set_label_text_if_changed(view->wifi_status_label, "");
+    if (view->wifi_status_label != NULL) {
+        lv_obj_set_style_text_color(view->wifi_status_label,
+                                    gui_view_wifi_status_color(view->current_theme,
+                                                               model->wifi.state),
+                                    0);
+        gui_view_set_label_text_if_changed(view->wifi_status_label,
+                                           gui_view_wifi_card_status_text(&model->wifi));
+    }
+
+    can_disconnect = model->wifi.can_disconnect;
+    is_connecting = model->wifi.state == GUI_WIFI_STATE_CONNECTING;
+
+    if (view->disconnect_button != NULL) {
+        if (can_disconnect) {
+            lv_obj_clear_flag(view->disconnect_button, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->disconnect_button, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (view->scan_button != NULL) {
+        if (is_connecting) {
+            lv_obj_add_state(view->scan_button, LV_STATE_DISABLED);
+        } else {
+            lv_obj_clear_state(view->scan_button, LV_STATE_DISABLED);
+        }
+    }
+
+    if (view->password_dialog_connect_button != NULL) {
+        if (is_connecting) {
+            lv_obj_add_state(view->password_dialog_connect_button, LV_STATE_DISABLED);
+        } else {
+            lv_obj_clear_state(view->password_dialog_connect_button, LV_STATE_DISABLED);
+        }
+    }
+
+    if (view->password_dialog_disconnect_button != NULL) {
+        if (can_disconnect) {
+            lv_obj_clear_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    gui_view_layout_password_dialog_buttons(view, can_disconnect);
+
     if (model->wifi.selected_ssid[0] != '\0') {
         gui_view_set_label_text_if_changed(view->password_dialog_network_label,
                                            model->wifi.selected_ssid);

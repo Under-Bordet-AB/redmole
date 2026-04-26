@@ -13,11 +13,11 @@ void gui_view_init_bme280_panel(gui_view_t *view, lv_obj_t *content)
 
     view->bme280_panel = lv_obj_create(content);
     lv_obj_set_size(view->bme280_panel, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_align(view->bme280_panel, LV_ALIGN_TOP_LEFT, 34, 118);
+    lv_obj_center(view->bme280_panel);
     lv_obj_set_layout(view->bme280_panel, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(view->bme280_panel, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_flex_align(view->bme280_panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_align(view->bme280_panel, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_all(view->bme280_panel, 24, 0);
     lv_obj_set_style_pad_column(view->bme280_panel, 14, 0);
     lv_obj_set_style_pad_row(view->bme280_panel, 14, 0);
@@ -53,6 +53,7 @@ void gui_view_apply_bme280_panel(gui_view_t *view, const gui_view_model_t *model
              model->sensor.pressure_deci_hpa / 10,
              gui_view_abs_i32(model->sensor.pressure_deci_hpa % 10));
 
+    lv_obj_center(view->bme280_panel);
     gui_view_set_label_text_if_changed(view->temperature_value, temperature_text);
     gui_view_set_label_text_if_changed(view->humidity_value, humidity_text);
     gui_view_set_label_text_if_changed(view->pressure_value, pressure_text);

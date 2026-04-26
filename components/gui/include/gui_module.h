@@ -19,6 +19,7 @@ typedef struct {
     void (*on_wifi_network_selected)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data);
     bool (*on_wifi_known_network_requested)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data);
     bool (*on_wifi_connect_requested)(gui_ctx_t *self, const char *ssid, const char *password, void *user_data);
+    bool (*on_wifi_disconnect_requested)(gui_ctx_t *self, void *user_data);
 } gui_module_bindings_t;
 
 void gui_init(gui_ctx_t *self);
@@ -32,6 +33,12 @@ void gui_set_sensor_state(gui_ctx_t *self, const gui_sensor_state_t *sensor);
 bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor);
 void gui_set_wifi_settings(gui_ctx_t *self, const gui_wifi_settings_t *wifi);
 bool gui_get_wifi_settings(gui_ctx_t *self, gui_wifi_settings_t *wifi);
+void gui_set_wifi_state(gui_ctx_t *self, gui_wifi_state_t state);
+bool gui_get_wifi_state(gui_ctx_t *self, gui_wifi_state_t *state);
+void gui_set_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t state);
+bool gui_get_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t *state);
+void gui_set_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t state);
+bool gui_get_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t *state);
 void gui_show_wifi_network_dialog(gui_ctx_t *self);
 void gui_show_wifi_password_dialog(gui_ctx_t *self);
 void gui_hide_wifi_dialogs(gui_ctx_t *self);
