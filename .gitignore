@@ -1,6 +1,4 @@
-sdkconfig
 sdkconfig.old
-sdkconfig.defaults
 sdkconfig.repo.backup
 build/
 managed_components/
