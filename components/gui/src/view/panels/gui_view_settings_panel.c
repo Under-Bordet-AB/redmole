@@ -68,6 +68,7 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
     bool night_enabled;
     bool night_switch_disabled;
     bool should_disable_night_switch;
+    uint16_t theme_dropdown_index;
 
     if ((view == NULL) || (appearance == NULL)) {
         return false;
@@ -78,7 +79,8 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
         return true;
     }
 
-    if (lv_dropdown_get_selected(view->theme_dropdown) != (uint16_t)appearance->theme) {
+    if (gui_theme_theme_to_dropdown_index(appearance->theme, &theme_dropdown_index) &&
+        (lv_dropdown_get_selected(view->theme_dropdown) != theme_dropdown_index)) {
         return true;
     }
 
@@ -735,9 +737,13 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
         return;
     }
 
-    if ((view->theme_dropdown != NULL) &&
-        (lv_dropdown_get_selected(view->theme_dropdown) != (uint16_t)model->appearance.theme)) {
-        lv_dropdown_set_selected(view->theme_dropdown, (uint16_t)model->appearance.theme);
+    if (view->theme_dropdown != NULL) {
+        uint16_t theme_dropdown_index;
+
+        if (gui_theme_theme_to_dropdown_index(model->appearance.theme, &theme_dropdown_index) &&
+            (lv_dropdown_get_selected(view->theme_dropdown) != theme_dropdown_index)) {
+            lv_dropdown_set_selected(view->theme_dropdown, theme_dropdown_index);
+        }
     }
 
     if (view->theme_background_switch != NULL) {

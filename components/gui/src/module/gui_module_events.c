@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../view/gui_theme_defs.h"
+
 static void gui_module_notify_panel_changed(gui_module_runtime_t *runtime, gui_panel_id_t panel)
 {
     if ((runtime == NULL) || (runtime->owner == NULL) ||
@@ -126,18 +128,10 @@ void gui_module_event_settings_cb(lv_event_t *event)
 
     if ((target == runtime->view.theme_dropdown) && (event_code == LV_EVENT_VALUE_CHANGED)) {
         uint16_t selected_theme = lv_dropdown_get_selected(runtime->view.theme_dropdown);
-        gui_view_theme_t theme = GUI_VIEW_THEME_LIGHT;
+        gui_view_theme_t theme;
 
-        if (selected_theme == 1U) {
-            theme = GUI_VIEW_THEME_DARK;
-        } else if (selected_theme == 2U) {
-            theme = GUI_VIEW_THEME_HELLO_KITTY;
-        } else if (selected_theme == 3U) {
-            theme = GUI_VIEW_THEME_TERMINAL;
-        } else if (selected_theme == 4U) {
-            theme = GUI_VIEW_THEME_DEATH_NOTE;
-        } else if (selected_theme == 5U) {
-            theme = GUI_VIEW_THEME_SPONGEBOB;
+        if (!gui_theme_dropdown_index_to_theme(selected_theme, &theme)) {
+            return;
         }
 
         runtime->control.appearance.theme = theme;

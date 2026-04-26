@@ -149,4 +149,16 @@ const gui_theme_def_t *gui_theme_get(gui_view_theme_t theme);
  */
 void gui_theme_build_dropdown_string(char *buf, size_t buf_size);
 
+/*
+ * Converts a settings dropdown row index to the corresponding selectable
+ * theme enum value.
+ */
+bool gui_theme_dropdown_index_to_theme(uint16_t index, gui_view_theme_t *theme_out);
+
+/*
+ * Converts a selectable theme enum value to its row index in the settings
+ * dropdown.
+ */
+bool gui_theme_theme_to_dropdown_index(gui_view_theme_t theme, uint16_t *index_out);
+
 #endif

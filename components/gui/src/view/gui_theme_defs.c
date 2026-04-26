@@ -632,3 +632,54 @@ void gui_theme_build_dropdown_string(char *buf, size_t buf_size)
         first = false;
     }
 }
+
+bool gui_theme_dropdown_index_to_theme(uint16_t index, gui_view_theme_t *theme_out)
+{
+    uint16_t selectable_index = 0;
+    uint32_t theme_index;
+
+    if (theme_out == NULL) {
+        return false;
+    }
+
+    for (theme_index = 0; theme_index < GUI_THEME_COUNT; theme_index++) {
+        if (!gui_themes[theme_index].is_user_selectable) {
+            continue;
+        }
+
+        if (selectable_index == index) {
+            *theme_out = (gui_view_theme_t)theme_index;
+            return true;
+        }
+
+        selectable_index++;
+    }
+
+    return false;
+}
+
+bool gui_theme_theme_to_dropdown_index(gui_view_theme_t theme, uint16_t *index_out)
+{
+    uint16_t selectable_index = 0;
+    uint32_t theme_index;
+
+    if ((index_out == NULL) || ((int)theme < 0) || ((uint32_t)theme >= GUI_THEME_COUNT) ||
+        !gui_themes[(uint32_t)theme].is_user_selectable) {
+        return false;
+    }
+
+    for (theme_index = 0; theme_index < GUI_THEME_COUNT; theme_index++) {
+        if (!gui_themes[theme_index].is_user_selectable) {
+            continue;
+        }
+
+        if (theme_index == (uint32_t)theme) {
+            *index_out = selectable_index;
+            return true;
+        }
+
+        selectable_index++;
+    }
+
+    return false;
+}
