@@ -20,6 +20,8 @@ void gui_control_init(gui_control_t *control)
     control->wifi.connect_requested = false;
     control->wifi.can_disconnect = false;
     control->wifi.state = GUI_WIFI_STATE_IDLE;
+    control->wifi_state = GUI_WIFI_STATE_IDLE;
+    control->bluetooth_state = GUI_BLUETOOTH_STATE_IDLE;
     gui_control_reset_wifi_scan(control);
     gui_control_copy_status(&control->wifi, "Press Scan to search for Wi-Fi networks.");
 }

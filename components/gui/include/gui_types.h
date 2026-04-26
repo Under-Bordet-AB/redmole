@@ -51,6 +51,13 @@ typedef enum {
     GUI_WIFI_STATE_FAILED,
 } gui_wifi_state_t;
 
+typedef enum {
+    GUI_BLUETOOTH_STATE_IDLE = 0,
+    GUI_BLUETOOTH_STATE_CONNECTING,
+    GUI_BLUETOOTH_STATE_CONNECTED,
+    GUI_BLUETOOTH_STATE_UNAVAILABLE,
+} gui_bluetooth_state_t;
+
 typedef struct {
     char ssid[GUI_WIFI_SSID_MAX_LEN];
     uint8_t signal_strength_pct;
@@ -83,6 +90,8 @@ typedef struct {
     gui_sensor_state_t sensor;
     gui_energy_plan_t energy_plan;
     gui_wifi_settings_t wifi;
+    gui_wifi_state_t wifi_state;
+    gui_bluetooth_state_t bluetooth_state;
     gui_appearance_settings_t appearance;
 } gui_view_model_t;
 

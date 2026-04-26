@@ -10,5 +10,7 @@ void gui_control_build_model(gui_control_t *control, gui_view_model_t *model)
     model->sensor = control->sensor;
     gui_control_clear_energy_plan(&model->energy_plan);
     model->wifi = control->wifi;
+    model->wifi_state = control->wifi_state;
+    model->bluetooth_state = control->bluetooth_state;
     model->appearance = control->appearance;
 }

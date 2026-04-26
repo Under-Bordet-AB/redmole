@@ -43,6 +43,26 @@ lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t s
     }
 }
 
+lv_color_t gui_view_bluetooth_status_color(gui_view_theme_t theme,
+                                           gui_bluetooth_state_t state)
+{
+    const gui_theme_def_t *def = gui_theme_get(theme);
+
+    switch (state) {
+        case GUI_BLUETOOTH_STATE_CONNECTED:
+            return (def != NULL) ? lv_color_hex(def->wifi_connected_color)
+                                 : lv_color_hex(0x1D4ED8);
+        case GUI_BLUETOOTH_STATE_CONNECTING:
+            return lv_color_hex(0xF59E0B);
+        case GUI_BLUETOOTH_STATE_UNAVAILABLE:
+            return lv_color_hex(0x4A5C78);
+        case GUI_BLUETOOTH_STATE_IDLE:
+        default:
+            return (def != NULL) ? lv_color_hex(def->wifi_idle_color)
+                                 : lv_color_hex(0x4A5C78);
+    }
+}
+
 static void gui_view_update_sidebar_clock_impl(gui_view_t *view)
 {
     time_t now;
@@ -103,6 +123,28 @@ static void gui_view_apply_header(gui_view_t *view, const gui_view_model_t *mode
         lv_obj_add_flag(view->energy_plan_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(view->forecast_panel, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(view->settings_panel, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void gui_view_apply_connectivity_icon_colors(gui_view_t *view,
+                                                    const gui_view_model_t *model)
+{
+    if ((view == NULL) || (model == NULL)) {
+        return;
+    }
+
+    if (view->sidebar_wifi_label != NULL) {
+        lv_obj_set_style_text_color(view->sidebar_wifi_label,
+                                    gui_view_wifi_status_color(view->current_theme,
+                                                               model->wifi_state),
+                                    0);
+    }
+
+    if (view->sidebar_bluetooth_label != NULL) {
+        lv_obj_set_style_text_color(view->sidebar_bluetooth_label,
+                                    gui_view_bluetooth_status_color(view->current_theme,
+                                                                    model->bluetooth_state),
+                                    0);
     }
 }
 
@@ -595,12 +637,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_color(brand, brand_text, 0);
         lv_obj_set_style_text_font(brand, body_font, 0);
     }
-    if (view->sidebar_wifi_label != NULL) {
-        lv_obj_set_style_text_color(view->sidebar_wifi_label, brand_text, 0);
-    }
-    if (view->sidebar_bluetooth_label != NULL) {
-        lv_obj_set_style_text_color(view->sidebar_bluetooth_label, brand_text, 0);
-    }
 
     lv_obj_set_style_bg_color(view->content, content_bg, 0);
     lv_obj_set_style_bg_opa(view->content, content_bg_opa, 0);
@@ -686,14 +722,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     if (view->brightness_value_label != NULL) {
         lv_obj_set_style_text_color(view->brightness_value_label, accent_soft_color, 0);
         lv_obj_set_style_text_font(view->brightness_value_label, emphasis_font, 0);
-    }
-    if (view->wifi_status_label != NULL) {
-        lv_obj_set_style_text_color(view->wifi_status_label, muted_text, 0);
-        lv_obj_set_style_text_font(view->wifi_status_label, body_font, 0);
-    }
-    if (view->wifi_selected_label != NULL) {
-        lv_obj_set_style_text_color(view->wifi_selected_label, subtitle_text, 0);
-        lv_obj_set_style_text_font(view->wifi_selected_label, body_font, 0);
     }
     if (view->brightness_slider != NULL) {
         lv_obj_set_style_bg_color(view->brightness_slider, slider_bg, LV_PART_MAIN);
@@ -845,10 +873,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     if (view->password_dialog_network_label != NULL) {
         lv_obj_set_style_text_color(view->password_dialog_network_label, subtitle_text, 0);
         lv_obj_set_style_text_font(view->password_dialog_network_label, body_font, 0);
-    }
-    if (view->password_dialog_status_label != NULL) {
-        lv_obj_set_style_text_color(view->password_dialog_status_label, muted_text, 0);
-        lv_obj_set_style_text_font(view->password_dialog_status_label, body_font, 0);
     }
 
     lv_obj_set_style_bg_color(view->wifi_password_textarea, dropdown_bg, 0);
@@ -1060,6 +1084,8 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)
                              model->appearance.show_background_image,
                              model->appearance.night_variant_enabled);
     }
+
+    gui_view_apply_connectivity_icon_colors(view, model);
 
     if (panel_changed) {
         gui_view_style_nav_button(view->bme280_button, view->current_theme,

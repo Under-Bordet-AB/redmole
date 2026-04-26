@@ -15,6 +15,8 @@ typedef struct {
     bool wifi_connect_requested;
     bool wifi_scan_requested;
     bool wifi_disconnect_requested;
+    bool has_last_wifi_state;
+    gui_wifi_state_t last_wifi_state;
     char requested_ssid[GUI_WIFI_SSID_MAX_LEN];
 } app_gui_bindings_ctx_t;
 
@@ -123,6 +125,25 @@ static void sync_sensor(gui_ctx_t *gui)
     }
 
     gui_set_sensor_state(gui, &sensor);
+}
+
+static bool sync_wifi_state(gui_ctx_t *gui)
+{
+    gui_wifi_state_t wifi_state;
+
+    if (gui == NULL) {
+        return false;
+    }
+
+    wifi_state = map_wifi_state(nac_get_wifi_status());
+    if (s_bindings.has_last_wifi_state && (s_bindings.last_wifi_state == wifi_state)) {
+        return false;
+    }
+
+    gui_set_wifi_state(gui, wifi_state);
+    s_bindings.last_wifi_state = wifi_state;
+    s_bindings.has_last_wifi_state = true;
+    return true;
 }
 
 static void sync_wifi(gui_ctx_t *gui)
@@ -348,10 +369,16 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
 
 void app_gui_bindings_sync(gui_ctx_t *gui)
 {
+    bool wifi_state_changed;
+
     if (gui == NULL) {
         return;
     }
 
     sync_sensor(gui);
-    sync_wifi(gui);
+    wifi_state_changed = sync_wifi_state(gui);
+    if (wifi_state_changed || s_bindings.wifi_scan_requested ||
+        s_bindings.wifi_connect_requested || s_bindings.wifi_disconnect_requested) {
+        sync_wifi(gui);
+    }
 }

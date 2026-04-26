@@ -7,6 +7,8 @@ typedef struct {
     gui_panel_id_t active_panel;
     gui_sensor_state_t sensor;
     gui_wifi_settings_t wifi;
+    gui_wifi_state_t wifi_state;
+    gui_bluetooth_state_t bluetooth_state;
     gui_appearance_settings_t appearance;
 } gui_control_t;
 

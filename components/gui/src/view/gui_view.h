@@ -43,8 +43,6 @@ typedef struct {
     lv_obj_t *theme_night_switch;
     lv_obj_t *brightness_slider;
     lv_obj_t *brightness_value_label;
-    lv_obj_t *wifi_status_label;
-    lv_obj_t *wifi_selected_label;
     lv_obj_t *dialog_scrim;
     lv_obj_t *network_dialog;
     lv_obj_t *network_dialog_title;
@@ -56,7 +54,6 @@ typedef struct {
     lv_obj_t *password_dialog;
     lv_obj_t *password_dialog_title;
     lv_obj_t *password_dialog_network_label;
-    lv_obj_t *password_dialog_status_label;
     lv_obj_t *wifi_password_textarea;
     lv_obj_t *wifi_keyboard;
     lv_obj_t *password_dialog_cancel_button;
@@ -90,6 +87,8 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model);
 void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_background_image,
                           bool night_variant_enabled);
 lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t state);
+lv_color_t gui_view_bluetooth_status_color(gui_view_theme_t theme,
+                                           gui_bluetooth_state_t state);
 void gui_view_update_sidebar_clock_labels(gui_view_t *view);
 void gui_view_hide_wifi_dialogs(gui_view_t *view);
 void gui_view_show_network_dialog(gui_view_t *view);
