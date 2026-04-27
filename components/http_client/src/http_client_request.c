@@ -5,6 +5,11 @@
 
 static const char *TAG = "HTTP Request";
 
+/*
+ * Context passed as user_data into the ESP HTTP client.
+ * Tracks the caller-supplied buffer and how many bytes have been written
+ * so the event handler can append each incoming chunk correctly.
+ */
 typedef struct
 {
     char *buf;
@@ -20,8 +25,10 @@ const char *tls_get_cert(void);
 // ================================================ //
 
 /*
- * Gets set as event_handler in esp_http_client_perform()'s config
- * Fires once for each chunk of data received via HTTP
+ * Event handler registered with esp_http_client_perform().
+ * Fires once per received data chunk. Appends each chunk into the
+ * caller's buffer via response_ctx_t, clamping to the available space
+ * to prevent overflow if the response is larger than the buffer.
  */
 static esp_err_t on_http_event(esp_http_client_event_t *event)
 {
@@ -34,6 +41,8 @@ static esp_err_t on_http_event(esp_http_client_event_t *event)
             response_ctx_t *ctx = (response_ctx_t *)event->user_data;
             size_t space_remaining = ctx->buf_len - ctx->written;
             size_t to_copy;
+
+            // Clamp to remaining space so we never write past the end of the buffer
             if (event->data_len < space_remaining)
             {
                 to_copy = event->data_len;
@@ -51,9 +60,11 @@ static esp_err_t on_http_event(esp_http_client_event_t *event)
 }
 
 /*
- * Sends a GET request
- * Returns ESP_FAIL or HTTP status code if failed
- * Returns ESP_OK on success
+ * Sends a blocking GET request to url.
+ * Response body is written into buf up to buf_len bytes via on_http_event.
+ * Returns ESP_OK on success.
+ * Returns ESP_FAIL if the client could not be initialized or the request failed.
+ * Returns the HTTP status code (>= 400) if the server returned an error.
  */
 esp_err_t request_get(const char* url, char* buf, size_t buf_len)
 {

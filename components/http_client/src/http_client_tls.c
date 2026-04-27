@@ -6,9 +6,10 @@ static const char *TAG = "TLS";
 static const char *tls_cert = NULL;
 
 /*
- * TLS initializer
- * Set ca_cert_pem to CA Certificate for TLS
- * Set ca_cert_pem to NULL if plain HTTP is wanted
+ * TLS initializer.
+ * Stores the PEM-encoded CA certificate pointer used by request_get/post
+ * when setting up the esp_http_client TLS context.
+ * Pass NULL to disable TLS and use plain HTTP.
  */
 esp_err_t _tls_init(const char *ca_cert_pem)
 {
@@ -27,8 +28,9 @@ esp_err_t _tls_init(const char *ca_cert_pem)
 }
 
 /*
- * TLS certificate getter
- * Returns NULL if no certificate was set
+ * Returns the stored CA certificate PEM string.
+ * Returns NULL if no certificate was set (plain HTTP mode).
+ * Called by request_get/post to populate cert_pem in the client config.
  */
 const char *tls_get_cert(void)
 {
@@ -36,8 +38,8 @@ const char *tls_get_cert(void)
 }
 
 /*
- * TLS deinitializer
- * Sets certificate to NULL
+ * Clears the stored certificate pointer.
+ * Called from http_client_deinit().
  */
 void _tls_deinit(void)
 {
