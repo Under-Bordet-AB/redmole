@@ -12,6 +12,7 @@
 #include "nac.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
+#include "http_client.h"
 
 static const char* TAG = "MAIN";
 static bme280_hal s_sensor_hal = {0};
@@ -31,6 +32,11 @@ static esp_err_t init_single_instance_modules(void) {
 
     if (nac_init() != ESP_OK) {
         ESP_LOGE(TAG, "nac_init failed: %s", esp_err_to_name(rv));
+        return rv;
+    }
+
+    if (http_client_init(NULL) != ESP_OK) {
+        ESP_LOGE(TAG, "http_client_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
