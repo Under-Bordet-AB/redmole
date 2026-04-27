@@ -3646,6 +3646,13 @@ CONFIG_REDMOLE_GUI_THEME_DEATH_NOTE=y
 # end of RedMole GUI Configuration
 
 #
+# RedMole HTTP Client
+#
+# default:
+CONFIG_REDMOLE_HTTP_POLL_INTERVAL_MS=10000
+# end of RedMole HTTP Client
+
+#
 # RedMole WiFi Configuration
 #
 # default:
