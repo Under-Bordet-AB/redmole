@@ -1,0 +1,9 @@
+menu "RedMole HTTP Client"
+
+    config REDMOLE_HTTP_POLL_INTERVAL_MS
+        int "API poll interval (ms)"
+        default 10000
+        help
+            How often the HTTP client polls the remote API in milliseconds.
+
+endmenu
