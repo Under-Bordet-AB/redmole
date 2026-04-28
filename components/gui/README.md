@@ -6,9 +6,11 @@ LVGL-based GUI module for the Waveshare `ESP32-S3-LCD-7B` board.
 
 The GUI component is now organized under `components/gui/src` as:
 
-- `module/`: module lifecycle, LVGL/event wiring, and platform integration
-- `control/`: GUI control state and view-model building
-- `view/`: top-level view composition, shared UI helpers, and panel-specific visuals under `view/panels/`
+- `gui.c`: public API entrypoints and top-level coordination
+- `gui_state.*`: GUI-owned state and pure state transitions
+- `gui_screen.*`: screen-facing wrapper over LVGL rendering and event wiring
+- `gui_platform.*`: display bring-up, backlight, and refresh timer glue
+- `view/`: LVGL widget composition, shared UI helpers, and panel-specific visuals under `view/panels/`
 - `gui_defs.h`: shared internal GUI definitions
 
 See `components/gui/src/README.md` for the internal ownership rules and file breakdown.
@@ -47,7 +49,7 @@ The public API also exposes callback bindings plus setters/getters for GUI-owned
 
 Current data path:
 
-`selected BME280 HAL backend -> bme280_hal -> sensor_data -> gui_control -> gui_view`
+`selected BME280 HAL backend -> bme280_hal -> sensor_data -> gui_state -> gui_screen`
 
 The GUI does not talk to the BME280 directly. At the moment the BME280 values are intentionally left at zero until a real GUI-side sensor integration path is wired in.
 

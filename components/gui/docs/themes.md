@@ -16,7 +16,7 @@ Theme behavior is driven by these files:
 - `components/gui/Kconfig`: compile-time theme enablement toggles.
 - `components/gui/src/view/gui_view.c`: runtime application logic and night-variant resolution.
 - `components/gui/src/view/panels/gui_view_settings_panel.c`: settings panel dropdown and switches.
-- `components/gui/src/module/gui_module_events.c`: maps settings dropdown selection to enum values.
+- `components/gui/src/gui.c`: routes settings events into GUI state transitions.
 
 ## Checklist: Add a New Selectable Theme
 
@@ -84,13 +84,13 @@ The dropdown options string is generated from entries where:
 Function:
 - `gui_theme_build_dropdown_string(...)` in `components/gui/src/view/gui_theme_defs.c`
 
-5. Update event mapping in settings handler.
+5. Confirm the settings event handler routes the new theme correctly.
 
 File:
-- `components/gui/src/module/gui_module_events.c`
+- `components/gui/src/gui.c`
 
-Current behavior maps dropdown index manually (hardcoded if/else).
-If you add another selectable theme, update this mapping so the new option selects the intended enum.
+Current behavior resolves the selected dropdown index with `gui_theme_dropdown_index_to_theme(...)`.
+If you add another selectable theme, make sure the dropdown ordering still matches the theme table exposed by `gui_theme_build_dropdown_string(...)`.
 
 ## Night Variant Pattern (Optional)
 
