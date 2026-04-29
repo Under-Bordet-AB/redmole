@@ -6,19 +6,37 @@
 
 #include "esp_log.h"
 #include "nac.h"
+#include "rm_nvs.h"
 #include "sensor_data.h"
 
 static const char *TAG = "APP_GUI_BINDINGS";
 
+#define GUI_NVS_KEY_THEME       "gui_theme"
+#define GUI_NVS_KEY_BG          "gui_bg"
+#define GUI_NVS_KEY_NIGHT       "gui_night"
+#define GUI_NVS_KEY_BRIGHT      "gui_bright"
+#define GUI_NVS_KEY_WIFI_SSID   "wifi_ssid"
+
 typedef struct {
     gui_ctx_t *gui;
+
     bool wifi_connect_requested;
     bool wifi_scan_requested;
     bool wifi_disconnect_requested;
+
     bool has_last_wifi_state;
     gui_wifi_state_t last_wifi_state;
+
     bool has_last_sd_card_state;
     gui_sd_card_state_t last_sd_card_state;
+
+    bool has_last_appearance;
+    gui_appearance_settings_t last_appearance;
+
+    bool has_last_brightness;
+    int32_t last_brightness;
+
+    bool boot_autoconnect_queued;
     char requested_ssid[GUI_WIFI_SSID_MAX_LEN];
 } app_gui_bindings_ctx_t;
 
@@ -27,6 +45,14 @@ static app_gui_bindings_ctx_t s_bindings;
 // Forward declarations
 //////////////////////////
 
+static int32_t clamp_saved_brightness(int32_t value);
+
+static bool load_saved_appearance(gui_ctx_t *gui);
+static bool save_appearance_if_changed(gui_ctx_t *gui);
+
+static bool load_saved_wifi_metadata(gui_ctx_t *gui);
+static bool refresh_saved_wifi_metadata(gui_ctx_t *gui);
+static bool queue_saved_wifi_autoconnect(gui_ctx_t *gui);
 static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password, void *user_data);
 static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data);
 
@@ -263,6 +289,60 @@ static void sync_wifi(gui_ctx_t *gui)
     }
 
     gui_set_wifi_settings(gui, &wifi);
+}
+
+// Loading & saving
+
+static int32_t clamp_saved_brightness(int32_t value) {
+    if (value < 5) {
+        return 5;
+    }
+
+    if (value > 100) {
+        return 100;
+    }
+
+    return value;
+}
+
+static bool load_saved_appearance(gui_ctx_t *gui) {
+    gui_appearance_settings_t appearance;
+    int32_t brightness = 0;
+    uint8_t value = 0;
+    bool loaded_any = false;
+
+    if ((gui == NULL) || !gui_get_appearance_settings(gui, &appearance) || !gui_get_brightness(gui, &brightness)) {
+        return false;
+    }
+
+    if (rm_nvs_get_u8(GUI_NVS_KEY_THEME, &value) == ESP_OK) {
+        appearance.theme = (gui_view_theme_t)value;
+        loaded_any = true;
+    }
+
+    if (rm_nvs_get_u8(GUI_NVS_KEY_BG, &value) == ESP_OK) {
+        appearance.show_background_image = (value != 0U);
+        loaded_any = true;
+    }
+
+    if (rm_nvs_get_u8(GUI_NVS_KEY_NIGHT, &value) == ESP_OK) {
+        appearance.night_variant_enabled = (value != 0U);
+        loaded_any = true;
+    }
+
+    if (rm_nvs_get_u8(GUI_NVS_KEY_BRIGHT, &value) == ESP_OK) {
+        brightness = clamp_saved_brightness((int32_t)value);
+        loaded_any = true;
+    }
+
+    gui_set_appearance_settings(gui, &appearance);
+    gui_set_brightness(gui, brightness);
+    
+    s_bindings.last_appearance = appearance;
+    s_bindings.has_last_appearance = true;
+    s_bindings.last_brightness = brightness;
+    s_bindings.has_last_brightness = true;
+    return loaded_any;
 }
 
 // UI Events

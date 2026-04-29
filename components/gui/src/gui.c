@@ -561,6 +561,63 @@ bool gui_get_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t *state)
     return true;
 }
 
+void gui_set_appearance_settings(gui_ctx_t *self, const gui_appearance_settings_t *appearance) {
+    gui_runtime_t *runtime = gui_get_runtime(self);
+    bool changed = false;
+
+    if ((runtime == NULL) || (appearance == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    changed |= gui_state_set_theme(&runtime->state, appearance->theme);
+    changed |= gui_state_set_background_image_enabled(&runtime->state, appearance->show_background_image);
+    changed |= gui_state_set_night_variant_enabled(&runtime->state, appearance->night_variant_enabled);
+
+    if (changed) {
+        gui_render_runtime(runtime);
+    }
+
+    lvgl_port_unlock();
+}
+
+bool gui_get_appearance_settings(gui_ctx_t *self, gui_appearance_settings_t *appearance) {
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (appearance == NULL)) {
+        return false;
+    }
+
+    *appearance = runtime->state.appearance;
+    return true;
+}
+
+void gui_set_brightness(gui_ctx_t *self, int32_t brightness_percent) {
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    if (brightness_percent < 5) {
+        brightness_percent = 5;
+    } else if (brightness_percent > 100) {
+        brightness_percent = 100;
+    }
+
+    gui_platform_set_brightness(brightness_percent);
+    gui_screen_sync_brightness(&runtime->screen, brightness_percent);
+    lvgl_port_unlock();
+}
+
+bool gui_get_brightness(gui_ctx_t *self, int32_t *brightness_percent) {
+    if (brightness_percent == NULL) {
+        return false;
+    }
+
+    *brightness_percent = gui_platform_get_brightness();
+    return true;
+}
+
 void gui_show_wifi_network_dialog(gui_ctx_t *self)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);

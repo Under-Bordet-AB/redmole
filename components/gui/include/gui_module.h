@@ -27,18 +27,31 @@ void gui_run(gui_ctx_t *self); // Task to process LVGL timers and render
 void gui_deinit(gui_ctx_t *self);
 void gui_set_bindings(gui_ctx_t *self, const gui_module_bindings_t *bindings);
 void gui_refresh(gui_ctx_t *self);
+
 void gui_set_active_panel(gui_ctx_t *self, gui_panel_id_t panel);
 bool gui_get_active_panel(gui_ctx_t *self, gui_panel_id_t *panel);
+
 void gui_set_sensor_state(gui_ctx_t *self, const gui_sensor_state_t *sensor);
 bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor);
+
 void gui_set_wifi_settings(gui_ctx_t *self, const gui_wifi_settings_t *wifi);
 bool gui_get_wifi_settings(gui_ctx_t *self, gui_wifi_settings_t *wifi);
+
 void gui_set_wifi_state(gui_ctx_t *self, gui_wifi_state_t state);
 bool gui_get_wifi_state(gui_ctx_t *self, gui_wifi_state_t *state);
+
 void gui_set_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t state);
 bool gui_get_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t *state);
+
 void gui_set_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t state);
 bool gui_get_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t *state);
+
+void gui_set_appearance_settings(gui_ctx_t *self, const gui_appearance_settings_t *appearance);
+bool gui_get_appearance_settings(gui_ctx_t *self, gui_appearance_settings_t *appearance);
+
+void gui_set_brightness(gui_ctx_t *self, int32_t brightness_percent);
+bool gui_get_brightness(gui_ctx_t *self, int32_t *brightness_percent);
+
 void gui_show_wifi_network_dialog(gui_ctx_t *self);
 void gui_show_wifi_password_dialog(gui_ctx_t *self);
 void gui_hide_wifi_dialogs(gui_ctx_t *self);
