@@ -22,13 +22,14 @@ static const char* TAG = "HTTP Client";
 // ============= FORWARD DECLARATIONS ============= //
 
 // Implemented in http_client_tls.c
-esp_err_t _tls_init(const char *ca_cert_pem);
+esp_err_t _tls_init(http_client_tls_mode_t mode, const char *ca_cert_pem);
 const char *tls_get_cert(void);
+http_client_tls_mode_t tls_get_mode(void);
 void _tls_deinit(void);
 
 // Implemented in http_client_request.c
 esp_err_t request_get(const char *url, char *buf, size_t buf_len);
-esp_err_t request_post(const char *url, const char *body, const char *content_type);
+// esp_err_t request_post(const char *url, const char *body, const char *content_type);
 
 // ================================================ //
 
@@ -78,10 +79,11 @@ static task_status_t http_poll(task_node_t *node)
  * Assigns the poll callback to the task node so it is ready to be
  * scheduled when the network comes up.
  */
-esp_err_t http_client_init(const char* ca_cert_pem)
+esp_err_t http_client_init(http_client_tls_mode_t mode, const char* ca_cert_pem)
 {
     ESP_LOGD(TAG, "Initializing client");
-    esp_err_t err = _tls_init(ca_cert_pem);
+    
+    esp_err_t err = _tls_init(mode, ca_cert_pem);
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "TLS init failed: %s", esp_err_to_name(err));
@@ -89,7 +91,6 @@ esp_err_t http_client_init(const char* ca_cert_pem)
     }
 
     s_client.task_node.work = http_poll;
-
     return ESP_OK;
 }
 
@@ -124,24 +125,24 @@ esp_err_t http_client_get(const char* url, char* buf, size_t buf_len)
  * Returns ESP_FAIL if the network is not up.
  * Returns ESP_OK on success, or the ESP error code on failure.
  */
-esp_err_t http_client_post(const char* url, const char* body, const char* content_type)
-{
-    if (!s_client.network_up)
-    {
-        ESP_LOGE(TAG, "Request failed, network is not up");
-        return ESP_FAIL;
-    }
+// esp_err_t http_client_post(const char* url, const char* body, const char* content_type)
+// {
+//     if (!s_client.network_up)
+//     {
+//         ESP_LOGE(TAG, "Request failed, network is not up");
+//         return ESP_FAIL;
+//     }
 
-    ESP_LOGD(TAG, "Sending POST request");
-    esp_err_t err = request_post(url, body, content_type);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Request failed: %s", esp_err_to_name(err));
-        return err;
-    }
+//     ESP_LOGD(TAG, "Sending POST request");
+//     esp_err_t err = request_post(url, body, content_type);
+//     if (err != ESP_OK)
+//     {
+//         ESP_LOGE(TAG, "Request failed: %s", esp_err_to_name(err));
+//         return err;
+//     }
 
-    return ESP_OK;
-}
+//     return ESP_OK;
+// }
 
 /*
  * Deinitializes the HTTP client module.

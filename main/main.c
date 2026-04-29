@@ -35,7 +35,7 @@ static esp_err_t init_single_instance_modules(void) {
         return rv;
     }
 
-    if (http_client_init(NULL) != ESP_OK) {
+    if (http_client_init(HTTP_CLIENT_TLS_NONE, NULL) != ESP_OK) {
         ESP_LOGE(TAG, "http_client_init failed: %s", esp_err_to_name(rv));
         return rv;
     }

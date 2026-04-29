@@ -1,7 +1,9 @@
-
+#include <string.h>
+#include "http_client.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_crt_bundle.h"
 
 static const char *TAG = "HTTP Request";
 
@@ -21,6 +23,7 @@ typedef struct
 
 // Implemented in http_client_tls.c
 const char *tls_get_cert(void);
+http_client_tls_mode_t tls_get_mode(void);
 
 // ================================================ //
 
@@ -75,12 +78,15 @@ esp_err_t request_get(const char* url, char* buf, size_t buf_len)
         .written = 0
     };
 
+    http_client_tls_mode_t mode = tls_get_mode();
+
     esp_http_client_config_t config =
     {
-        .cert_pem      = tls_get_cert(),
-        .event_handler = on_http_event,
-        .url           = url,
-        .user_data     = &ctx
+        .url               = url,
+        .user_data         = &ctx,
+        .event_handler     = on_http_event,
+        .cert_pem          = tls_get_cert(),
+        .crt_bundle_attach = (mode == HTTP_CLIENT_TLS_BUNDLE) ? esp_crt_bundle_attach : NULL
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
