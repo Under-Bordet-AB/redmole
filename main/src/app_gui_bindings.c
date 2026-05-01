@@ -1,3 +1,12 @@
+/**
+ * @file app_gui_bindings.c
+ * @brief Synchronize application services, persisted settings, and GUI events.
+ *
+ * This module restores saved GUI preferences, mirrors runtime application state
+ * into the GUI model, and forwards GUI-originated Wi-Fi actions to the network
+ * control layer.
+ */
+
 #include "app_gui_bindings.h"
 
 #include <stdbool.h>
@@ -45,15 +54,160 @@ static app_gui_bindings_ctx_t s_bindings;
 // Forward declarations
 //////////////////////////
 
+/**
+ * @brief Copy the latest local sensor sample into the GUI state.
+ *
+ * When a fresh local sample is available, this updates the GUI sensor model
+ * with the latest readings and freshness metadata.
+ *
+ * @param gui Initialized GUI context to update.
+ */
+static void sync_sensor(gui_ctx_t *gui);
+
+/**
+ * @brief Refresh the cached GUI Wi-Fi state indicator when it changes.
+ *
+ * @param gui Initialized GUI context to update.
+ * @return True when the GUI state changed, otherwise false.
+ */
+static bool sync_wifi_state(gui_ctx_t *gui);
+
+/**
+ * @brief Refresh the sidebar SD card indicator when its state changes.
+ *
+ * @param gui Initialized GUI context to update.
+ * @return True when the GUI state changed, otherwise false.
+ */
+static bool sync_sd_card_state(gui_ctx_t *gui);
+
+/**
+ * @brief Refresh the GUI Wi-Fi model from the current NAC state.
+ *
+ * This applies scan results, connection progress, disconnect events, and
+ * remembered SSID metadata so the GUI stays aligned with network activity.
+ *
+ * @param gui Initialized GUI context to update.
+ */
+static void sync_wifi(gui_ctx_t *gui);
+
+/**
+ * @brief Clamp a persisted brightness value into the supported GUI range.
+ *
+ * @param value Stored brightness percentage.
+ * @return Brightness clamped to the supported range.
+ */
 static int32_t clamp_saved_brightness(int32_t value);
 
+/**
+ * @brief Restore persisted appearance settings from NVS into the GUI state.
+ *
+ * This loads any saved theme, background, night-mode, and brightness values,
+ * applies them to the GUI, and refreshes the cached last-saved snapshot.
+ *
+ * @param gui Initialized GUI context to update.
+ * @return True when at least one saved value was loaded, otherwise false.
+ */
 static bool load_saved_appearance(gui_ctx_t *gui);
+
+/**
+ * @brief Persist GUI appearance changes when they differ from the last save.
+ *
+ * @param gui Initialized GUI context to inspect.
+ * @return True when a changed value was written to NVS, otherwise false.
+ */
 static bool save_appearance_if_changed(gui_ctx_t *gui);
 
+/**
+ * @brief Restore remembered Wi-Fi metadata into the GUI model.
+ *
+ * Currently this restores the last saved SSID as a known network and selected
+ * target network when one is not already selected.
+ *
+ * @param gui Initialized GUI context to update.
+ * @return True when saved Wi-Fi metadata was loaded, otherwise false.
+ */
 static bool load_saved_wifi_metadata(gui_ctx_t *gui);
+
+/**
+ * @brief Reload remembered Wi-Fi metadata after a connection-state update.
+ *
+ * @param gui Initialized GUI context to update.
+ * @return True when saved Wi-Fi metadata was loaded, otherwise false.
+ */
 static bool refresh_saved_wifi_metadata(gui_ctx_t *gui);
+
+/**
+ * @brief Queue a boot-time Wi-Fi connection using the remembered network.
+ *
+ * The request is issued at most once per boot after remembered Wi-Fi metadata
+ * has been restored into the GUI state.
+ *
+ * @param gui Initialized GUI context to update.
+ * @return True when an auto-connect request was queued, otherwise false.
+ */
 static bool queue_saved_wifi_autoconnect(gui_ctx_t *gui);
+
+/**
+ * @brief Handle top-level panel change notifications from the GUI.
+ *
+ * @param gui Initialized GUI context that emitted the event.
+ * @param panel Newly active panel.
+ * @param user_data Opaque binding context supplied during registration.
+ */
+static void on_panel_changed(gui_ctx_t *gui, gui_panel_id_t panel, void *user_data);
+
+/**
+ * @brief Start a Wi-Fi scan requested by the GUI.
+ *
+ * This clears any pending connect state, resets the selected network in the
+ * GUI model, and forwards the scan request to the network control layer.
+ *
+ * @param gui Initialized GUI context that emitted the event.
+ * @param user_data Opaque binding context supplied during registration.
+ * @return True after the request is handled, including failure reporting.
+ */
+static bool on_wifi_scan_requested(gui_ctx_t *gui, void *user_data);
+
+/**
+ * @brief Observe the currently selected scanned Wi-Fi network.
+ *
+ * The current implementation logs the selection and leaves the actual connect
+ * flow to the explicit connect request callback.
+ *
+ * @param gui Initialized GUI context that emitted the event.
+ * @param network Selected network, or NULL when no selection is available.
+ * @param user_data Opaque binding context supplied during registration.
+ */
+static void on_wifi_network_selected(gui_ctx_t *gui, const gui_wifi_network_t *network, void *user_data);
+
+/**
+ * @brief Start connection flow for a remembered Wi-Fi network.
+ *
+ * @param gui Initialized GUI context that emitted the event.
+ * @param network Remembered network chosen by the user.
+ * @param user_data Opaque binding context supplied during registration.
+ * @return True after the request is handled, including failure reporting.
+ */
+static bool on_wifi_known_network_requested(gui_ctx_t *gui, const gui_wifi_network_t *network, void *user_data);
+
+/**
+ * @brief Request a Wi-Fi connection using explicit credentials.
+ *
+ * @param gui Initialized GUI context that emitted the event.
+ * @param ssid Target SSID, or NULL when reconnecting with saved credentials.
+ * @param password Password associated with @p ssid, or NULL when unused.
+ * @param user_data Opaque binding context supplied during registration.
+ * @return True after the request is handled, including failure reporting.
+ */
 static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password, void *user_data);
+
+/**
+ * @brief Request disconnection from the current Wi-Fi network.
+ *
+ * @param gui Initialized GUI context that emitted the event.
+ * @param user_data Opaque binding context supplied during registration.
+ * @return True after the request is handled, including failure reporting.
+ */
 static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data);
 
 // Function definitions
