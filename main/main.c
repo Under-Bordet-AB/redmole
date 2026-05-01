@@ -44,6 +44,12 @@ static esp_err_t init_single_instance_modules(void) {
 }
 
 static esp_err_t init_runtime_modules(void) {
+    if (task_scheduler_init() != ESP_OK) {
+        ESP_LOGE(TAG, "task_scheduler_init failed");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "task_scheduler_init started");
+
     esp_err_t rv = bme280_hal_init(&s_sensor_hal);
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "bme280_hal_init failed: %s", esp_err_to_name(rv));
@@ -94,13 +100,6 @@ static void sensor_local_source_task(void* pvParameters) {
 }
 
 static esp_err_t start_runtime_modules() {
-
-    if (task_scheduler_init() != ESP_OK) {
-        ESP_LOGE(TAG, "task_scheduler_init failed");
-        return ESP_FAIL;
-    }
-    ESP_LOGI(TAG, "task_scheduler_init started");
-
     /*
     if(nac_request_wifi_connect() != ESP_OK) {
         ESP_LOGE(TAG, "nac_request_wifi_connect failed");

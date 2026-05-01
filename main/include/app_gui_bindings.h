@@ -2,6 +2,7 @@
 #define APP_GUI_BINDINGS_H
 
 #include "esp_err.h"
+#include "task_scheduler.h"
 #include "gui_module.h"
 
 esp_err_t app_gui_bindings_init(gui_ctx_t *gui);
