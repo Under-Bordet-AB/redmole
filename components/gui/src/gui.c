@@ -12,6 +12,46 @@
 
 static gui_runtime_t s_runtime;
 
+static int32_t gui_clamp_brightness(int32_t brightness_percent)
+{
+    if (brightness_percent < 5) {
+        return 5;
+    }
+
+    if (brightness_percent > 100) {
+        return 100;
+    }
+
+    return brightness_percent;
+}
+
+static void gui_apply_init_config(gui_runtime_t *runtime,
+                                  const gui_init_config_t *config)
+{
+    if ((runtime == NULL) || (config == NULL)) {
+        return;
+    }
+
+    if (config->has_theme) {
+        runtime->state.appearance.theme = config->theme;
+    }
+
+    if (config->has_background_image) {
+        runtime->state.appearance.show_background_image =
+            config->show_background_image;
+    }
+
+    if (config->has_night_variant) {
+        runtime->state.appearance.night_variant_enabled =
+            config->night_variant_enabled;
+    }
+
+    if (config->has_brightness) {
+        gui_platform_set_brightness(
+            gui_clamp_brightness(config->brightness_percent));
+    }
+}
+
 static void gui_notify_panel_changed(gui_runtime_t *runtime, gui_panel_id_t panel)
 {
     if ((runtime == NULL) || (runtime->owner == NULL) ||
@@ -336,7 +376,7 @@ void gui_render_runtime(gui_runtime_t *runtime)
     gui_screen_apply(&runtime->screen, &model);
 }
 
-void gui_init(gui_ctx_t *self)
+void gui_init(gui_ctx_t *self, const gui_init_config_t *config)
 {
     gui_screen_model_t model = { 0 };
     gui_runtime_t *runtime;
@@ -358,6 +398,7 @@ void gui_init(gui_ctx_t *self)
     ESP_ERROR_CHECK(gui_platform_init_display());
 
     gui_state_init(&runtime->state);
+    gui_apply_init_config(runtime, config);
     gui_state_build_screen_model(&runtime->state, &model);
 
     if (lvgl_port_lock(-1)) {
@@ -598,11 +639,7 @@ void gui_set_brightness(gui_ctx_t *self, int32_t brightness_percent) {
         return;
     }
 
-    if (brightness_percent < 5) {
-        brightness_percent = 5;
-    } else if (brightness_percent > 100) {
-        brightness_percent = 100;
-    }
+    brightness_percent = gui_clamp_brightness(brightness_percent);
 
     gui_platform_set_brightness(brightness_percent);
     gui_screen_sync_brightness(&runtime->screen, brightness_percent);

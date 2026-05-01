@@ -38,7 +38,7 @@ The public header is `include/gui_module.h`.
 
 Current API:
 
-- `gui_init(gui_ctx_t *self)`
+- `gui_init(gui_ctx_t *self, const gui_init_config_t *config)`
 - `gui_run(gui_ctx_t *self)`
 - `gui_deinit(gui_ctx_t *self)`
 

@@ -11,11 +11,22 @@
 #include "gui_module.h"
 
 /**
- * @brief Initialize GUI bindings and restore any saved GUI state.
+ * @brief Load saved GUI appearance settings for startup.
  *
- * Registers the callback table used by the GUI, restores persisted appearance
- * and remembered Wi-Fi metadata, performs an initial sync, and queues a saved
- * Wi-Fi auto-connect request when possible.
+ * Reads any persisted appearance and brightness overrides that should be
+ * applied before the GUI performs its first render.
+ *
+ * @param config Output startup configuration to populate.
+ * @return True when at least one saved value was loaded, otherwise false.
+ */
+bool app_gui_bindings_load_saved_appearance(gui_init_config_t *config);
+
+/**
+ * @brief Initialize GUI bindings and restore saved runtime GUI state.
+ *
+ * Registers the callback table used by the GUI, restores remembered Wi-Fi
+ * metadata, performs an initial sync, and queues a saved Wi-Fi auto-connect
+ * request when possible.
  *
  * @param gui Initialized GUI context to bind to the application.
  * @return ESP_OK on success, or ESP_ERR_INVALID_ARG when @p gui is NULL.

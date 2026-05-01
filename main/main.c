@@ -44,6 +44,8 @@ static esp_err_t init_single_instance_modules(void) {
 }
 
 static esp_err_t init_runtime_modules(void) {
+    gui_init_config_t gui_init_config = {0};
+
     if (task_scheduler_init() != ESP_OK) {
         ESP_LOGE(TAG, "task_scheduler_init failed");
         return ESP_FAIL;
@@ -56,7 +58,8 @@ static esp_err_t init_runtime_modules(void) {
         return rv;
     }
 
-    gui_init(&s_gui);
+    (void)app_gui_bindings_load_saved_appearance(&gui_init_config);
+    gui_init(&s_gui, &gui_init_config);
     rv = app_gui_bindings_init(&s_gui);
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "app_gui_bindings_init failed: %s", esp_err_to_name(rv));

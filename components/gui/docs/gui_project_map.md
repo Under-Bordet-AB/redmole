@@ -70,14 +70,15 @@ flowchart TD
     boot[app_main] --> init1[init_single_instance_modules]
     init1 --> services[rm_nvs + nac + sensor_data]
     services --> init2[init_runtime_modules]
-    init2 --> guiinit[gui_init & app_gui_bindings_init]
+    init2 --> preload[Load saved appearance into gui_init config]
+    preload --> guiinit[gui_init & app_gui_bindings_init]
     guiinit --> start[start_runtime_modules]
     start --> sensorTask[sensor_local_source_task]
     start --> loop[main loop]
 
     sensorTask --> sensorData[sensor_data_submit_local]
     loop --> sync[app_gui_bindings_sync]
-    sync --> push[Push app state into GUI\nsensor Wi-Fi SD appearance brightness]
+    sync --> push[Push app state into GUI\nsensor Wi-Fi SD]
     push --> setters[gui_set_* APIs]
     setters --> state[GUI internal state]
     state --> render[gui_render_runtime]
@@ -95,7 +96,8 @@ flowchart TD
 ### What this means in practice
 
 - `main/main.c` owns system startup and the outer polling loop.
-- `app_gui_bindings_sync()` keeps GUI-visible state aligned with app services such as `sensor_data`, `nac`, and `rm_nvs`.
+- `main/main.c` loads persisted appearance before `gui_init()` so the first render already uses saved theme and brightness values.
+- `app_gui_bindings_sync()` keeps GUI-visible runtime state aligned with app services such as `sensor_data` and `nac`, while persisting appearance changes back through `rm_nvs`.
 - `gui.c` handles UI events, mutates state through `gui_state_*`, and triggers rendering.
 - callback bindings let the GUI request actions such as Wi-Fi scan/connect/disconnect without directly owning those services.
 
@@ -115,7 +117,7 @@ The GUI component registers these direct component dependencies in `components/g
 The app-level integration adds additional dependencies around the GUI rather than inside it:
 
 - `nac` for Wi-Fi status and requests
-- `rm_nvs` for persisted appearance and Wi-Fi metadata
+- `rm_nvs` for persisted appearance preload and Wi-Fi metadata
 - `bme280_hal` and `sensor_data` for sensor acquisition and publication
 
 The result is a deliberate split:

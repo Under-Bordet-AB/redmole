@@ -2,9 +2,9 @@
  * @file app_gui_bindings.c
  * @brief Synchronize application services, persisted settings, and GUI events.
  *
- * This module restores saved GUI preferences, mirrors runtime application state
- * into the GUI model, and forwards GUI-originated Wi-Fi actions to the network
- * control layer.
+ * This module loads persisted GUI startup preferences, mirrors runtime
+ * application state into the GUI model, persists appearance changes, and
+ * forwards GUI-originated Wi-Fi actions to the network control layer.
  */
 
 #include "app_gui_bindings.h"
@@ -99,15 +99,22 @@ static void sync_wifi(gui_ctx_t *gui);
 static int32_t clamp_saved_brightness(int32_t value);
 
 /**
- * @brief Restore persisted appearance settings from NVS into the GUI state.
+ * @brief Load persisted appearance settings from NVS for GUI startup.
  *
- * This loads any saved theme, background, night-mode, and brightness values,
- * applies them to the GUI, and refreshes the cached last-saved snapshot.
+ * This loads any saved theme, background, night-mode, and brightness values
+ * into a GUI init config so the first render uses the persisted settings.
  *
- * @param gui Initialized GUI context to update.
+ * @param config Startup configuration to populate.
  * @return True when at least one saved value was loaded, otherwise false.
  */
-static bool load_saved_appearance(gui_ctx_t *gui);
+bool app_gui_bindings_load_saved_appearance(gui_init_config_t *config);
+
+/**
+ * @brief Seed the last-saved appearance cache from the current GUI state.
+ *
+ * @param gui Initialized GUI context to inspect.
+ */
+static void cache_current_appearance(gui_ctx_t *gui);
 
 /**
  * @brief Persist GUI appearance changes when they differ from the last save.
@@ -472,44 +479,58 @@ static int32_t clamp_saved_brightness(int32_t value) {
     return value;
 }
 
-static bool load_saved_appearance(gui_ctx_t *gui) {
-    gui_appearance_settings_t appearance;
-    int32_t brightness = 0;
+bool app_gui_bindings_load_saved_appearance(gui_init_config_t *config)
+{
     uint8_t value = 0;
     bool loaded_any = false;
 
-    if ((gui == NULL) || !gui_get_appearance_settings(gui, &appearance) || !gui_get_brightness(gui, &brightness)) {
+    if (config == NULL) {
         return false;
     }
 
+    memset(config, 0, sizeof(*config));
+
     if (rm_nvs_get_u8(GUI_NVS_KEY_THEME, &value) == ESP_OK) {
-        appearance.theme = (gui_view_theme_t)value;
+        config->has_theme = true;
+        config->theme = (gui_view_theme_t)value;
         loaded_any = true;
     }
 
     if (rm_nvs_get_u8(GUI_NVS_KEY_BG, &value) == ESP_OK) {
-        appearance.show_background_image = (value != 0U);
+        config->has_background_image = true;
+        config->show_background_image = (value != 0U);
         loaded_any = true;
     }
 
     if (rm_nvs_get_u8(GUI_NVS_KEY_NIGHT, &value) == ESP_OK) {
-        appearance.night_variant_enabled = (value != 0U);
+        config->has_night_variant = true;
+        config->night_variant_enabled = (value != 0U);
         loaded_any = true;
     }
 
     if (rm_nvs_get_u8(GUI_NVS_KEY_BRIGHT, &value) == ESP_OK) {
-        brightness = clamp_saved_brightness((int32_t)value);
+        config->has_brightness = true;
+        config->brightness_percent = clamp_saved_brightness((int32_t)value);
         loaded_any = true;
     }
 
-    gui_set_appearance_settings(gui, &appearance);
-    gui_set_brightness(gui, brightness);
-    
+    return loaded_any;
+}
+
+static void cache_current_appearance(gui_ctx_t *gui)
+{
+    gui_appearance_settings_t appearance;
+    int32_t brightness = 0;
+
+    if ((gui == NULL) || !gui_get_appearance_settings(gui, &appearance) ||
+        !gui_get_brightness(gui, &brightness)) {
+        return;
+    }
+
     s_bindings.last_appearance = appearance;
     s_bindings.has_last_appearance = true;
-    s_bindings.last_brightness = brightness;
+    s_bindings.last_brightness = clamp_saved_brightness(brightness);
     s_bindings.has_last_brightness = true;
-    return loaded_any;
 }
 
 static bool save_appearance_if_changed(gui_ctx_t *gui)
@@ -798,7 +819,7 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
     bindings.on_wifi_disconnect_requested = on_wifi_disconnect_requested;
     gui_set_bindings(gui, &bindings);
 
-    (void)load_saved_appearance(gui);
+    cache_current_appearance(gui);
     (void)load_saved_wifi_metadata(gui);
     app_gui_bindings_sync(gui);
     (void)queue_saved_wifi_autoconnect(gui);

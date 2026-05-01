@@ -21,6 +21,20 @@ typedef struct gui_ctx {
 } gui_ctx_t;
 
 /**
+ * @brief Optional startup overrides applied before the first GUI render.
+ */
+typedef struct {
+    bool has_theme; /*!< True when @p theme should override the default theme. */
+    gui_view_theme_t theme; /*!< Theme to apply during GUI initialization. */
+    bool has_background_image; /*!< True when @p show_background_image should override the default. */
+    bool show_background_image; /*!< Initial background-image visibility. */
+    bool has_night_variant; /*!< True when @p night_variant_enabled should override the default. */
+    bool night_variant_enabled; /*!< Initial night-variant state. */
+    bool has_brightness; /*!< True when @p brightness_percent should override the default brightness. */
+    int32_t brightness_percent; /*!< Initial brightness percentage. */
+} gui_init_config_t;
+
+/**
  * @brief Callback bindings used to connect GUI interactions to application logic.
  */
 typedef struct {
@@ -37,8 +51,9 @@ typedef struct {
  * @brief Initialize the GUI module and its backing runtime state.
  *
  * @param self GUI context to initialize.
+ * @param config Optional startup overrides applied before the first render.
  */
-void gui_init(gui_ctx_t *self);
+void gui_init(gui_ctx_t *self, const gui_init_config_t *config);
 
 /**
  * @brief Run one GUI processing iteration.
