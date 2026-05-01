@@ -20,6 +20,7 @@ See `components/gui/src/README.md` for the internal ownership rules and file bre
 To add or modify GUI themes, follow the dedicated guide:
 
 - `components/gui/docs/themes.md`
+- `components/gui/docs/gui_project_map.md`
 
 ## Current Screen
 
