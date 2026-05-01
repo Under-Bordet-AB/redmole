@@ -1,3 +1,8 @@
+/**
+ * @file gui_theme_defs.h
+ * @brief Theme descriptors and lookup helpers for the GUI view layer.
+ */
+
 #ifndef GUI_THEME_DEFS_H
 #define GUI_THEME_DEFS_H
 
@@ -141,8 +146,27 @@ typedef struct {
  * Returns the descriptor for the given theme, or NULL if the value is
  * out of range.
  */
+/**
+ * @brief Look up the descriptor for a theme enum value.
+ *
+ * @param theme Theme to resolve.
+ * @return Theme descriptor, or NULL when the value is out of range.
+ */
 const gui_theme_def_t *gui_theme_get(gui_view_theme_t theme);
+
+/**
+ * @brief Return the default theme used when no explicit choice is available.
+ *
+ * @return Default theme enum value.
+ */
 gui_view_theme_t gui_theme_default(void);
+
+/**
+ * @brief Resolve a theme to a valid user-available fallback when needed.
+ *
+ * @param theme Requested theme.
+ * @return Supported theme value that can be applied to the GUI.
+ */
 gui_view_theme_t gui_theme_resolve_available(gui_view_theme_t theme);
 
 /*
