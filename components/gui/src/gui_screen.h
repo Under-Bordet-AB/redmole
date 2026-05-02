@@ -22,9 +22,7 @@ typedef gui_view_model_t gui_screen_model_t;
  * @param settings_event_cb Settings callback for controls owned by the settings panel.
  * @param event_user_data User data forwarded to the event callbacks.
  */
-void gui_screen_init(gui_screen_t *screen, const gui_screen_model_t *model,
-                     lv_event_cb_t nav_event_cb, lv_event_cb_t settings_event_cb,
-                     void *event_user_data);
+void gui_screen_init(gui_screen_t *screen, const gui_screen_model_t *model, lv_event_cb_t nav_event_cb, lv_event_cb_t settings_event_cb, void *event_user_data);
 
 /**
  * @brief Apply a new screen model to the existing LVGL object tree.

@@ -132,8 +132,7 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model);
  * @param show_background_image True to show the theme background image.
  * @param night_variant_enabled True to use the theme night variant when available.
  */
-void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_background_image,
-                          bool night_variant_enabled);
+void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_background_image, bool night_variant_enabled);
 
 /**
  * @brief Resolve the theme color for the Wi-Fi status indicator.
@@ -151,8 +150,7 @@ lv_color_t gui_view_wifi_status_color(gui_view_theme_t theme, gui_wifi_state_t s
  * @param state Bluetooth state to map to a color.
  * @return Theme-specific LVGL color for the given state.
  */
-lv_color_t gui_view_bluetooth_status_color(gui_view_theme_t theme,
-                                           gui_bluetooth_state_t state);
+lv_color_t gui_view_bluetooth_status_color(gui_view_theme_t theme, gui_bluetooth_state_t state);
 
 /**
  * @brief Resolve the theme color for the SD card status indicator.

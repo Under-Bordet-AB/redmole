@@ -54,167 +54,33 @@ static app_gui_bindings_ctx_t s_bindings;
 // Forward declarations
 //////////////////////////
 
-/**
- * @brief Copy the latest local sensor sample into the GUI state.
- *
- * When a fresh local sample is available, this updates the GUI sensor model
- * with the latest readings and freshness metadata.
- *
- * @param gui Initialized GUI context to update.
- */
+// Syncing UI to backend
 static void sync_sensor(gui_ctx_t *gui);
-
-/**
- * @brief Refresh the cached GUI Wi-Fi state indicator when it changes.
- *
- * @param gui Initialized GUI context to update.
- * @return True when the GUI state changed, otherwise false.
- */
 static bool sync_wifi_state(gui_ctx_t *gui);
-
-/**
- * @brief Refresh the sidebar SD card indicator when its state changes.
- *
- * @param gui Initialized GUI context to update.
- * @return True when the GUI state changed, otherwise false.
- */
+static void sync_wifi(gui_ctx_t *gui);
 static bool sync_sd_card_state(gui_ctx_t *gui);
 
-/**
- * @brief Refresh the GUI Wi-Fi model from the current NAC state.
- *
- * This applies scan results, connection progress, disconnect events, and
- * remembered SSID metadata so the GUI stays aligned with network activity.
- *
- * @param gui Initialized GUI context to update.
- */
-static void sync_wifi(gui_ctx_t *gui);
-
-/**
- * @brief Clamp a persisted brightness value into the supported GUI range.
- *
- * @param value Stored brightness percentage.
- * @return Brightness clamped to the supported range.
- */
+// Helpers
+static uint8_t signal_strength_pct(int8_t rssi);
+static gui_wifi_state_t map_wifi_state(nac_wifi_status_t status);
 static int32_t clamp_saved_brightness(int32_t value);
 
-/**
- * @brief Load persisted appearance settings from NVS for GUI startup.
- *
- * This loads any saved theme, background, night-mode, and brightness values
- * into a GUI init config so the first render uses the persisted settings.
- *
- * @param config Startup configuration to populate.
- * @return True when at least one saved value was loaded, otherwise false.
- */
+// UI caching
 bool app_gui_bindings_load_saved_appearance(gui_init_config_t *config);
-
-/**
- * @brief Seed the last-saved appearance cache from the current GUI state.
- *
- * @param gui Initialized GUI context to inspect.
- */
 static void cache_current_appearance(gui_ctx_t *gui);
-
-/**
- * @brief Persist GUI appearance changes when they differ from the last save.
- *
- * @param gui Initialized GUI context to inspect.
- * @return True when a changed value was written to NVS, otherwise false.
- */
 static bool save_appearance_if_changed(gui_ctx_t *gui);
 
-/**
- * @brief Restore remembered Wi-Fi metadata into the GUI model.
- *
- * Currently this restores the last saved SSID as a known network and selected
- * target network when one is not already selected.
- *
- * @param gui Initialized GUI context to update.
- * @return True when saved Wi-Fi metadata was loaded, otherwise false.
- */
+// Wifi caching
 static bool load_saved_wifi_metadata(gui_ctx_t *gui);
-
-/**
- * @brief Reload remembered Wi-Fi metadata after a connection-state update.
- *
- * @param gui Initialized GUI context to update.
- * @return True when saved Wi-Fi metadata was loaded, otherwise false.
- */
 static bool refresh_saved_wifi_metadata(gui_ctx_t *gui);
-
-/**
- * @brief Queue a boot-time Wi-Fi connection using the remembered network.
- *
- * The request is issued at most once per boot after remembered Wi-Fi metadata
- * has been restored into the GUI state.
- *
- * @param gui Initialized GUI context to update.
- * @return True when an auto-connect request was queued, otherwise false.
- */
 static bool queue_saved_wifi_autoconnect(gui_ctx_t *gui);
 
-/**
- * @brief Handle top-level panel change notifications from the GUI.
- *
- * @param gui Initialized GUI context that emitted the event.
- * @param panel Newly active panel.
- * @param user_data Opaque binding context supplied during registration.
- */
+// UI Events
 static void on_panel_changed(gui_ctx_t *gui, gui_panel_id_t panel, void *user_data);
-
-/**
- * @brief Start a Wi-Fi scan requested by the GUI.
- *
- * This clears any pending connect state, resets the selected network in the
- * GUI model, and forwards the scan request to the network control layer.
- *
- * @param gui Initialized GUI context that emitted the event.
- * @param user_data Opaque binding context supplied during registration.
- * @return True after the request is handled, including failure reporting.
- */
 static bool on_wifi_scan_requested(gui_ctx_t *gui, void *user_data);
-
-/**
- * @brief Observe the currently selected scanned Wi-Fi network.
- *
- * The current implementation logs the selection and leaves the actual connect
- * flow to the explicit connect request callback.
- *
- * @param gui Initialized GUI context that emitted the event.
- * @param network Selected network, or NULL when no selection is available.
- * @param user_data Opaque binding context supplied during registration.
- */
 static void on_wifi_network_selected(gui_ctx_t *gui, const gui_wifi_network_t *network, void *user_data);
-
-/**
- * @brief Start connection flow for a remembered Wi-Fi network.
- *
- * @param gui Initialized GUI context that emitted the event.
- * @param network Remembered network chosen by the user.
- * @param user_data Opaque binding context supplied during registration.
- * @return True after the request is handled, including failure reporting.
- */
 static bool on_wifi_known_network_requested(gui_ctx_t *gui, const gui_wifi_network_t *network, void *user_data);
-
-/**
- * @brief Request a Wi-Fi connection using explicit credentials.
- *
- * @param gui Initialized GUI context that emitted the event.
- * @param ssid Target SSID, or NULL when reconnecting with saved credentials.
- * @param password Password associated with @p ssid, or NULL when unused.
- * @param user_data Opaque binding context supplied during registration.
- * @return True after the request is handled, including failure reporting.
- */
 static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password, void *user_data);
-
-/**
- * @brief Request disconnection from the current Wi-Fi network.
- *
- * @param gui Initialized GUI context that emitted the event.
- * @param user_data Opaque binding context supplied during registration.
- * @return True after the request is handled, including failure reporting.
- */
 static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data);
 
 // Function definitions
@@ -284,13 +150,11 @@ static void copy_scan_results(gui_wifi_settings_t *wifi)
 
     count = (record_count > GUI_WIFI_NETWORK_COUNT) ? GUI_WIFI_NETWORK_COUNT : (uint8_t)record_count;
     for (uint8_t index = 0; index < count; index++) {
-        size_t ssid_len = strnlen((const char *)records[index].ssid,
-                                  sizeof(wifi->networks[index].ssid) - 1U);
+        size_t ssid_len = strnlen((const char *)records[index].ssid, sizeof(wifi->networks[index].ssid) - 1U);
 
         memcpy(wifi->networks[index].ssid, records[index].ssid, ssid_len);
         wifi->networks[index].ssid[ssid_len] = '\0';
-        wifi->networks[index].signal_strength_pct =
-            signal_strength_pct(records[index].rssi);
+        wifi->networks[index].signal_strength_pct = signal_strength_pct(records[index].rssi);
         wifi->networks[index].secured = records[index].authmode != WIFI_AUTH_OPEN;
     }
     wifi->network_count = count;
@@ -380,26 +244,21 @@ static void sync_wifi(gui_ctx_t *gui)
     }
 
     if (nac_status == NAC_WIFI_SCANNING) {
-        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                 "Scanning for Wi-Fi networks...");
+        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Scanning for Wi-Fi networks...");
     } else if (s_bindings.wifi_scan_requested && nac_scan_is_complete()) {
         s_bindings.wifi_scan_requested = false;
         copy_scan_results(&wifi);
         if (wifi.network_count > 0U) {
             wifi.state = GUI_WIFI_STATE_SCANNED;
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                     "Scan complete. Select a network.");
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Scan complete. Select a network.");
         } else {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                     "Scan complete. No Wi-Fi networks found.");
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Scan complete. No Wi-Fi networks found.");
         }
     } else if (nac_status == NAC_WIFI_CONNECTING) {
         if (wifi.selected_ssid[0] != '\0') {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connecting to %s...",
-                     wifi.selected_ssid);
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connecting to %s...", wifi.selected_ssid);
         } else {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                     "Connecting to Wi-Fi...");
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Connecting to Wi-Fi...");
         }
     } else if (nac_status == NAC_WIFI_CONNECTED) {
         s_bindings.wifi_connect_requested = false;
@@ -407,11 +266,9 @@ static void sync_wifi(gui_ctx_t *gui)
         wifi.connect_requested = false;
         wifi.can_disconnect = true;
         if (wifi.selected_ssid[0] != '\0') {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connected to %s.",
-                     wifi.selected_ssid);
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connected to %s.", wifi.selected_ssid);
         } else {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                     "Wi-Fi connected.");
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi connected.");
         }
         gui_set_wifi_settings(gui, &wifi);
         (void)refresh_saved_wifi_metadata(gui);
@@ -423,11 +280,9 @@ static void sync_wifi(gui_ctx_t *gui)
         wifi.connect_requested = false;
         wifi.can_disconnect = false;
         if (wifi.selected_ssid[0] != '\0') {
-            snprintf(wifi.status_text, sizeof(wifi.status_text),
-                     "Failed to connect to %s.", wifi.selected_ssid);
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "Failed to connect to %s.", wifi.selected_ssid);
         } else {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                     "Wi-Fi connection failed.");
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi connection failed.");
         }
     } else if (s_bindings.wifi_connect_requested &&
                nac_status == NAC_WIFI_DISCONNECTED) {
@@ -435,17 +290,14 @@ static void sync_wifi(gui_ctx_t *gui)
         wifi.connect_requested = false;
         wifi.can_disconnect = false;
         wifi.state = GUI_WIFI_STATE_IDLE;
-        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                 "Wi-Fi disconnected.");
+        snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi disconnected.");
     } else if (s_bindings.wifi_connect_requested) {
         wifi.state = GUI_WIFI_STATE_CONNECTING;
         wifi.connect_requested = true;
         if (wifi.selected_ssid[0] != '\0') {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connecting to %s...",
-                     wifi.selected_ssid);
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "Connecting to %s...", wifi.selected_ssid);
         } else {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                     "Connecting to Wi-Fi...");
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Connecting to Wi-Fi...");
         }
     } else if (s_bindings.wifi_disconnect_requested) {
         s_bindings.wifi_disconnect_requested = false;
@@ -457,8 +309,7 @@ static void sync_wifi(gui_ctx_t *gui)
         wifi.connect_requested = false;
         wifi.can_disconnect = false;
         if (wifi.status_text[0] == '\0') {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
-                     "Press Scan to search for Wi-Fi networks.");
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Press Scan to search for Wi-Fi networks.");
         }
     }
 
@@ -548,17 +399,9 @@ static bool save_appearance_if_changed(gui_ctx_t *gui)
 
     brightness = clamp_saved_brightness(brightness);
 
-    appearance_changed =
-        !s_bindings.has_last_appearance ||
-        (appearance.theme != s_bindings.last_appearance.theme) ||
-        (appearance.show_background_image !=
-         s_bindings.last_appearance.show_background_image) ||
-        (appearance.night_variant_enabled !=
-         s_bindings.last_appearance.night_variant_enabled);
+    appearance_changed = !s_bindings.has_last_appearance || (appearance.theme != s_bindings.last_appearance.theme) || (appearance.show_background_image != s_bindings.last_appearance.show_background_image) || (appearance.night_variant_enabled != s_bindings.last_appearance.night_variant_enabled);
 
-    brightness_changed =
-        !s_bindings.has_last_brightness ||
-        (brightness != s_bindings.last_brightness);
+    brightness_changed = !s_bindings.has_last_brightness || (brightness != s_bindings.last_brightness);
 
     if (!appearance_changed && !brightness_changed) {
         return false;
@@ -567,24 +410,19 @@ static bool save_appearance_if_changed(gui_ctx_t *gui)
     if (appearance_changed) {
         err = rm_nvs_set_u8(GUI_NVS_KEY_THEME, (uint8_t)appearance.theme);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "rm_nvs_set_u8(%s) failed: %s",
-                     GUI_NVS_KEY_THEME, esp_err_to_name(err));
+            ESP_LOGE(TAG, "rm_nvs_set_u8(%s) failed: %s", GUI_NVS_KEY_THEME, esp_err_to_name(err));
             return false;
         }
 
-        err = rm_nvs_set_u8(GUI_NVS_KEY_BG,
-                            appearance.show_background_image ? 1U : 0U);
+        err = rm_nvs_set_u8(GUI_NVS_KEY_BG, appearance.show_background_image ? 1U : 0U);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "rm_nvs_set_u8(%s) failed: %s",
-                     GUI_NVS_KEY_BG, esp_err_to_name(err));
+            ESP_LOGE(TAG, "rm_nvs_set_u8(%s) failed: %s", GUI_NVS_KEY_BG, esp_err_to_name(err));
             return false;
         }
 
-        err = rm_nvs_set_u8(GUI_NVS_KEY_NIGHT,
-                            appearance.night_variant_enabled ? 1U : 0U);
+        err = rm_nvs_set_u8(GUI_NVS_KEY_NIGHT, appearance.night_variant_enabled ? 1U : 0U);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "rm_nvs_set_u8(%s) failed: %s",
-                     GUI_NVS_KEY_NIGHT, esp_err_to_name(err));
+            ESP_LOGE(TAG, "rm_nvs_set_u8(%s) failed: %s", GUI_NVS_KEY_NIGHT, esp_err_to_name(err));
             return false;
         }
 
@@ -595,8 +433,7 @@ static bool save_appearance_if_changed(gui_ctx_t *gui)
     if (brightness_changed) {
         err = rm_nvs_set_u8(GUI_NVS_KEY_BRIGHT, (uint8_t)brightness);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "rm_nvs_set_u8(%s) failed: %s",
-                     GUI_NVS_KEY_BRIGHT, esp_err_to_name(err));
+            ESP_LOGE(TAG, "rm_nvs_set_u8(%s) failed: %s", GUI_NVS_KEY_BRIGHT, esp_err_to_name(err));
             return false;
         }
 
@@ -622,8 +459,7 @@ static bool load_saved_wifi_metadata(gui_ctx_t *gui)
     }
 
     memset(wifi.known_networks, 0, sizeof(wifi.known_networks));
-    snprintf(wifi.known_networks[0].ssid, sizeof(wifi.known_networks[0].ssid), "%s",
-             saved_ssid);
+    snprintf(wifi.known_networks[0].ssid, sizeof(wifi.known_networks[0].ssid), "%s", saved_ssid);
     wifi.known_networks[0].secured = true;
     wifi.known_networks[0].signal_strength_pct = 0;
     wifi.known_network_count = 1;
@@ -632,8 +468,7 @@ static bool load_saved_wifi_metadata(gui_ctx_t *gui)
         snprintf(wifi.selected_ssid, sizeof(wifi.selected_ssid), "%s", saved_ssid);
     }
 
-    snprintf(s_bindings.requested_ssid, sizeof(s_bindings.requested_ssid), "%s",
-             saved_ssid);
+    snprintf(s_bindings.requested_ssid, sizeof(s_bindings.requested_ssid), "%s", saved_ssid);
     gui_set_wifi_settings(gui, &wifi);
     return true;
 }
@@ -660,8 +495,7 @@ static bool queue_saved_wifi_autoconnect(gui_ctx_t *gui)
     s_bindings.wifi_disconnect_requested = false;
 
     if (s_bindings.requested_ssid[0] != '\0') {
-        snprintf(status_text, sizeof(status_text), "Connecting to %s...",
-                 s_bindings.requested_ssid);
+        snprintf(status_text, sizeof(status_text), "Connecting to %s...", s_bindings.requested_ssid);
         set_wifi_status(gui, status_text, GUI_WIFI_STATE_CONNECTING);
     } else {
         set_wifi_status(gui, "Connecting to Wi-Fi...", GUI_WIFI_STATE_CONNECTING);
@@ -669,11 +503,9 @@ static bool queue_saved_wifi_autoconnect(gui_ctx_t *gui)
 
     result = nac_request_wifi_connect(NULL, NULL);
     if (result != ESP_OK) {
-        ESP_LOGE(TAG, "nac_request_wifi_connect(NULL, NULL) failed: %s",
-                 esp_err_to_name(result));
+        ESP_LOGE(TAG, "nac_request_wifi_connect(NULL, NULL) failed: %s", esp_err_to_name(result));
         s_bindings.wifi_connect_requested = false;
-        set_wifi_status(gui, "Failed to request Wi-Fi connection.",
-                        GUI_WIFI_STATE_FAILED);
+        set_wifi_status(gui, "Failed to request Wi-Fi connection.", GUI_WIFI_STATE_FAILED);
         return false;
     }
 
@@ -835,11 +667,14 @@ void app_gui_bindings_sync(gui_ctx_t *gui)
     }
 
     sync_sensor(gui);
+    
     wifi_state_changed = sync_wifi_state(gui);
+    
     sync_sd_card_state(gui);
-    if (wifi_state_changed || s_bindings.wifi_scan_requested ||
-        s_bindings.wifi_connect_requested || s_bindings.wifi_disconnect_requested) {
+
+    if (wifi_state_changed || s_bindings.wifi_scan_requested || s_bindings.wifi_connect_requested || s_bindings.wifi_disconnect_requested) {
         sync_wifi(gui);
     }
+
     (void)save_appearance_if_changed(gui);
 }

@@ -22,6 +22,16 @@ To add or modify GUI themes, follow the dedicated guide:
 - `components/gui/docs/themes.md`
 - `components/gui/docs/gui_project_map.md`
 
+## How-To Guides
+
+For newcomer-friendly implementation guides, start here:
+
+- `components/gui/docs/howto/create-settings-card.md`
+- `components/gui/docs/howto/create-theme.md`
+- `components/gui/docs/howto/create-panel-or-dialog.md`
+- `components/gui/docs/themes.md`
+- `components/gui/docs/gui_project_map.md`
+
 ## Current Screen
 
 The active screen contains:

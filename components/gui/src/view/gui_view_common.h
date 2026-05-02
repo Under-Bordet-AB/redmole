@@ -36,8 +36,7 @@ void gui_view_set_textarea_text_if_changed(lv_obj_t *textarea, const char *text)
  * @param is_known True when the network also exists in the known network list.
  * @param is_connected True when the network is currently connected.
  */
-void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme,
-                                        bool is_selected, bool is_known, bool is_connected);
+void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme, bool is_selected, bool is_known, bool is_connected);
 
 /**
  * @brief Determine whether a given SSID is the currently connected Wi-Fi network.
@@ -78,10 +77,7 @@ int32_t gui_view_abs_i32(int32_t value);
  * @param event_user_data User data forwarded to the callback.
  * @return Newly created LVGL button object.
  */
-lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
-                                        lv_coord_t width, const char *text,
-                                        lv_event_code_t event_code, lv_event_cb_t event_cb,
-                                        void *event_user_data);
+lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t width, const char *text, lv_event_code_t event_code, lv_event_cb_t event_cb, void *event_user_data);
 
 /**
  * @brief Create a chart legend item composed of a colored dot and text label.
@@ -94,9 +90,7 @@ lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord
  * @param text Null-terminated legend label.
  * @return Newly created LVGL container object for the legend item.
  */
-lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
-                                      lv_coord_t width, lv_color_t color,
-                                      const char *text);
+lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t width, lv_color_t color, const char *text);
 
 /**
  * @brief Create a metric card with a static label and caller-owned value label pointer.
@@ -108,8 +102,7 @@ lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t
  * @param value_label Output pointer receiving the created value label.
  * @return Newly created LVGL card container.
  */
-lv_obj_t *gui_view_create_metric_card(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
-                                      const char *label_text, lv_obj_t **value_label);
+lv_obj_t *gui_view_create_metric_card(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, const char *label_text, lv_obj_t **value_label);
 
 /**
  * @brief Copy an energy series into an LVGL chart series.
@@ -118,7 +111,6 @@ lv_obj_t *gui_view_create_metric_card(lv_obj_t *parent, lv_coord_t x, lv_coord_t
  * @param series Chart series to update.
  * @param values Array of GUI_ENERGY_PLAN_POINT_COUNT values.
  */
-void gui_view_apply_energy_series(lv_obj_t *chart, lv_chart_series_t *series,
-                                  const uint16_t *values);
+void gui_view_apply_energy_series(lv_obj_t *chart, lv_chart_series_t *series, const uint16_t *values);
 
 #endif

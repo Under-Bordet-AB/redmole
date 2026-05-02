@@ -402,8 +402,7 @@ void gui_init(gui_ctx_t *self, const gui_init_config_t *config)
     gui_state_build_screen_model(&runtime->state, &model);
 
     if (lvgl_port_lock(-1)) {
-        gui_screen_init(&runtime->screen, &model, gui_handle_nav_event,
-                        gui_handle_settings_event, runtime);
+        gui_screen_init(&runtime->screen, &model, gui_handle_nav_event, gui_handle_settings_event, runtime);
         gui_platform_start_refresh_timer(self, runtime);
         gui_screen_sync_brightness(&runtime->screen, gui_platform_get_brightness());
         lvgl_port_unlock();

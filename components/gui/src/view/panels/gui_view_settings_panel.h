@@ -15,8 +15,7 @@
  * @param settings_event_cb Callback for settings interactions.
  * @param event_user_data User data forwarded to the callback.
  */
-void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event_cb,
-                                  void *event_user_data);
+void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event_cb,void *event_user_data);
 
 /**
  * @brief Apply the current settings-related model state to the settings panel.
