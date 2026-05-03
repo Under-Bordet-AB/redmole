@@ -26,16 +26,16 @@
 #ifndef UART_MOLE_H
 #define UART_MOLE_H
 
+#include <stdarg.h>
 #include <stdint.h>
 #include "esp_err.h"
-#include "driver/uart.h"
 #include "task_scheduler.h"
 
 /* Start, stop and escape bytes for UART packets */
-#define UART_START                  0xF0
-#define UART_END                    0xF1
-#define UART_ESCAPE                 0xF2
-#define UART_XOR_MASK               0x20
+#define UART_START                   0xF0
+#define UART_END                     0xF1
+#define UART_ESCAPE                  0xF2
+#define UART_XOR_MASK                0x20
 
 /* TAG bits for UART packets */
 #define UART_TAG_STATUS             (1 << 0)
@@ -75,8 +75,8 @@ typedef struct __attribute__ ((packed))
     uint8_t  tag_bit;
     uint16_t data_len;
     uint8_t  status;
-    uint32_t uptime_ms;
-    uint32_t timestamp_ms;
+    uint32_t uptime_s;
+    uint32_t timestamp_s;
     uint16_t crc16;
     uint8_t  end_of_packet;
 } uart_status_pkg_t;
@@ -87,8 +87,13 @@ typedef struct __attribute__ ((packed))
     uint8_t  start_of_packet;
     uint8_t  tag_bit;
     uint16_t data_len;
-    char     json_data[UART_SERVER_PKG_MAX_SIZE];
-    uint32_t timestamp_ms;
+    /* Note to self: use this handle when allocating on the PSRAM
+     * The package itself wll also be allocated on the PSRAM heap
+     * Will get handle to result.json and then perform a memcpy to json_data
+     * This will happen in uart listen function that packs the data
+     */
+    char     *json_data[UART_SERVER_PKG_MAX_SIZE];
+    uint32_t timestamp_s;
     uint16_t crc16;
     uint8_t  end_of_packet;
 } uart_server_pkg_t;
@@ -104,7 +109,7 @@ typedef struct __attribute__ ((packed))
     int32_t  temperature_x_100;
     int32_t  humidity_x_100;
     int32_t  pressure_x_100;
-    uint32_t timestamp_ms;
+    uint32_t timestamp_s;
     uint16_t crc16;
     uint8_t  end_of_packet;
 } uart_sensor_pkg_t;
@@ -116,7 +121,7 @@ typedef struct __attribute__ ((packed))
     uint8_t  tag_bit;
     uint16_t data_len;
     uint8_t  rslt_bit;
-    uint32_t timestamp_ms;
+    uint32_t timestamp_s;
     uint16_t crc16;
     uint8_t  end_of_packet;
 } uart_config_pkg_t;
@@ -130,22 +135,15 @@ typedef struct __attribute__ ((packed))
     uint8_t  number_of_tasks;
     uint32_t stack_hw;
     uint32_t stack_used;
-    uint32_t timestamp_ms;
+    uint32_t timestamp_s;
     uint16_t crc16;
     uint8_t  end_of_packet;
 } uart_diag_pkg_t;
-
-typedef struct uart_mole_persist
-{
-    uint32_t      time_since_boot;
-    uart_config_t uart_config;
-} uart_mole_persist_t;
 
 typedef struct uart_ctx
 {
     task_node_t           task_node;
     uart_pkg_tag_t        pkg_tag;
-    uart_config_pkg_t     persistant_vars;
     /* Tagged union for UART mole context packet types */
     union
     {
@@ -166,6 +164,6 @@ esp_err_t uart_mole_init(void);
 /* @brief  Deinitializes the UART mole context and ESP-IDF UART driver.
  * @param  self Pointer to the UART mole context.
  */
-void uart_diag_deinit(uart_ctx_t *self);
+esp_err_t uart_mole_deinit(void);
 
 #endif // UART_MOLE_H
