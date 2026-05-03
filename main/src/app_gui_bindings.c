@@ -20,6 +20,7 @@
 
 static const char *TAG = "APP_GUI_BINDINGS";
 
+// Defines for NVS keys
 #define GUI_NVS_KEY_THEME       "gui_theme"
 #define GUI_NVS_KEY_BG          "gui_bg"
 #define GUI_NVS_KEY_NIGHT       "gui_night"
@@ -54,34 +55,41 @@ static app_gui_bindings_ctx_t s_bindings;
 // Forward declarations
 //////////////////////////
 
-// Syncing UI to backend
+// Helpers
+static uint8_t signal_strength_pct(int8_t rssi);
+static gui_wifi_state_t map_wifi_state(nac_wifi_status_t status);
+static void set_wifi_status(gui_ctx_t *gui, const char *status_text, gui_wifi_state_t state);
+static void copy_scan_results(gui_wifi_settings_t *wifi);
+static gui_sd_card_state_t get_sd_card_state(void);
+static int32_t clamp_saved_brightness(int32_t value);
+
+// UI sync
 static void sync_sensor(gui_ctx_t *gui);
 static bool sync_wifi_state(gui_ctx_t *gui);
 static void sync_wifi(gui_ctx_t *gui);
 static bool sync_sd_card_state(gui_ctx_t *gui);
-
-// Helpers
-static uint8_t signal_strength_pct(int8_t rssi);
-static gui_wifi_state_t map_wifi_state(nac_wifi_status_t status);
-static int32_t clamp_saved_brightness(int32_t value);
 
 // UI caching
 bool app_gui_bindings_load_saved_appearance(gui_init_config_t *config);
 static void cache_current_appearance(gui_ctx_t *gui);
 static bool save_appearance_if_changed(gui_ctx_t *gui);
 
-// Wifi caching
+// Wi-Fi metadata
 static bool load_saved_wifi_metadata(gui_ctx_t *gui);
 static bool refresh_saved_wifi_metadata(gui_ctx_t *gui);
 static bool queue_saved_wifi_autoconnect(gui_ctx_t *gui);
 
-// UI Events
+// UI events
 static void on_panel_changed(gui_ctx_t *gui, gui_panel_id_t panel, void *user_data);
 static bool on_wifi_scan_requested(gui_ctx_t *gui, void *user_data);
 static void on_wifi_network_selected(gui_ctx_t *gui, const gui_wifi_network_t *network, void *user_data);
 static bool on_wifi_known_network_requested(gui_ctx_t *gui, const gui_wifi_network_t *network, void *user_data);
 static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const char *password, void *user_data);
 static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data);
+
+// Basics
+esp_err_t app_gui_bindings_init(gui_ctx_t *gui);
+void app_gui_bindings_sync(gui_ctx_t *gui);
 
 // Function definitions
 //////////////////////////
@@ -95,7 +103,7 @@ static uint8_t signal_strength_pct(int8_t rssi)
     if (rssi >= -50) {
         return 100;
     }
-
+    
     return (uint8_t)((rssi + 100) * 2);
 }
 

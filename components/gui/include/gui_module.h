@@ -15,36 +15,36 @@
  * @brief Opaque-like context owned by the caller and initialized by the GUI module.
  */
 typedef struct gui_ctx {
-    bool is_ready;      /*!< True after gui_init() has completed successfully. */
-    void *frame_buffer; /*!< Frame buffer storage, typically allocated from PSRAM. */
-    void *module_state; /*!< Private GUI runtime state managed by the module implementation. */
+    bool is_ready;
+    void *frame_buffer;
+    void *module_state;
 } gui_ctx_t;
 
 /**
  * @brief Optional startup overrides applied before the first GUI render.
  */
 typedef struct {
-    bool has_theme; /*!< True when @p theme should override the default theme. */
-    gui_view_theme_t theme; /*!< Theme to apply during GUI initialization. */
-    bool has_background_image; /*!< True when @p show_background_image should override the default. */
-    bool show_background_image; /*!< Initial background-image visibility. */
-    bool has_night_variant; /*!< True when @p night_variant_enabled should override the default. */
-    bool night_variant_enabled; /*!< Initial night-variant state. */
-    bool has_brightness; /*!< True when @p brightness_percent should override the default brightness. */
-    int32_t brightness_percent; /*!< Initial brightness percentage. */
+    bool has_theme;
+    gui_view_theme_t theme;
+    bool has_background_image;
+    bool show_background_image;
+    bool has_night_variant;
+    bool night_variant_enabled;
+    bool has_brightness;
+    int32_t brightness_percent;
 } gui_init_config_t;
 
 /**
  * @brief Callback bindings used to connect GUI interactions to application logic.
  */
 typedef struct {
-    void *user_data; /*!< Opaque pointer forwarded to every registered callback. */
-    void (*on_panel_changed)(gui_ctx_t *self, gui_panel_id_t panel, void *user_data); /*!< Called after the user switches panels. */
-    bool (*on_wifi_scan_requested)(gui_ctx_t *self, void *user_data); /*!< Requests a Wi-Fi scan and returns true when accepted. */
-    void (*on_wifi_network_selected)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data); /*!< Notifies the application when a scanned network is selected. */
-    bool (*on_wifi_known_network_requested)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data); /*!< Requests connection flow for a remembered network. */
-    bool (*on_wifi_connect_requested)(gui_ctx_t *self, const char *ssid, const char *password, void *user_data); /*!< Requests a Wi-Fi connection using explicit credentials. */
-    bool (*on_wifi_disconnect_requested)(gui_ctx_t *self, void *user_data); /*!< Requests disconnection from the current Wi-Fi network. */
+    void *user_data;
+    void (*on_panel_changed)(gui_ctx_t *self, gui_panel_id_t panel, void *user_data);
+    bool (*on_wifi_scan_requested)(gui_ctx_t *self, void *user_data);
+    void (*on_wifi_network_selected)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data);
+    bool (*on_wifi_known_network_requested)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data);
+    bool (*on_wifi_connect_requested)(gui_ctx_t *self, const char *ssid, const char *password, void *user_data);
+    bool (*on_wifi_disconnect_requested)(gui_ctx_t *self, void *user_data);
 } gui_module_bindings_t;
 
 /**
