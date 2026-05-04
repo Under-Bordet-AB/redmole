@@ -1,4 +1,6 @@
-#include "gui_module_internal.h"
+#include "gui_platform.h"
+
+#include <stdbool.h>
 
 #include "esp_check.h"
 #include "gt911.h"
@@ -9,7 +11,33 @@
 static int32_t s_backlight_percent = GUI_MODULE_DEFAULT_BRIGHTNESS;
 static bool s_backlight_enabled;
 
-void gui_module_apply_brightness(int32_t brightness_percent)
+static void gui_platform_refresh_timer_cb(lv_timer_t *timer)
+{
+    gui_ctx_t *self;
+    gui_runtime_t *runtime;
+
+    if (timer == NULL) {
+        return;
+    }
+
+    self = (gui_ctx_t *)timer->user_data;
+    if ((self == NULL) || (self->module_state == NULL)) {
+        return;
+    }
+
+    runtime = (gui_runtime_t *)self->module_state;
+
+    gui_screen_update_sidebar_clock(&runtime->screen);
+
+    if ((runtime->state.active_panel != GUI_PANEL_BME280) &&
+        (runtime->state.active_panel != GUI_PANEL_SETTINGS)) {
+        return;
+    }
+
+    gui_render_runtime(runtime);
+}
+
+void gui_platform_set_brightness(int32_t brightness_percent)
 {
     uint8_t pwm_percent;
 
@@ -38,12 +66,12 @@ void gui_module_apply_brightness(int32_t brightness_percent)
     IO_EXTENSION_Pwm_Output(pwm_percent);
 }
 
-int32_t gui_module_get_brightness(void)
+int32_t gui_platform_get_brightness(void)
 {
     return s_backlight_percent;
 }
 
-esp_err_t gui_module_platform_init_display(void)
+esp_err_t gui_platform_init_display(void)
 {
     esp_lcd_touch_handle_t touch_handle;
     esp_lcd_panel_handle_t lcd_handle;
@@ -55,43 +83,17 @@ esp_err_t gui_module_platform_init_display(void)
     return ESP_OK;
 }
 
-void gui_module_refresh_timer_cb(lv_timer_t *timer)
-{
-    gui_ctx_t *self;
-    gui_module_runtime_t *runtime;
-
-    if (timer == NULL) {
-        return;
-    }
-
-    self = (gui_ctx_t *)timer->user_data;
-    if ((self == NULL) || (self->module_state == NULL)) {
-        return;
-    }
-
-    runtime = (gui_module_runtime_t *)self->module_state;
-
-    gui_view_update_sidebar_clock_labels(&runtime->view);
-
-    if ((runtime->control.active_panel != GUI_PANEL_BME280) &&
-        (runtime->control.active_panel != GUI_PANEL_SETTINGS)) {
-        return;
-    }
-
-    gui_module_apply_model(runtime);
-}
-
-void gui_module_platform_start_refresh_timer(gui_ctx_t *self, gui_module_runtime_t *runtime)
+void gui_platform_start_refresh_timer(gui_ctx_t *self, gui_runtime_t *runtime)
 {
     if ((self == NULL) || (runtime == NULL)) {
         return;
     }
 
-    runtime->refresh_timer = lv_timer_create(gui_module_refresh_timer_cb, 2000, self);
-    gui_module_apply_brightness(s_backlight_percent);
+    runtime->refresh_timer = lv_timer_create(gui_platform_refresh_timer_cb, 2000, self);
+    gui_platform_set_brightness(s_backlight_percent);
 }
 
-void gui_module_platform_stop_refresh_timer(gui_module_runtime_t *runtime)
+void gui_platform_stop_refresh_timer(gui_runtime_t *runtime)
 {
     if (runtime == NULL) {
         return;
@@ -103,5 +105,5 @@ void gui_module_platform_stop_refresh_timer(gui_module_runtime_t *runtime)
         lvgl_port_unlock();
     }
 
-    gui_module_apply_brightness(0);
+    gui_platform_set_brightness(0);
 }
