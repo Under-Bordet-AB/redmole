@@ -73,11 +73,15 @@ static task_status_t http_poll(task_node_t *node)
     return TASK_RUN_AGAIN;
 }
 
-/*
+/** 
  * Initializes the HTTP client module.
- * Pass a PEM-encoded CA certificate string for TLS, or NULL for plain HTTP.
  * Assigns the poll callback to the task node so it is ready to be
  * scheduled when the network comes up.
+ * @param mode
+ * Select which TLS type, or none.
+ * @param ca_cert_pem
+ * Pass a PEM-encoded CA certificate string for TLS. 
+ * Only do this if you selected the HTTP_CLIENT_TLS_BUNDLE mode.
  */
 esp_err_t http_client_init(http_client_tls_mode_t mode, const char* ca_cert_pem)
 {
