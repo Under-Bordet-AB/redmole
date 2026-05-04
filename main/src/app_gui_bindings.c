@@ -18,6 +18,10 @@
 #include "rm_nvs.h"
 #include "sensor_data.h"
 
+#include "protocomm.h"
+#include "protocomm_ble.h"
+#include "protocomm_security0.h"
+
 static const char *TAG = "APP_GUI_BINDINGS";
 
 // Defines for NVS keys
@@ -636,6 +640,72 @@ static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data)
     return true;
 }
 
+esp_err_t echo_req_handler (uint32_t session_id,
+                            const uint8_t *inbuf, ssize_t inlen,
+                            uint8_t **outbuf, ssize_t *outlen,
+                            void *priv_data)
+{
+    /* Session ID may be used for persistence. */
+    printf("Session ID : %ld", session_id);
+
+    /* Echo back the received data. */
+    *outlen = inlen;            /* Output the data length updated. */
+    *outbuf = malloc(inlen);    /* This is to be deallocated outside. */
+    memcpy(*outbuf, inbuf, inlen);
+
+    /* Private data that was passed at the time of endpoint creation. */
+    uint32_t *priv = (uint32_t *) priv_data;
+    if (priv) {
+        printf("Private data : %ld", *priv);
+    }
+
+    return ESP_OK;
+}
+
+/* The example function for launching a secure protocomm instance over Bluetooth LE. */
+protocomm_t *start_pc()
+{
+    protocomm_t *pc = protocomm_new();
+
+    /* Endpoint UUIDs */
+    protocomm_ble_name_uuid_t nu_lookup_table[] = {
+        {"security_endpoint", 0xFF51},
+        {"echo_req_endpoint", 0xFF52}
+    };
+
+    /* Config for protocomm_ble_start(). */
+    protocomm_ble_config_t config = {
+        .service_uuid = {
+            /* LSB <---------------------------------------
+            * ---------------------------------------> MSB */
+            0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80,
+            0x00, 0x10, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00,
+        },
+        .nu_lookup_count = sizeof(nu_lookup_table)/sizeof(nu_lookup_table[0]),
+        .nu_lookup = nu_lookup_table
+    };
+
+    /* Start protocomm layer on top of Bluetooth LE. */
+    protocomm_ble_start(pc, &config);
+
+    /* For protocomm_security0, Proof of Possession is not used, and can be kept NULL. */
+    protocomm_set_security(pc, "security_endpoint", &protocomm_security0, NULL);
+    protocomm_add_endpoint(pc, "echo_req_endpoint", echo_req_handler, NULL);
+    return pc;
+}
+
+/* The example function for stopping a protocomm instance. */
+void stop_pc(protocomm_t *pc)
+{
+    protocomm_remove_endpoint(pc, "echo_req_endpoint");
+    protocomm_unset_security(pc, "security_endpoint");
+
+    /* Stop the Bluetooth LE protocomm service. */
+    protocomm_ble_stop(pc);
+
+    protocomm_delete(pc);
+}
+
 // Basics
 //////////////////////////
 
@@ -658,6 +728,8 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
     bindings.on_wifi_connect_requested = on_wifi_connect_requested;
     bindings.on_wifi_disconnect_requested = on_wifi_disconnect_requested;
     gui_set_bindings(gui, &bindings);
+
+    protocomm_t* test = start_pc();
 
     cache_current_appearance(gui);
     (void)load_saved_wifi_metadata(gui);
