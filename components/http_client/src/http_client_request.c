@@ -42,7 +42,7 @@ static esp_err_t on_http_event(esp_http_client_event_t *event)
             ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA");
 
             response_ctx_t *ctx = (response_ctx_t *)event->user_data;
-            size_t space_remaining = ctx->buf_len - ctx->written;
+            size_t space_remaining = ctx->buf_len - ctx->written - 1;
             size_t to_copy;
 
             // Clamp to remaining space so we never write past the end of the buffer
@@ -54,6 +54,7 @@ static esp_err_t on_http_event(esp_http_client_event_t *event)
         
             memcpy(ctx->buf + ctx->written, event->data, to_copy);
             ctx->written += to_copy;
+            ctx->buf[ctx->written] = '\0';
             break;
         }
         default:
