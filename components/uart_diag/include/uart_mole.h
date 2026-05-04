@@ -3,12 +3,12 @@
  * and sends it over UART to the client.
  *
  * A package consists of:
- * - Start byte
+ * (- Start byte) DEPRECATED
  * - Tag byte (identifies the type of package)
  * - Data length
  * - Data bytes
- * - Checksum
- * - End byte
+ * - Checksum of the data bytes
+ * (- End byte) DEPRECATED
  *
  * When making a package bytes that collide with UART_START and UART_END are escaped.
  * The client decodes the package by removing escape bytes and validating the checksum.
@@ -18,24 +18,24 @@
  * 1. Initialize UART driver
  * 2. Start UART listener task
  * 3. Wait for UART events
- * 4. Pack data into packages (dynamic allocation on PSRAM, heap_4 needed) and add task to scheduler
+ * 4. Pack data into packages (dynamic allocation on PSRAM) and add task to scheduler
  * 5. Send packages over UART and free allocated memory.
  * 6. Repeat steps 3-5
+ *
+ * IMPORTANT: One thing to be aware of: esp_crc16_le is CRC-16/IBM (polynomial 0x8005, reflected).
+ * CRC-16 has several incompatible variants (CCITT, Modbus, IBM) that all produce different results on the same data.
  */
 
 #ifndef UART_MOLE_H
 #define UART_MOLE_H
 
+#include <complex.h>
 #include <stdarg.h>
 #include <stdint.h>
+#include <sys/types.h>
 #include "esp_err.h"
+#include "freertos/idf_additions.h"
 #include "task_scheduler.h"
-
-/* Start, stop and escape bytes for UART packets */
-#define UART_START                   0xF0
-#define UART_END                     0xF1
-#define UART_ESCAPE                  0xF2
-#define UART_XOR_MASK                0x20
 
 /* TAG bits for UART packets */
 #define UART_TAG_STATUS             (1 << 0)
@@ -48,22 +48,18 @@
 #define SET_LEOP_SERVER_ONLINE      (1 << 1)
 #define SET_BME280_SENSOR_ONLINE    (1 << 2)
 
-/* Max buffer size for UART server packages */
-#define UART_SERVER_PKG_MAX_SIZE 256 // Calculate exact size needed
-
 /* Result bits for UART config packages */
 #define SET_CONFIG_OK               (1 << 0)
 #define SET_CONFIG_FAILED           (1 << 1)
 
-/*
- * UART packet tags
- */
+/* UART packet tags */
 typedef enum
 {
     UART_STATUS_PKG = 0,
     UART_SERVER_PKG = 1,
     UART_SENSOR_PKG = 2,
     UART_CONFIG_PKG = 3,
+    UART_DIAG_PKG   = 4,
 } uart_pkg_tag_t;
 
 /* UART packages */
@@ -71,37 +67,32 @@ typedef enum
 /* Sent to client when command: STATUS is received */
 typedef struct __attribute__ ((packed))
 {
-    uint8_t  start_of_packet;
     uint8_t  tag_bit;
     uint16_t data_len;
+    /* Flags indicating the status of the mole: WIFI, SERVER and SENSOR online. */
     uint8_t  status;
     uint32_t uptime_s;
     uint32_t timestamp_s;
     uint16_t crc16;
-    uint8_t  end_of_packet;
 } uart_status_pkg_t;
 
 /* Sent to client when command: SERVER is received */
 typedef struct __attribute__ ((packed))
 {
-    uint8_t  start_of_packet;
     uint8_t  tag_bit;
     uint16_t data_len;
-    /* Note to self: use this handle when allocating on the PSRAM
-     * The package itself wll also be allocated on the PSRAM heap
-     * Will get handle to result.json and then perform a memcpy to json_data
-     * This will happen in uart listen function that packs the data
+    /* this handle is used to allocate
+     * memory for the json data on the PSRAM heap
+     * I will free this memory before freeing the package
      */
-    char     *json_data[UART_SERVER_PKG_MAX_SIZE];
+    char     *json_data;
     uint32_t timestamp_s;
     uint16_t crc16;
-    uint8_t  end_of_packet;
 } uart_server_pkg_t;
 
 /* Sent to client when command: SENSOR is received */
 typedef struct __attribute__ ((packed))
 {
-    uint8_t  start_of_packet;
     uint8_t  tag_bit;
     uint16_t data_len;
     /* scaled integers (multiplied by 100)
@@ -111,25 +102,22 @@ typedef struct __attribute__ ((packed))
     int32_t  pressure_x_100;
     uint32_t timestamp_s;
     uint16_t crc16;
-    uint8_t  end_of_packet;
 } uart_sensor_pkg_t;
 
 /* Sent to client when command: CONFIG is received */
 typedef struct __attribute__ ((packed))
 {
-    uint8_t  start_of_packet;
+
     uint8_t  tag_bit;
     uint16_t data_len;
     uint8_t  rslt_bit;
     uint32_t timestamp_s;
     uint16_t crc16;
-    uint8_t  end_of_packet;
 } uart_config_pkg_t;
 
 /* Sent to client when command: DIAGNOSTICS is received */
 typedef struct __attribute__ ((packed))
 {
-    uint8_t  start_of_packet;
     uint8_t  tag_bit;
     uint16_t data_len;
     uint8_t  number_of_tasks;
@@ -137,29 +125,45 @@ typedef struct __attribute__ ((packed))
     uint32_t stack_used;
     uint32_t timestamp_s;
     uint16_t crc16;
-    uint8_t  end_of_packet;
 } uart_diag_pkg_t;
+
+typedef struct uart_mole_stats
+{
+    uint32_t uart_mole_status_pkg;
+    uint32_t uart_mole_server_pkg;
+    uint32_t uart_mole_sensor_pkg;
+    uint32_t uart_mole_config_pkg;
+} uart_mole_stats_t;
+
 
 typedef struct uart_ctx
 {
-    task_node_t           task_node;
-    uart_pkg_tag_t        pkg_tag;
-    /* Tagged union for UART mole context packet types */
-    union
-    {
-        uart_status_pkg_t status_pkg;
-        uart_server_pkg_t server_pkg;
-        uart_sensor_pkg_t sensor_pkg;
-        uart_config_pkg_t config_pkg;
-        uart_diag_pkg_t   diag_pkg;
-    };
+    task_node_t        task_node;
+    /* Injected from global in main,
+     * used to check flags of other modules */
+    EventGroupHandle_t *event_group;
+    QueueHandle_t      queue;
+    TaskHandle_t       rtos_task;
+    uart_mole_stats_t  stats;
+    const char         *tag;
+    uint8_t            uart_mole_port;
+    uint8_t            uart_mole_rx_pin;
+    uint8_t            uart_mole_tx_pin;
+    uint16_t           uart_mole_rx_buf_size;
+    uint16_t           uart_mole_tx_buf_size;
+    uint32_t           uart_mole_baud_rate;
+
+    uart_pkg_tag_t     pkg_tag;
+    void               *pkg_data;
 } uart_ctx_t;
 
 
-/* @brief Initialize the UART mole context and ESP-IDF UART driver.
+/* @brief Initialize the uart config and ESP-IDF UART driver.
+ * @note the object is dynamically allocated when packet is constructed
+ *       and freed when the packet is transmitted.
  * @return ESP_OK on success, or an error code on failure.
  */
-esp_err_t uart_mole_init(void);
+esp_err_t uart_mole_init(EventGroupHandle_t *event_group);
 
 /* @brief  Deinitializes the UART mole context and ESP-IDF UART driver.
  * @param  self Pointer to the UART mole context.
