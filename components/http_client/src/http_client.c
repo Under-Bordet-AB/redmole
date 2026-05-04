@@ -17,6 +17,7 @@ typedef struct
 } http_client_ctx_t;
 
 static http_client_ctx_t s_client = {0};
+static char *s_response_buf = NULL;
 static const char* TAG = "HTTP Client";
 
 // ============= FORWARD DECLARATIONS ============= //
@@ -58,6 +59,15 @@ void http_client_notify_network_down(void)
 }
 
 /*
+ * A simple getter function that returns a pointer to the first character in
+ * the static HTTP response buffer, or NULL if nothing has been received.
+ */
+const char *http_client_response_buf(void)
+{
+    return s_response_buf;
+}
+
+/*
  * Scheduler callback, fires once per poll interval.
  * Uses container_of to recover the full context from the node pointer.
  * Always reschedules itself by updating run_at_tick before returning
@@ -67,7 +77,11 @@ void http_client_notify_network_down(void)
 static task_status_t http_poll(task_node_t *node)
 {
     http_client_ctx_t *self = container_of(node, http_client_ctx_t, task_node);
-    (void)self; // TODO: call request_get() and forward result to sensor_data
+    (void)self;
+    if (request_get("https://jsonplaceholder.typicode.com/todos/1", s_response_buf, CONFIG_REDMOLE_HTTP_RESPONSE_BUF_SIZE) != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Request failed");
+    }
 
     node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(CONFIG_REDMOLE_HTTP_POLL_INTERVAL_MS);
     return TASK_RUN_AGAIN;
@@ -86,11 +100,20 @@ static task_status_t http_poll(task_node_t *node)
 esp_err_t http_client_init(http_client_tls_mode_t mode, const char* ca_cert_pem)
 {
     ESP_LOGD(TAG, "Initializing client");
+
+    s_response_buf = heap_caps_malloc(CONFIG_REDMOLE_HTTP_RESPONSE_BUF_SIZE, MALLOC_CAP_SPIRAM);
+    if (!s_response_buf)
+    {
+        ESP_LOGE(TAG, "HTTP response buffer memory allocation failed");
+        return ESP_ERR_NO_MEM;
+    }
     
     esp_err_t err = _tls_init(mode, ca_cert_pem);
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "TLS init failed: %s", esp_err_to_name(err));
+        free(s_response_buf);
+        s_response_buf = NULL;
         return err;
     }
 
@@ -156,5 +179,7 @@ esp_err_t http_client_get(const char* url, char* buf, size_t buf_len)
 void http_client_deinit(void)
 {
     ESP_LOGD(TAG, "Deinitializing client");
+    free(s_response_buf);
+    s_response_buf  = NULL;
     _tls_deinit();
 }

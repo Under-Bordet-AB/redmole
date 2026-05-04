@@ -22,6 +22,12 @@ void http_client_notify_network_up(void);
 void http_client_notify_network_down(void);
 
 /*
+ * A simple getter function that returns a pointer to the first character in
+ * the static HTTP response buffer, or NULL if nothing has been received.
+ */
+const char *http_client_response_buf(void);
+
+/*
  * Initializes the HTTP client. Must be called once at startup before
  * any other function. Pass a PEM-encoded CA certificate for TLS, or
  * NULL for plain HTTP.
