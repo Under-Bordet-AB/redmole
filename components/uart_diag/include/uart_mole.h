@@ -81,10 +81,8 @@ typedef struct __attribute__ ((packed))
 {
     uint8_t  tag_bit;
     uint16_t data_len;
-    /* this handle is used to allocate
-     * memory for the json data on the PSRAM heap
-     * I will free this memory before freeing the package
-     */
+    /* Changes: This handle will be declared and allocated on the
+     * PSRAM heap on init and kept throughout the lifetime of the mole. */
     char     *json_data;
     uint32_t timestamp_s;
     uint16_t crc16;
@@ -135,7 +133,6 @@ typedef struct uart_mole_stats
     uint32_t uart_mole_config_pkg;
 } uart_mole_stats_t;
 
-
 typedef struct uart_ctx
 {
     task_node_t        task_node;
@@ -146,7 +143,7 @@ typedef struct uart_ctx
     TaskHandle_t       rtos_task;
     uart_mole_stats_t  stats;
     const char         *tag;
-    uint8_t            uart_mole_port;
+    uart_port_t        uart_mole_port;
     uint8_t            uart_mole_rx_pin;
     uint8_t            uart_mole_tx_pin;
     uint16_t           uart_mole_rx_buf_size;
@@ -154,13 +151,20 @@ typedef struct uart_ctx
     uint32_t           uart_mole_baud_rate;
 
     uart_pkg_tag_t     pkg_tag;
-    void               *pkg_data;
+    char               *json_buf;
+    union {
+        uart_status_pkg_t  status;
+        uart_server_pkg_t  server;
+        uart_sensor_pkg_t  sensor;
+        uart_config_pkg_t  config;
+        uart_diag_pkg_t    diag;
+    } pkg_buf;
 } uart_ctx_t;
 
 
 /* @brief Initialize the uart config and ESP-IDF UART driver.
- * @note the object is dynamically allocated when packet is constructed
- *       and freed when the packet is transmitted.
+ * @note Allocates a persistent JSON buffer on PSRAM. All other package
+ *       storage lives in pkg_buf inside the context.
  * @return ESP_OK on success, or an error code on failure.
  */
 esp_err_t uart_mole_init(EventGroupHandle_t *event_group);

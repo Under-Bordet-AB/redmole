@@ -17,13 +17,14 @@
 #include <string.h>
 #include <time.h>
 
-#define UART_MOLE_PORT          0
+#define UART_MOLE_PORT          UART_NUM_0
 #define UART_MOLE_TX            43
 #define UART_MOLE_RX            44
 #define UART_MOLE_RX_BUF_SIZE   128
 #define UART_MOLE_TX_BUF_SIZE   1024
 #define UART_MOLE_BAUD_RATE     115200
 #define UART_MOLE_STACK_SIZE    4096
+#define UART_MOLE_JSON_BUF_SIZE 10240
 
 static const char *TAG = "UART_MOLE";
 
@@ -33,15 +34,44 @@ static uart_ctx_t s_uart_mole;
 static task_status_t uart_mole_work(task_node_t *node);
 static void uart_mole_listener_task(void *pvParameters);
 
+/* Loops until all len bytes are written, returns ESP_FAIL on driver error. */
+static esp_err_t uart_mole_uart_write_wrapper(uart_port_t port, const void *data, size_t len)
+{
+    const uint8_t *ptr = (const uint8_t *)data;
+    size_t remaining = len;
+    while (remaining > 0)
+    {
+        int written = uart_write_bytes(port, ptr, remaining);
+        if (written < 0)
+        {
+            ESP_LOGE(TAG, "uart_write_bytes failed: %d", written);
+            return ESP_FAIL;
+        }
+        ptr       += (size_t)written;
+        remaining -= (size_t)written;
+    }
+    return ESP_OK;
+}
+
 esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
 {
     memset(&s_uart_mole, 0, sizeof(uart_ctx_t));
-    s_uart_mole.event_group       = event_group;
-    s_uart_mole.tag               = TAG;
-    s_uart_mole.uart_mole_port    = UART_MOLE_PORT;
-    s_uart_mole.uart_mole_tx_pin  = UART_MOLE_TX;
-    s_uart_mole.uart_mole_rx_pin  = UART_MOLE_RX;
-    s_uart_mole.task_node.work    = uart_mole_work;
+    s_uart_mole.task_node.work        = uart_mole_work;
+    s_uart_mole.event_group           = event_group;
+    s_uart_mole.tag                   = TAG;
+    s_uart_mole.uart_mole_port        = UART_MOLE_PORT;
+    s_uart_mole.uart_mole_rx_pin      = UART_MOLE_RX;
+    s_uart_mole.uart_mole_tx_pin      = UART_MOLE_TX;
+    s_uart_mole.uart_mole_rx_buf_size = UART_MOLE_RX_BUF_SIZE;
+    s_uart_mole.uart_mole_tx_buf_size = UART_MOLE_TX_BUF_SIZE;
+    s_uart_mole.uart_mole_baud_rate   = UART_MOLE_BAUD_RATE;
+
+    s_uart_mole.json_buf = heap_caps_malloc(UART_MOLE_JSON_BUF_SIZE, MALLOC_CAP_SPIRAM);
+    if (!s_uart_mole.json_buf)
+    {
+        ESP_LOGE(TAG, "json_buf alloc failed");
+        return ESP_ERR_NO_MEM;
+    }
 
     const uart_config_t uart_config =
     {
@@ -57,6 +87,7 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "uart_param_config failed: %s", esp_err_to_name(err));
+        heap_caps_free(s_uart_mole.json_buf);
         return err;
     }
 
@@ -64,6 +95,7 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "uart_set_pin failed: %s", esp_err_to_name(err));
+        heap_caps_free(s_uart_mole.json_buf);
         return err;
     }
 
@@ -72,6 +104,7 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "uart_driver_install failed: %s", esp_err_to_name(err));
+        heap_caps_free(s_uart_mole.json_buf);
         return err;
     }
 
@@ -81,6 +114,7 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
     {
         ESP_LOGE(TAG, "xTaskCreate failed");
         uart_driver_delete(UART_MOLE_PORT);
+        heap_caps_free(s_uart_mole.json_buf);
         return ESP_FAIL;
     }
 
@@ -96,6 +130,11 @@ esp_err_t uart_mole_deinit(void)
         s_uart_mole.rtos_task = NULL;
     }
     uart_driver_delete(UART_MOLE_PORT);
+    if (s_uart_mole.json_buf)
+    {
+        heap_caps_free(s_uart_mole.json_buf);
+        s_uart_mole.json_buf = NULL;
+    }
     return ESP_OK;
 }
 
@@ -104,7 +143,8 @@ esp_err_t uart_mole_deinit(void)
  * data_len is the byte count of everything that follows data_len itself,
  * including the trailing crc16. The receiver reads tag, then data_len,
  * then reads exactly data_len bytes — no start/end bytes needed.
- * Frees the package allocation when done; does not free the context.
+ * After transmitting, the package buffer is zeroed; for the server package
+ * the persistent json_buf is also zeroed.
  */
 static task_status_t uart_mole_work(task_node_t *node)
 {
@@ -115,66 +155,70 @@ static task_status_t uart_mole_work(task_node_t *node)
     {
         case UART_STATUS_PKG:
         {
-            uart_status_pkg_t *pkg = (uart_status_pkg_t *)self->pkg_data;
-            /* payload: status + uptime_s + timestamp_s + crc16 */
-            uart_write_bytes(port, &pkg->tag_bit, sizeof(pkg->tag_bit) + sizeof(pkg->data_len));
-            uart_write_bytes(port, &pkg->status, pkg->data_len);
-            heap_caps_free(pkg);
+            uart_status_pkg_t *pkg  = &self->pkg_buf.status;
+            size_t hdr_len          = sizeof(pkg->tag_bit) + sizeof(pkg->data_len);
+            const uint8_t *payload  = (const uint8_t *)pkg + hdr_len;
+            uart_mole_uart_write_wrapper(port, pkg, hdr_len);
+            uart_mole_uart_write_wrapper(port, payload, pkg->data_len);
+            memset(pkg, 0, sizeof(*pkg));
             break;
         }
 
         case UART_SENSOR_PKG:
         {
-            uart_sensor_pkg_t *pkg = (uart_sensor_pkg_t *)self->pkg_data;
-            /* payload: temperature_x_100 + humidity_x_100 + pressure_x_100 + timestamp_s + crc16 */
-            uart_write_bytes(port, &pkg->tag_bit, sizeof(pkg->tag_bit) + sizeof(pkg->data_len));
-            uart_write_bytes(port, &pkg->temperature_x_100, pkg->data_len);
-            heap_caps_free(pkg);
+            uart_sensor_pkg_t *pkg  = &self->pkg_buf.sensor;
+            size_t hdr_len          = sizeof(pkg->tag_bit) + sizeof(pkg->data_len);
+            const uint8_t *payload  = (const uint8_t *)pkg + hdr_len;
+            uart_mole_uart_write_wrapper(port, pkg, hdr_len);
+            uart_mole_uart_write_wrapper(port, payload, pkg->data_len);
+            memset(pkg, 0, sizeof(*pkg));
             break;
         }
 
         case UART_CONFIG_PKG:
         {
-            uart_config_pkg_t *pkg = (uart_config_pkg_t *)self->pkg_data;
-            /* payload: rslt_bit + timestamp_s + crc16 */
-            uart_write_bytes(port, &pkg->tag_bit, sizeof(pkg->tag_bit) + sizeof(pkg->data_len));
-            uart_write_bytes(port, &pkg->rslt_bit, pkg->data_len);
-            heap_caps_free(pkg);
+            uart_config_pkg_t *pkg  = &self->pkg_buf.config;
+            size_t hdr_len          = sizeof(pkg->tag_bit) + sizeof(pkg->data_len);
+            const uint8_t *payload  = (const uint8_t *)pkg + hdr_len;
+            uart_mole_uart_write_wrapper(port, pkg, hdr_len);
+            uart_mole_uart_write_wrapper(port, payload, pkg->data_len);
+            memset(pkg, 0, sizeof(*pkg));
             break;
         }
 
         case UART_DIAG_PKG:
         {
-            uart_diag_pkg_t *pkg = (uart_diag_pkg_t *)self->pkg_data;
-            /* payload: number_of_tasks + stack_hw + stack_used + timestamp_s + crc16 */
-            uart_write_bytes(port, &pkg->tag_bit, sizeof(pkg->tag_bit) + sizeof(pkg->data_len));
-            uart_write_bytes(port, &pkg->number_of_tasks, pkg->data_len);
-            heap_caps_free(pkg);
+            uart_diag_pkg_t *pkg    = &self->pkg_buf.diag;
+            size_t hdr_len          = sizeof(pkg->tag_bit) + sizeof(pkg->data_len);
+            const uint8_t *payload  = (const uint8_t *)pkg + hdr_len;
+            uart_mole_uart_write_wrapper(port, pkg, hdr_len);
+            uart_mole_uart_write_wrapper(port, payload, pkg->data_len);
+            memset(pkg, 0, sizeof(*pkg));
             break;
         }
 
         case UART_SERVER_PKG:
         {
-            uart_server_pkg_t *pkg = (uart_server_pkg_t *)self->pkg_data;
-            /* payload: json_data (variable) + timestamp_s + crc16
-             * json_data is not inline in the struct so it cannot be sent in one write.
-             * json_len is recovered from data_len: data_len = json_len + timestamp_s + crc16 */
-            uint16_t json_len = pkg->data_len - sizeof(pkg->timestamp_s) - sizeof(pkg->crc16);
-            uart_write_bytes(port, &pkg->tag_bit, sizeof(pkg->tag_bit) + sizeof(pkg->data_len));
-            uart_write_bytes(port, pkg->json_data, json_len);
-            /* timestamp_s and crc16 are contiguous at the end of the packed struct */
-            uart_write_bytes(port, &pkg->timestamp_s, sizeof(pkg->timestamp_s) + sizeof(pkg->crc16));
-            heap_caps_free(pkg);
+            /* json_data points into json_buf; timestamp_s and crc16 are not contiguous
+             * with it in memory so they are sent in a separate write. */
+            uart_server_pkg_t *pkg  = &self->pkg_buf.server;
+            size_t hdr_len          = sizeof(pkg->tag_bit) + sizeof(pkg->data_len);
+            uint16_t json_len       = pkg->data_len - sizeof(pkg->timestamp_s) - sizeof(pkg->crc16);
+            uart_mole_uart_write_wrapper(port, pkg, hdr_len);
+            uart_mole_uart_write_wrapper(port, pkg->json_data, json_len);
+            uart_mole_uart_write_wrapper(port, &pkg->timestamp_s,
+                                         sizeof(pkg->timestamp_s) + sizeof(pkg->crc16));
+            memset(self->json_buf, 0, UART_MOLE_JSON_BUF_SIZE);
+            memset(pkg, 0, sizeof(*pkg));
             break;
         }
     }
 
-    self->pkg_data = NULL;
     return TASK_DONE;
 }
 
-/* Waits for incoming UART commands, allocates and populates the appropriate
- * package on PSRAM, then hands it to the scheduler for transmission.
+/* Waits for incoming UART commands, populates the appropriate package into
+ * pkg_buf, then hands it to the scheduler for transmission.
  */
 static void uart_mole_listener_task(void *pvParameters)
 {
@@ -213,8 +257,7 @@ static void uart_mole_listener_task(void *pvParameters)
             {
                 /* payload (data_len bytes): status + uptime_s + timestamp_s + crc16
                  * crc16 covers:             status + uptime_s + timestamp_s            */
-                uart_status_pkg_t *pkg = heap_caps_malloc(sizeof(*pkg), MALLOC_CAP_SPIRAM);
-                if (!pkg) { ESP_LOGE(TAG, "alloc failed"); break; }
+                uart_status_pkg_t *pkg = &s_uart_mole.pkg_buf.status;
 
                 uint8_t status = 0;
                 if (nac_get_wifi_status() == NAC_WIFI_CONNECTED)
@@ -230,8 +273,7 @@ static void uart_mole_listener_task(void *pvParameters)
                 pkg->crc16       = esp_crc16_le(0, &pkg->status,
                                                 (uint32_t)(pkg->data_len - sizeof(pkg->crc16)));
 
-                s_uart_mole.pkg_tag  = UART_STATUS_PKG;
-                s_uart_mole.pkg_data = pkg;
+                s_uart_mole.pkg_tag = UART_STATUS_PKG;
                 s_uart_mole.stats.uart_mole_status_pkg++;
                 task_scheduler_add(&s_uart_mole.task_node, 0);
                 break;
@@ -248,8 +290,7 @@ static void uart_mole_listener_task(void *pvParameters)
                     break;
                 }
 
-                uart_sensor_pkg_t *pkg = heap_caps_malloc(sizeof(*pkg), MALLOC_CAP_SPIRAM);
-                if (!pkg) { ESP_LOGE(TAG, "alloc failed"); break; }
+                uart_sensor_pkg_t *pkg = &s_uart_mole.pkg_buf.sensor;
 
                 pkg->tag_bit           = UART_SENSOR_PKG;
                 pkg->data_len          = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);
@@ -260,8 +301,7 @@ static void uart_mole_listener_task(void *pvParameters)
                 pkg->crc16             = esp_crc16_le(0, (uint8_t const *)&pkg->temperature_x_100,
                                                       (uint32_t)(pkg->data_len - sizeof(pkg->crc16)));
 
-                s_uart_mole.pkg_tag  = UART_SENSOR_PKG;
-                s_uart_mole.pkg_data = pkg;
+                s_uart_mole.pkg_tag = UART_SENSOR_PKG;
                 s_uart_mole.stats.uart_mole_sensor_pkg++;
                 task_scheduler_add(&s_uart_mole.task_node, 0);
                 break;
@@ -271,8 +311,7 @@ static void uart_mole_listener_task(void *pvParameters)
             {
                 /* payload (data_len bytes): rslt_bit + timestamp_s + crc16
                  * crc16 covers:             rslt_bit + timestamp_s            */
-                uart_config_pkg_t *pkg = heap_caps_malloc(sizeof(*pkg), MALLOC_CAP_SPIRAM);
-                if (!pkg) { ESP_LOGE(TAG, "alloc failed"); break; }
+                uart_config_pkg_t *pkg = &s_uart_mole.pkg_buf.config;
 
                 pkg->tag_bit     = UART_CONFIG_PKG;
                 pkg->data_len    = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);
@@ -281,8 +320,7 @@ static void uart_mole_listener_task(void *pvParameters)
                 pkg->crc16       = esp_crc16_le(0, &pkg->rslt_bit,
                                                 (uint32_t)(pkg->data_len - sizeof(pkg->crc16)));
 
-                s_uart_mole.pkg_tag  = UART_CONFIG_PKG;
-                s_uart_mole.pkg_data = pkg;
+                s_uart_mole.pkg_tag = UART_CONFIG_PKG;
                 s_uart_mole.stats.uart_mole_config_pkg++;
                 task_scheduler_add(&s_uart_mole.task_node, 0);
                 break;
@@ -292,11 +330,10 @@ static void uart_mole_listener_task(void *pvParameters)
             {
                 /* payload (data_len bytes): number_of_tasks + stack_hw + stack_used + timestamp_s + crc16
                  * crc16 covers:             number_of_tasks + stack_hw + stack_used + timestamp_s         */
-                uart_diag_pkg_t *pkg = heap_caps_malloc(sizeof(*pkg), MALLOC_CAP_SPIRAM);
-                if (!pkg) { ESP_LOGE(TAG, "alloc failed"); break; }
-
                 UBaseType_t free_words = uxTaskGetStackHighWaterMark(s_uart_mole.rtos_task);
                 uint32_t    free_bytes = (uint32_t)(free_words * sizeof(StackType_t));
+
+                uart_diag_pkg_t *pkg = &s_uart_mole.pkg_buf.diag;
 
                 pkg->tag_bit         = UART_DIAG_PKG;
                 pkg->data_len        = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);
@@ -307,26 +344,30 @@ static void uart_mole_listener_task(void *pvParameters)
                 pkg->crc16           = esp_crc16_le(0, &pkg->number_of_tasks,
                                                     (uint32_t)(pkg->data_len - sizeof(pkg->crc16)));
 
-                s_uart_mole.pkg_tag  = UART_DIAG_PKG;
-                s_uart_mole.pkg_data = pkg;
+                s_uart_mole.pkg_tag = UART_DIAG_PKG;
                 task_scheduler_add(&s_uart_mole.task_node, 0);
                 break;
             }
 
             case UART_SERVER_PKG:
             {
-                /* TODO: allocate single PSRAM block (struct + JSON copy) once the
-                 * http_client getter API is available:
+                /* json_buf is allocated at init and persists for the application lifetime.
+                 * When the http_client getter API is available:
                  *
-                 *   const char *json_ptr;
                  *   size_t json_len;
-                 *   http_client_get_cached(&json_ptr, &json_len);
+                 *   http_client_get_cached(s_uart_mole.json_buf, UART_MOLE_JSON_BUF_SIZE, &json_len);
                  *
-                 *   size_t total = sizeof(uart_server_pkg_t) + json_len;
-                 *   uart_server_pkg_t *pkg = heap_caps_malloc(total, MALLOC_CAP_SPIRAM);
-                 *   pkg->json_data = (char *)(pkg + 1);
-                 *   memcpy(pkg->json_data, json_ptr, json_len);
-                 *   ...
+                 *   uart_server_pkg_t *pkg = &s_uart_mole.pkg_buf.server;
+                 *   pkg->json_data   = s_uart_mole.json_buf;
+                 *   pkg->tag_bit     = UART_SERVER_PKG;
+                 *   pkg->data_len    = json_len + sizeof(pkg->timestamp_s) + sizeof(pkg->crc16);
+                 *   pkg->timestamp_s = (uint32_t)time(NULL);
+                 *   uint16_t crc     = esp_crc16_le(0, (uint8_t *)pkg->json_data, json_len);
+                 *   pkg->crc16       = esp_crc16_le(crc, (uint8_t *)&pkg->timestamp_s,
+                 *                                   sizeof(pkg->timestamp_s));
+                 *   s_uart_mole.pkg_tag = UART_SERVER_PKG;
+                 *   s_uart_mole.stats.uart_mole_server_pkg++;
+                 *   task_scheduler_add(&s_uart_mole.task_node, 0);
                  */
                 ESP_LOGW(TAG, "SERVER pkg not yet implemented");
                 break;
