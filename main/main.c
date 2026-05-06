@@ -1,21 +1,17 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "app_gui_bindings.h"
 #include "task_scheduler.h"
-#include "bme280_hal.h"
 #include "gui_module.h"
+#include "local_sensor_service.h"
 #include "nac.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
 #include "http_client.h"
 
 static const char* TAG = "MAIN";
-static bme280_hal s_sensor_hal = {0};
 static gui_ctx_t s_gui = {0};
 
 static esp_err_t init_single_instance_modules(void) {
@@ -56,9 +52,9 @@ static esp_err_t init_runtime_modules(void) {
     }
     ESP_LOGI(TAG, "task_scheduler_init started");
 
-    esp_err_t rv = bme280_hal_init(&s_sensor_hal);
+    esp_err_t rv = local_sensor_service_init();
     if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "bme280_hal_init failed: %s", esp_err_to_name(rv));
+        ESP_LOGE(TAG, "local_sensor_service_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
@@ -79,47 +75,12 @@ static esp_err_t init_runtime_modules(void) {
     return ESP_OK;
 }
 
-static void sensor_local_source_task(void* pvParameters) {
-    bme280_measurement measurement = {0};
-    sensor_data_sample sample = {0};
-    uint32_t period_ms = 1000U;
-
-    (void)pvParameters;
-
-    period_ms = bme280_hal_get_period_ms(&s_sensor_hal);
-    if (period_ms == 0U) {
-        period_ms = 1000U;
-    }
-
-    while (true) {
-        esp_err_t rv = bme280_hal_read(&s_sensor_hal, &measurement);
-        if (rv == ESP_OK) {
-            sample.timestamp_ms = measurement.timestamp_ms;
-            sample.temperature_deci_c = measurement.temperature_deci_c;
-            sample.humidity_deci_pct = measurement.humidity_deci_pct;
-            sample.pressure_deci_hpa = measurement.pressure_deci_hpa;
-            sample.valid = true;
-
-            rv = sensor_data_submit_local(&sample);
-            if (rv != ESP_OK) {
-                ESP_LOGE(TAG, "sensor_data_submit_local failed: %s", esp_err_to_name(rv));
-            }
-        } else {
-            ESP_LOGW(TAG, "bme280_hal_read failed: %s", esp_err_to_name(rv));
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(period_ms));
-    }
-}
-
 static esp_err_t start_runtime_modules() {
-    BaseType_t sensor =
-        xTaskCreate(sensor_local_source_task, "sensor_local_source_task", 4096, NULL, 5, NULL);
-    if (sensor != pdPASS) {
-        ESP_LOGE(TAG, "Could not spawn sensor_local_source_task!");
-        return ESP_FAIL;
+    esp_err_t rv = local_sensor_service_start();
+    if (rv != ESP_OK) {
+        ESP_LOGE(TAG, "local_sensor_service_start failed: %s", esp_err_to_name(rv));
+        return rv;
     }
-    ESP_LOGI(TAG, "sensor_local_source_task started");
 
     if (!s_gui.is_ready) {
         ESP_LOGW(TAG, "GUI not ready after initialization");
@@ -145,7 +106,7 @@ void app_main(void) {
         goto fatal_error;
     }
 
-    //vTaskDelay(pdMS_TO_TICKS(5000));
+    // vTaskDelay(pdMS_TO_TICKS(5000));
     ESP_LOGI(TAG, "Startup complete");
 
     /* Pump the task scheduler to start tasks, needed to connect wifi in this mock code

@@ -969,10 +969,8 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 # RedMole Sensor Configuration
 #
-# default:
-CONFIG_REDMOLE_BME280_BACKEND_SIM=y
-# default:
-# CONFIG_REDMOLE_BME280_BACKEND_HW is not set
+# CONFIG_REDMOLE_BME280_BACKEND_SIM is not set
+CONFIG_REDMOLE_BME280_BACKEND_HW=y
 # end of RedMole Sensor Configuration
 
 #

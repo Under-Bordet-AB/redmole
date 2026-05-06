@@ -11,9 +11,12 @@
  * |                 GPIO pins using I2C communication with IO_EXTENSION.
  *
  ******************************************************************************/
- #include "io_extension.h"  // Include IO_EXTENSION driver header for GPIO functions
+#include "io_extension.h"  // Include IO_EXTENSION driver header for GPIO functions
+
+#include <stdbool.h>
  
  io_extension_obj_t IO_EXTENSION;  // Define the global IO_EXTENSION object
+ static bool s_io_extension_initialized;
  
  /**
   * @brief Set the IO mode for the specified pins.
@@ -22,11 +25,11 @@
   * 
   * @param pin An 8-bit value where each bit represents a pin (0 = input, 1 = output).
   */
- void IO_EXTENSION_IO_Mode(uint8_t pin) 
+void IO_EXTENSION_IO_Mode(uint8_t pin) 
  {
      uint8_t data[2] = {IO_EXTENSION_Mode, pin}; // Prepare the data to write to the mode register
      // Write the 8-bit value to the IO mode register
-     DEV_I2C_Write_Nbyte(IO_EXTENSION.addr, data, 2);
+     ESP_ERROR_CHECK(board_i2c_write(IO_EXTENSION.addr, data, 2));
  }
  
  /**
@@ -35,10 +38,14 @@
   * This function configures the slave addresses for different registers of the
   * IO_EXTENSION chip via I2C, and sets the control flags for input/output modes.
   */
- void IO_EXTENSION_Init()
+void IO_EXTENSION_Init()
  {
+     if (s_io_extension_initialized) {
+         return;
+     }
+
      // Set the I2C slave address for the IO_EXTENSION device
-     DEV_I2C_Set_Slave_Addr(&IO_EXTENSION.addr, IO_EXTENSION_ADDR);
+     ESP_ERROR_CHECK(board_i2c_add_device(IO_EXTENSION_ADDR, BOARD_I2C_DEFAULT_SPEED_HZ, &IO_EXTENSION.addr));
  
      IO_EXTENSION_IO_Mode(0xff); // Set all pins to output mode
  
@@ -47,7 +54,8 @@
      IO_EXTENSION.Last_od_value = 0xFF; // All pins are initially set to high (open-drain mode)
 
      uint8_t data[2] = {IO_EXTENSION_IO_OUTPUT_ADDR, IO_EXTENSION.Last_io_value};
-     DEV_I2C_Write_Nbyte(IO_EXTENSION.addr, data, 2);
+     ESP_ERROR_CHECK(board_i2c_write(IO_EXTENSION.addr, data, 2));
+     s_io_extension_initialized = true;
  }
  
  /**
@@ -69,7 +77,7 @@
  
      uint8_t data[2] = {IO_EXTENSION_IO_OUTPUT_ADDR, IO_EXTENSION.Last_io_value}; // Prepare the data to write to the output register
      // Write the 8-bit value to the IO output register
-     DEV_I2C_Write_Nbyte(IO_EXTENSION.addr, data, 2);
+     ESP_ERROR_CHECK(board_i2c_write(IO_EXTENSION.addr, data, 2));
  }
  
  /**
@@ -86,7 +94,7 @@
      uint8_t value = 0;
  
      // Read the value of the input pins
-     DEV_I2C_Read_Nbyte(IO_EXTENSION.addr, IO_EXTENSION_IO_INPUT_ADDR, &value, 1);
+     ESP_ERROR_CHECK(board_i2c_read_reg(IO_EXTENSION.addr, IO_EXTENSION_IO_INPUT_ADDR, &value, 1));
      // Return the value of the specific pin(s) by masking with the provided bit mask
      return ((value & (1 << pin)) > 0);
  }
@@ -111,7 +119,7 @@
      // Calculate the duty cycle based on the resolution (12 bits)
      data[1] = Value * (255 / 100.0);
      // Write the 8-bit value to the PWM output register
-     DEV_I2C_Write_Nbyte(IO_EXTENSION.addr, data, 2);
+     ESP_ERROR_CHECK(board_i2c_write(IO_EXTENSION.addr, data, 2));
  }
  
  /**
@@ -121,8 +129,11 @@
   * 
   * @return The ADC input value.
   */
- uint16_t IO_EXTENSION_Adc_Input()
+uint16_t IO_EXTENSION_Adc_Input()
  {
+     uint16_t value = 0;
+
      // Read the ADC input value from the IO_EXTENSION device
-     return DEV_I2C_Read_Word(IO_EXTENSION.addr, IO_EXTENSION_ADC_ADDR);
+     ESP_ERROR_CHECK(board_i2c_read_reg_u16_le(IO_EXTENSION.addr, IO_EXTENSION_ADC_ADDR, &value));
+     return value;
  }

@@ -1,32 +1,33 @@
 # Sensor Data Component
 
-`sensor_data` is a single-instance application data owner.
+`sensor_data` is a single-instance application data store.
 
-It is not a HAL.
-It does not talk to hardware directly.
+It stores the latest local environmental sample. It does not talk to hardware,
+own physical sensor status, or know which driver produced the sample.
 
 ## Responsibility
 
-This module owns the latest published local sensor sample and exposes copy-out read APIs.
+This module owns:
 
-Current responsibilities:
-
-- own the latest local sample
-- support single-writer / many-reader access
-- provide copy-out snapshot reads
-- track freshness and update count
-- store measurements as scaled integers
+- the latest published local sample
+- single-writer / many-reader copy-out access
+- versioned snapshot reads
+- freshness checks based on sample age
+- a monotonic local update counter
+- scaled integer measurement storage
 
 ## Intended Write Path
 
-Current intended path:
+Current local sensor path:
 
-1. `bme280_hal` produces a measurement
-2. the sensor task translates it into `sensor_data_sample`
-3. the task calls `sensor_data_submit_local(...)`
-4. readers call `sensor_data_get_latest_local(...)`
+```text
+bme280 -> local_sensor_service -> sensor_data -> consumers
+```
 
-That keeps ownership centralized inside this module.
+The service layer translates a driver measurement into `sensor_data_sample` and
+then calls `sensor_data_submit_local(...)`.
+
+Readers call `sensor_data_get_latest_local(...)` to copy out a stable snapshot.
 
 ## Measurement Format
 
@@ -41,6 +42,9 @@ Examples:
 - `112` means `11.2 C`
 - `503` means `50.3 %`
 - `10132` means `1013.2 hPa`
+
+Pressure is stored as local/station pressure. Sea-level correction belongs in a
+separate application/calibration layer.
 
 ## Snapshot Pattern
 
@@ -57,12 +61,33 @@ Meaning:
 - odd = write in progress
 - even = stable published snapshot
 
+## Freshness
+
+`sensor_data_get_latest_local(...)` answers:
+
+```text
+Do we have a valid sample?
+```
+
+`sensor_data_is_local_fresh(...)` answers:
+
+```text
+Is the valid sample recent enough for this consumer?
+```
+
+Those are intentionally separate. A sample can be valid but stale if the sensor
+was unplugged after a successful reading.
+
 ## What Does Not Belong Here
 
 This module should not directly own:
 
 - BME280 bus or chip access
+- BME280 presence/missing state
+- service health or driver error counters
 - Wi-Fi or HTTP state
 - GUI rendering
 - history buffers or graph data
+- sea-level pressure correction
+- user calibration offsets
 - unrelated application state
