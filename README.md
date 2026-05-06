@@ -47,46 +47,31 @@ Current runtime behavior:
 
 - console output uses `USB Serial/JTAG`
 - PSRAM is enabled because the RGB panel frame buffers need it
-- the simulated BME280 backend is the default local sensor path
-- `main.c` directly owns the current bring-up flow
+- the hardware BME280 backend is the default local sensor path
+- `main.c` owns app-layer orchestration
+- `local_sensor_service` owns the BME280 polling task
 - the Wi-Fi module code is still present in the repo
-- Wi-Fi startup from `main.c` is currently commented out on purpose
-- `rm_event_notify` gates task startup
-
-The old Wi-Fi startup block is kept in `main.c` as commented reference code so it can be re-enabled later without changing the Wi-Fi module itself.
+- Wi-Fi behavior is driven through the current NAC/app binding path
 
 ## Active Runtime Flow
 
 Current active path:
 
-`selected BME280 HAL backend -> bme280_hal -> sensor task -> sensor_data -> gui`
+`selected BME280 HAL backend -> bme280_hal -> local_sensor_service -> sensor_data -> gui`
 
 Startup flow:
 
 1. `main.c` initializes single-instance modules:
-   `rm_nvs`, `sensor_data`, `rm_event_notify`
+   `rm_nvs`, `task_scheduler`, `nac`, `http_client`, `sensor_data`
 2. `main.c` initializes runtime modules:
-   `bme280_hal`, `gui`
-3. `main.c` starts the local sensor task
-4. `main.c` starts the GUI task if GUI init succeeded
-5. tasks signal readiness through `rm_event_notify`
-6. `main.c` releases the startup gate
-
-### Startup Gating Behavior
-
-`main.c` currently uses a simple startup gate:
-
-- the sensor task signals `RM_EVENT_NOTIFY_BIT_SENSOR_READY` before entering its main loop
-- the GUI task signals `RM_EVENT_NOTIFY_BIT_GUI_READY` before entering its main loop
-- both tasks wait on `RM_EVENT_NOTIFY_BIT_INIT_DONE`
-- `main.c` waits until all expected ready bits are set
-- `main.c` then signals `RM_EVENT_NOTIFY_BIT_INIT_DONE`
-
-That means tasks are created first, but they do not enter their steady-state loops until the expected startup participants have reached the gate.
+   `local_sensor_service`, `gui`
+3. `main.c` starts `local_sensor_service`
+4. `main.c` runs the GUI bindings and task scheduler from the app loop
 
 ## Module Notes
 
 - `rm_nvs` is a single-instance NVS wrapper with a fixed default namespace.
+- `board_i2c` owns the shared ESP32-S3 I2C master bus configuration.
 - `sensor_data` owns the latest published local sample.
 - `bme280_hal` is the public sensor-facing API above the selected backend.
 - `gui` is currently a single-instance module that owns its own internal runtime state.
