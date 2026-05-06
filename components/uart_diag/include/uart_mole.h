@@ -29,11 +29,11 @@
 #ifndef UART_MOLE_H
 #define UART_MOLE_H
 
-#include <complex.h>
-#include <stdarg.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include "esp_err.h"
+#include "driver/gpio.h"
+#include "driver/uart.h"
 #include "freertos/idf_additions.h"
 #include "task_scheduler.h"
 
@@ -162,16 +162,15 @@ typedef struct uart_ctx
 } uart_ctx_t;
 
 
-/* @brief Initialize the uart config and ESP-IDF UART driver.
- * @note Allocates a persistent JSON buffer on PSRAM. All other package
- *       storage lives in pkg_buf inside the context.
- * @return ESP_OK on success, or an error code on failure.
- */
+/** @brief Initialises the UART driver, configures pins, spawns the listener task,
+ *         and starts the underlying UART driver task and ISR via uart_driver_install.
+ *  @note  Allocates a persistent JSON buffer on PSRAM; all other package storage uses pkg_buf.
+ *  @param event_group Pointer to the application event group, injected from main.
+ *  @return ESP_OK on success, or an esp_err_t error code. */
 esp_err_t uart_mole_init(EventGroupHandle_t *event_group);
 
-/* @brief  Deinitializes the UART mole context and ESP-IDF UART driver.
- * @param  self Pointer to the UART mole context.
- */
+/** @brief Deletes the listener task, uninstalls the UART driver and ISR, and frees the JSON buffer.
+ *  @return ESP_OK unconditionally. */
 esp_err_t uart_mole_deinit(void);
 
 #endif // UART_MOLE_H

@@ -34,7 +34,8 @@ static uart_ctx_t s_uart_mole;
 static task_status_t uart_mole_work(task_node_t *node);
 static void uart_mole_listener_task(void *pvParameters);
 
-/* Loops until all len bytes are written, returns ESP_FAIL on driver error. */
+/** @brief Writes exactly @p len bytes to @p port, retrying on short writes.
+ *  @return ESP_OK on success, ESP_FAIL if the driver returns an error. */
 static esp_err_t uart_mole_uart_write_wrapper(uart_port_t port, const void *data, size_t len)
 {
     const uint8_t *ptr = (const uint8_t *)data;
@@ -53,6 +54,10 @@ static esp_err_t uart_mole_uart_write_wrapper(uart_port_t port, const void *data
     return ESP_OK;
 }
 
+/** @brief Initialises the UART driver, configures pins, spawns the listener task,
+ *         and starts the underlying UART driver task and ISR via uart_driver_install.
+ *  @param event_group Pointer to the application event group, injected from main.
+ *  @return ESP_OK on success, or an esp_err_t error code. */
 esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
 {
     memset(&s_uart_mole, 0, sizeof(uart_ctx_t));
@@ -100,7 +105,7 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
     }
 
     err = uart_driver_install(UART_MOLE_PORT, UART_MOLE_RX_BUF_SIZE, UART_MOLE_TX_BUF_SIZE,
-                              20, &s_uart_mole.queue, NULL);
+                              20, &s_uart_mole.queue, 0);
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "uart_driver_install failed: %s", esp_err_to_name(err));
@@ -122,6 +127,8 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
     return ESP_OK;
 }
 
+/** @brief Deletes the listener task, uninstalls the UART driver and ISR, and frees the JSON buffer.
+ *  @return ESP_OK unconditionally. */
 esp_err_t uart_mole_deinit(void)
 {
     if (s_uart_mole.rtos_task)
@@ -138,14 +145,12 @@ esp_err_t uart_mole_deinit(void)
     return ESP_OK;
 }
 
-/* Called by the scheduler to transmit the pending package over UART.
- * Wire format: [tag_bit (1)] [data_len (2)] [payload (data_len bytes)]
- * data_len is the byte count of everything that follows data_len itself,
- * including the trailing crc16. The receiver reads tag, then data_len,
- * then reads exactly data_len bytes — no start/end bytes needed.
- * After transmitting, the package buffer is zeroed; for the server package
- * the persistent json_buf is also zeroed.
- */
+/** @brief Scheduler callback that transmits the staged package over UART and clears the buffer.
+ *
+ *  Wire format: [tag_bit (1B)] [data_len (2B)] [payload (data_len B)]
+ *  data_len counts every byte after the data_len field, including the trailing crc16.
+ *  After TX the package buffer is zeroed; for SERVER the json_buf is also zeroed.
+ *  @return TASK_DONE always. */
 static task_status_t uart_mole_work(task_node_t *node)
 {
     uart_ctx_t *self = container_of(node, uart_ctx_t, task_node);
@@ -217,9 +222,26 @@ static task_status_t uart_mole_work(task_node_t *node)
     return TASK_DONE;
 }
 
-/* Waits for incoming UART commands, populates the appropriate package into
- * pkg_buf, then hands it to the scheduler for transmission.
- */
+/** @brief FreeRTOS task that waits for a one-byte command, builds the response package,
+ *         and queues it for transmission via the task scheduler.
+ *
+ *  The command byte maps directly to uart_pkg_tag_t.  For fixed-layout packages
+ *  (STATUS / SENSOR / CONFIG / DIAG), data_len is the number of bytes the receiver
+ *  must read after data_len itself:
+ *
+ *      data_len = sizeof(pkg) - sizeof(tag_bit) - sizeof(data_len)
+ *               = all payload fields + crc16
+ *
+ *  SERVER is the exception: json_data is a heap pointer rather than an inline field,
+ *  so sizeof(pkg) would count the pointer width, not the actual JSON length.
+ *  data_len is therefore built manually from its actual wire parts:
+ *
+ *      data_len = json_len + sizeof(timestamp_s) + sizeof(crc16)
+ *
+ *  where json_len is the byte count of the JSON string in json_buf (excluding NUL).
+ *  The transmit path in uart_mole_work recovers json_len from data_len by the inverse:
+ *
+ *      json_len = data_len - sizeof(timestamp_s) - sizeof(crc16) */
 static void uart_mole_listener_task(void *pvParameters)
 {
     (void)pvParameters;
@@ -259,6 +281,11 @@ static void uart_mole_listener_task(void *pvParameters)
                  * crc16 covers:             status + uptime_s + timestamp_s            */
                 uart_status_pkg_t *pkg = &s_uart_mole.pkg_buf.status;
 
+                /* These will be changed, we will read the event group and set status bits accordingly
+                 * ReadEventBits self->event_group
+                 * The sensor status is also checked through the eventgroup and not a function call
+                 * This decouples the modules much better.
+                 */
                 uint8_t status = 0;
                 if (nac_get_wifi_status() == NAC_WIFI_CONNECTED)
                     status |= SET_WIFI_ONLINE;
@@ -283,6 +310,7 @@ static void uart_mole_listener_task(void *pvParameters)
             {
                 /* payload (data_len bytes): temperature_x_100 + humidity_x_100 + pressure_x_100 + timestamp_s + crc16
                  * crc16 covers:             temperature_x_100 + humidity_x_100 + pressure_x_100 + timestamp_s         */
+                /* How we will get the latest sensor data is yet to be determined, maybe from NVS, this is just a placeholder */
                 sensor_data_sample sample;
                 if (!sensor_data_get_latest_local(&sample))
                 {
