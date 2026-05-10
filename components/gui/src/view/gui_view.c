@@ -512,22 +512,6 @@ static void gui_view_style_action_button(lv_obj_t *button, gui_view_theme_t them
     lv_obj_set_style_text_font(button, def->body_font, 0);
 }
 
-static lv_obj_t *gui_view_settings_page_header_card(lv_obj_t *page)
-{
-    lv_obj_t *stack;
-
-    if (page == NULL) {
-        return NULL;
-    }
-
-    stack = lv_obj_get_child(page, 0);
-    if (stack == NULL) {
-        return NULL;
-    }
-
-    return lv_obj_get_child(stack, 0);
-}
-
 static lv_obj_t *gui_view_create_nav_button(lv_obj_t *parent, lv_coord_t y, const char *label_text,
                                             lv_event_cb_t nav_event_cb, void *nav_user_data)
 {
@@ -778,8 +762,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                   card_border, title_text, subtitle_text, accent_color,
                                   effective_theme);
 
-    gui_view_style_settings_card(view->connectivity_card, card_bg, card_border, title_text,
-                                 subtitle_text, effective_theme);
     gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
                                  subtitle_text, effective_theme);
     gui_view_style_settings_card(view->settings_connectivity_button, card_bg, card_border,
@@ -788,12 +770,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                  title_text, subtitle_text, effective_theme);
     gui_view_style_settings_card(view->settings_system_button, card_bg, card_border,
                                  title_text, subtitle_text, effective_theme);
-    gui_view_style_settings_card(gui_view_settings_page_header_card(view->settings_display_panel),
-                                 item_bg, item_border, title_text, subtitle_text,
-                                 effective_theme);
-    gui_view_style_settings_card(gui_view_settings_page_header_card(view->settings_system_panel),
-                                 item_bg, item_border, title_text, subtitle_text,
-                                 effective_theme);
     gui_view_style_wifi_card(view, item_bg, item_border, title_text, subtitle_text,
                              effective_theme);
     gui_view_style_settings_card(view->bluetooth_card, item_bg, item_border, title_text,

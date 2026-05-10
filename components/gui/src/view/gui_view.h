@@ -58,7 +58,6 @@ typedef struct {
     lv_obj_t *settings_connectivity_back_button; /*!< Back button on the connectivity subpage. */
     lv_obj_t *settings_display_back_button; /*!< Back button on the display subpage. */
     lv_obj_t *settings_system_back_button; /*!< Back button on the system subpage. */
-    lv_obj_t *connectivity_card;      /*!< Settings card containing connectivity controls. */
     lv_obj_t *other_settings_card;    /*!< Settings card containing non-connectivity options. */
     lv_obj_t *wifi_card;              /*!< Settings subsection for Wi-Fi controls. */
     lv_obj_t *wifi_header_row;        /*!< Row containing the Wi-Fi section title and status. */

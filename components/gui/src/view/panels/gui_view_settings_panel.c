@@ -130,44 +130,6 @@ static const char *gui_view_wifi_card_status_text(const gui_wifi_settings_t *wif
     }
 }
 
-static lv_obj_t *gui_view_create_settings_card(lv_obj_t *parent, const char *title_text,
-                                               const char *subtitle_text, lv_coord_t height)
-{
-    lv_obj_t *card = lv_obj_create(parent);
-
-    lv_obj_set_width(card, LV_PCT(100));
-    lv_obj_set_height(card, height);
-    lv_obj_set_layout(card, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
-    lv_obj_set_style_radius(card, 22, 0);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(card, 1, 0);
-    lv_obj_set_style_border_color(card, lv_color_hex(0xD7E1EE), 0);
-    lv_obj_set_style_shadow_width(card, 0, 0);
-    lv_obj_set_style_pad_top(card, 18, 0);
-    lv_obj_set_style_pad_left(card, 18, 0);
-    lv_obj_set_style_pad_right(card, 18, 0);
-    lv_obj_set_style_pad_bottom(card, 18, 0);
-    lv_obj_set_style_pad_row(card, 8, 0);
-    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *title = lv_label_create(card);
-    lv_label_set_text(title, title_text);
-    lv_obj_set_width(title, LV_PCT(100));
-    lv_obj_set_style_text_color(title, lv_color_hex(0x10213D), 0);
-
-    lv_obj_t *subtitle = lv_label_create(card);
-    lv_label_set_text(subtitle, subtitle_text);
-    lv_obj_set_width(subtitle, LV_PCT(100));
-    lv_label_set_long_mode(subtitle, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_color(subtitle, lv_color_hex(0x607089), 0);
-
-    return card;
-}
-
 static lv_obj_t *gui_view_create_setting_item_card(lv_obj_t *parent, const char *title_text,
                                                    const char *subtitle_text,
                                                    lv_coord_t height)
@@ -286,6 +248,46 @@ static lv_obj_t *gui_view_create_settings_category_button(lv_obj_t *parent,
     lv_obj_set_style_text_align(subtitle, LV_TEXT_ALIGN_LEFT, 0);
 
     return button;
+}
+
+static lv_obj_t *gui_view_create_settings_subpage_stack(lv_obj_t *parent)
+{
+    lv_obj_t *stack = lv_obj_create(parent);
+
+    lv_obj_set_size(stack, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_pos(stack, 0, 0);
+    lv_obj_set_layout(stack, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(stack, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(stack, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(stack, 0, 0);
+    lv_obj_set_style_shadow_width(stack, 0, 0);
+    lv_obj_set_style_pad_all(stack, 0, 0);
+    lv_obj_set_style_pad_row(stack, 14, 0);
+    lv_obj_clear_flag(stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    return stack;
+}
+
+static lv_obj_t *gui_view_create_settings_action_row(lv_obj_t *parent)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+
+    lv_obj_set_width(row, LV_PCT(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_shadow_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_style_pad_column(row, 12, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    return row;
 }
 
 static void gui_view_set_settings_subpage_visibility(gui_view_t *view,
@@ -424,9 +426,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 {
     lv_obj_t *home_stack;
     lv_obj_t *page_stack;
-    lv_obj_t *page_header_card;
-    lv_obj_t *page_header_title;
-    lv_obj_t *page_header_subtitle;
+    lv_obj_t *page_action_row;
     lv_obj_t *connectivity_stack;
     lv_obj_t *display_stack;
     lv_obj_t *system_stack;
@@ -443,6 +443,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     if (view == NULL) {
         return;
     }
+
+    view->other_settings_card = NULL;
 
     view->settings_panel = lv_obj_create(view->content);
     lv_obj_set_size(view->settings_panel, 734, 500);
@@ -472,11 +474,6 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_row(home_stack, 14, 0);
     lv_obj_clear_flag(home_stack, LV_OBJ_FLAG_SCROLLABLE);
 
-    view->connectivity_card = gui_view_create_settings_card(
-        home_stack, "Settings",
-        "Pick a category to open full-page controls with more room to breathe.",
-        LV_SIZE_CONTENT);
-
     view->settings_connectivity_button = gui_view_create_settings_category_button(
         home_stack, "Connectivity", "Wi-Fi, Bluetooth, and network-related controls.",
         settings_event_cb, event_user_data);
@@ -488,36 +485,12 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
         settings_event_cb, event_user_data);
 
     view->settings_connectivity_panel = gui_view_create_settings_page(view->settings_panel);
-    page_stack = lv_obj_create(view->settings_connectivity_panel);
-    lv_obj_set_size(page_stack, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_pos(page_stack, 0, 0);
-    lv_obj_set_layout(page_stack, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(page_stack, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(page_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
-    lv_obj_set_style_bg_opa(page_stack, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(page_stack, 0, 0);
-    lv_obj_set_style_shadow_width(page_stack, 0, 0);
-    lv_obj_set_style_pad_all(page_stack, 0, 0);
-    lv_obj_set_style_pad_row(page_stack, 14, 0);
-    lv_obj_clear_flag(page_stack, LV_OBJ_FLAG_SCROLLABLE);
-
-    page_header_card = gui_view_create_setting_item_card_shell(page_stack, LV_SIZE_CONTENT);
-    view->other_settings_card = page_header_card;
-    page_header_title = lv_label_create(page_header_card);
-    lv_label_set_text(page_header_title, "Connectivity");
-    lv_obj_set_width(page_header_title, LV_PCT(100));
-    page_header_subtitle = lv_label_create(page_header_card);
-    lv_label_set_text(page_header_subtitle,
-                      "Manage network access and device connections from one place.");
-    lv_obj_set_width(page_header_subtitle, LV_PCT(100));
-    lv_label_set_long_mode(page_header_subtitle, LV_LABEL_LONG_WRAP);
-    view->settings_connectivity_back_button = gui_view_create_action_button(
-        page_header_card, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
-        event_user_data);
+    page_stack = gui_view_create_settings_subpage_stack(view->settings_connectivity_panel);
 
     connectivity_stack = lv_obj_create(page_stack);
-    lv_obj_set_size(connectivity_stack, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_width(connectivity_stack, LV_PCT(100));
+    lv_obj_set_height(connectivity_stack, 0);
+    lv_obj_set_flex_grow(connectivity_stack, 1);
     lv_obj_set_layout(connectivity_stack, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(connectivity_stack, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(connectivity_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
@@ -528,6 +501,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_all(connectivity_stack, 0, 0);
     lv_obj_set_style_pad_row(connectivity_stack, 12, 0);
     lv_obj_clear_flag(connectivity_stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    page_action_row = gui_view_create_settings_action_row(page_stack);
+    view->settings_connectivity_back_button = gui_view_create_action_button(
+        page_action_row, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
 
     wifi_card = gui_view_create_setting_item_card_shell(connectivity_stack, LV_SIZE_CONTENT);
     view->wifi_card = wifi_card;
@@ -601,35 +579,12 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_color(bluetooth_status, lv_color_hex(0x4A5C78), 0);
 
     view->settings_display_panel = gui_view_create_settings_page(view->settings_panel);
-    page_stack = lv_obj_create(view->settings_display_panel);
-    lv_obj_set_size(page_stack, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_pos(page_stack, 0, 0);
-    lv_obj_set_layout(page_stack, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(page_stack, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(page_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
-    lv_obj_set_style_bg_opa(page_stack, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(page_stack, 0, 0);
-    lv_obj_set_style_shadow_width(page_stack, 0, 0);
-    lv_obj_set_style_pad_all(page_stack, 0, 0);
-    lv_obj_set_style_pad_row(page_stack, 14, 0);
-    lv_obj_clear_flag(page_stack, LV_OBJ_FLAG_SCROLLABLE);
-
-    page_header_card = gui_view_create_setting_item_card_shell(page_stack, LV_SIZE_CONTENT);
-    page_header_title = lv_label_create(page_header_card);
-    lv_label_set_text(page_header_title, "Display");
-    lv_obj_set_width(page_header_title, LV_PCT(100));
-    page_header_subtitle = lv_label_create(page_header_card);
-    lv_label_set_text(page_header_subtitle,
-                      "Adjust screen brightness and tune the look and feel.");
-    lv_obj_set_width(page_header_subtitle, LV_PCT(100));
-    lv_label_set_long_mode(page_header_subtitle, LV_LABEL_LONG_WRAP);
-    view->settings_display_back_button = gui_view_create_action_button(
-        page_header_card, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
-        event_user_data);
+    page_stack = gui_view_create_settings_subpage_stack(view->settings_display_panel);
 
     display_stack = lv_obj_create(page_stack);
-    lv_obj_set_size(display_stack, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_width(display_stack, LV_PCT(100));
+    lv_obj_set_height(display_stack, 0);
+    lv_obj_set_flex_grow(display_stack, 1);
     lv_obj_set_layout(display_stack, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(display_stack, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(display_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
@@ -640,6 +595,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_all(display_stack, 0, 0);
     lv_obj_set_style_pad_row(display_stack, 12, 0);
     lv_obj_clear_flag(display_stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    page_action_row = gui_view_create_settings_action_row(page_stack);
+    view->settings_display_back_button = gui_view_create_action_button(
+        page_action_row, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
 
     brightness_card = gui_view_create_setting_item_card(
         display_stack, "Screen brightness",
@@ -788,35 +748,12 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_KNOB);
 
     view->settings_system_panel = gui_view_create_settings_page(view->settings_panel);
-    page_stack = lv_obj_create(view->settings_system_panel);
-    lv_obj_set_size(page_stack, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_pos(page_stack, 0, 0);
-    lv_obj_set_layout(page_stack, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(page_stack, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(page_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
-    lv_obj_set_style_bg_opa(page_stack, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(page_stack, 0, 0);
-    lv_obj_set_style_shadow_width(page_stack, 0, 0);
-    lv_obj_set_style_pad_all(page_stack, 0, 0);
-    lv_obj_set_style_pad_row(page_stack, 14, 0);
-    lv_obj_clear_flag(page_stack, LV_OBJ_FLAG_SCROLLABLE);
-
-    page_header_card = gui_view_create_setting_item_card_shell(page_stack, LV_SIZE_CONTENT);
-    page_header_title = lv_label_create(page_header_card);
-    lv_label_set_text(page_header_title, "System");
-    lv_obj_set_width(page_header_title, LV_PCT(100));
-    page_header_subtitle = lv_label_create(page_header_card);
-    lv_label_set_text(page_header_subtitle,
-                      "This area is reserved for future device-wide settings and diagnostics.");
-    lv_obj_set_width(page_header_subtitle, LV_PCT(100));
-    lv_label_set_long_mode(page_header_subtitle, LV_LABEL_LONG_WRAP);
-    view->settings_system_back_button = gui_view_create_action_button(
-        page_header_card, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
-        event_user_data);
+    page_stack = gui_view_create_settings_subpage_stack(view->settings_system_panel);
 
     system_stack = lv_obj_create(page_stack);
-    lv_obj_set_size(system_stack, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_width(system_stack, LV_PCT(100));
+    lv_obj_set_height(system_stack, 0);
+    lv_obj_set_flex_grow(system_stack, 1);
     lv_obj_set_layout(system_stack, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(system_stack, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(system_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
@@ -827,6 +764,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_all(system_stack, 0, 0);
     lv_obj_set_style_pad_row(system_stack, 12, 0);
     lv_obj_clear_flag(system_stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    page_action_row = gui_view_create_settings_action_row(page_stack);
+    view->settings_system_back_button = gui_view_create_action_button(
+        page_action_row, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
 
     (void)gui_view_create_setting_item_card(
         system_stack, "Coming soon",
