@@ -8,6 +8,7 @@
 #include "gui_internal.h"
 #include "gui_platform.h"
 #include "lvgl_port.h"
+#include "view/gui_view_common.h"
 #include "view/gui_theme_defs.h"
 
 static gui_runtime_t s_runtime;
@@ -117,6 +118,51 @@ static bool gui_request_wifi_disconnect(gui_runtime_t *runtime)
 
     return runtime->bindings.on_wifi_disconnect_requested(runtime->owner,
                                                           runtime->bindings.user_data);
+}
+
+static void gui_restore_location_textarea(gui_runtime_t *runtime, lv_obj_t *target)
+{
+    const char *text = NULL;
+
+    if ((runtime == NULL) || (target == NULL)) {
+        return;
+    }
+
+    if (target == runtime->screen.location_latitude_textarea) {
+        text = runtime->state.location.latitude;
+    } else if (target == runtime->screen.location_longitude_textarea) {
+        text = runtime->state.location.longitude;
+    }
+
+    if (text != NULL) {
+        gui_view_set_textarea_text_if_changed(target, text);
+    }
+}
+
+static bool gui_update_location_from_textarea(gui_runtime_t *runtime, lv_obj_t *target)
+{
+    gui_location_settings_t location;
+    const char *text;
+
+    if ((runtime == NULL) || (target == NULL)) {
+        return false;
+    }
+
+    location = runtime->state.location;
+    text = lv_textarea_get_text(target);
+    if (text == NULL) {
+        text = "";
+    }
+
+    if (target == runtime->screen.location_latitude_textarea) {
+        snprintf(location.latitude, sizeof(location.latitude), "%s", text);
+    } else if (target == runtime->screen.location_longitude_textarea) {
+        snprintf(location.longitude, sizeof(location.longitude), "%s", text);
+    } else {
+        return false;
+    }
+
+    return gui_state_set_location_settings(&runtime->state, &location);
 }
 
 static gui_panel_id_t gui_screen_target_to_panel(gui_screen_t *screen, lv_obj_t *target)
@@ -245,6 +291,47 @@ static void gui_handle_password_textarea_event(gui_runtime_t *runtime, lv_obj_t 
         gui_state_set_wifi_password(
             &runtime->state,
             lv_textarea_get_text(runtime->screen.wifi_password_textarea));
+        gui_render_runtime(runtime);
+    }
+}
+
+static void gui_handle_location_textarea_event(gui_runtime_t *runtime, lv_obj_t *target,
+                                               lv_event_code_t event_code)
+{
+    bool is_location_target;
+
+    is_location_target = (target == runtime->screen.location_latitude_textarea) ||
+                         (target == runtime->screen.location_longitude_textarea);
+    if (!is_location_target) {
+        return;
+    }
+
+    if ((event_code == LV_EVENT_PRESSED) || (event_code == LV_EVENT_CLICKED) ||
+        (event_code == LV_EVENT_FOCUSED)) {
+        lv_obj_add_state(target, LV_STATE_FOCUSED);
+        lv_keyboard_set_textarea(runtime->screen.location_keyboard, target);
+        lv_obj_clear_flag(runtime->screen.location_keyboard, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(runtime->screen.location_keyboard);
+        return;
+    }
+
+    if (event_code == LV_EVENT_READY) {
+        lv_obj_clear_state(target, LV_STATE_FOCUSED);
+        lv_indev_reset(NULL, target);
+        lv_keyboard_set_textarea(runtime->screen.location_keyboard, NULL);
+        lv_obj_add_flag(runtime->screen.location_keyboard, LV_OBJ_FLAG_HIDDEN);
+        if (gui_update_location_from_textarea(runtime, target)) {
+            gui_render_runtime(runtime);
+        }
+        return;
+    }
+
+    if (event_code == LV_EVENT_CANCEL) {
+        lv_obj_clear_state(target, LV_STATE_FOCUSED);
+        lv_indev_reset(NULL, target);
+        lv_keyboard_set_textarea(runtime->screen.location_keyboard, NULL);
+        lv_obj_add_flag(runtime->screen.location_keyboard, LV_OBJ_FLAG_HIDDEN);
+        gui_restore_location_textarea(runtime, target);
         gui_render_runtime(runtime);
     }
 }
@@ -380,6 +467,7 @@ static void gui_handle_settings_event(lv_event_t *event)
     gui_handle_theme_event(runtime, target, event_code);
     gui_handle_brightness_event(runtime, target, event_code);
     gui_handle_password_textarea_event(runtime, target, event_code);
+    gui_handle_location_textarea_event(runtime, target, event_code);
     gui_handle_settings_navigation_event(runtime, target, event_code);
     gui_handle_wifi_action_event(runtime, target, event_code);
     (void)gui_handle_network_dialog_selection(runtime, target, event_code);
@@ -658,6 +746,33 @@ bool gui_get_appearance_settings(gui_ctx_t *self, gui_appearance_settings_t *app
     }
 
     *appearance = runtime->state.appearance;
+    return true;
+}
+
+void gui_set_location_settings(gui_ctx_t *self, const gui_location_settings_t *location)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (location == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    if (gui_state_set_location_settings(&runtime->state, location)) {
+        gui_render_runtime(runtime);
+    }
+
+    lvgl_port_unlock();
+}
+
+bool gui_get_location_settings(gui_ctx_t *self, gui_location_settings_t *location)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (location == NULL)) {
+        return false;
+    }
+
+    *location = runtime->state.location;
     return true;
 }
 

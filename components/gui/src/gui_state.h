@@ -22,6 +22,7 @@ typedef struct {
     gui_bluetooth_state_t bluetooth_state;      /*!< Sidebar Bluetooth indicator state. */
     gui_sd_card_state_t sd_card_state;          /*!< Sidebar SD card indicator state. */
     gui_appearance_settings_t appearance;       /*!< Appearance settings used to theme the screen. */
+    gui_location_settings_t location;           /*!< Editable location settings used by the System page. */
 } gui_state_t;
 
 /**
@@ -111,6 +112,15 @@ bool gui_state_set_background_image_enabled(gui_state_t *state, bool enabled);
  * @return True when the stored value changed.
  */
 bool gui_state_set_night_variant_enabled(gui_state_t *state, bool enabled);
+
+/**
+ * @brief Update the stored location settings.
+ *
+ * @param state State object to update.
+ * @param location Location settings snapshot to copy.
+ * @return True when the stored value changed.
+ */
+bool gui_state_set_location_settings(gui_state_t *state, const gui_location_settings_t *location);
 
 /**
  * @brief Mark the Wi-Fi state as actively scanning.

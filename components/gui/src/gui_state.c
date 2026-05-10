@@ -99,6 +99,17 @@ static bool gui_state_wifi_settings_equals(const gui_wifi_settings_t *left,
     return true;
 }
 
+static bool gui_state_location_settings_equals(const gui_location_settings_t *left,
+                                               const gui_location_settings_t *right)
+{
+    if ((left == NULL) || (right == NULL)) {
+        return false;
+    }
+
+    return (strcmp(left->latitude, right->latitude) == 0) &&
+           (strcmp(left->longitude, right->longitude) == 0);
+}
+
 void gui_state_init(gui_state_t *state)
 {
     if (state == NULL) {
@@ -212,6 +223,17 @@ bool gui_state_set_night_variant_enabled(gui_state_t *state, bool enabled)
     }
 
     state->appearance.night_variant_enabled = enabled;
+    return true;
+}
+
+bool gui_state_set_location_settings(gui_state_t *state, const gui_location_settings_t *location)
+{
+    if ((state == NULL) || (location == NULL) ||
+        gui_state_location_settings_equals(&state->location, location)) {
+        return false;
+    }
+
+    state->location = *location;
     return true;
 }
 
@@ -368,4 +390,5 @@ void gui_state_build_screen_model(const gui_state_t *state, gui_view_model_t *mo
     model->bluetooth_state = state->bluetooth_state;
     model->sd_card_state = state->sd_card_state;
     model->appearance = state->appearance;
+    model->location = state->location;
 }

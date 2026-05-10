@@ -44,6 +44,8 @@ typedef enum {
 #define GUI_WIFI_PASSWORD_MAX_LEN 64
 /** Maximum length of the user-visible Wi-Fi status message buffer. */
 #define GUI_WIFI_STATUS_TEXT_MAX_LEN 96
+/** Maximum length of a user-entered location coordinate string. */
+#define GUI_LOCATION_TEXT_MAX_LEN 24
 
 /**
  * @brief Latest sensor readings displayed by the GUI.
@@ -133,6 +135,14 @@ typedef struct {
 } gui_appearance_settings_t;
 
 /**
+ * @brief User-editable location settings shown in the System settings page.
+ */
+typedef struct {
+    char latitude[GUI_LOCATION_TEXT_MAX_LEN + 1];  /*!< Latitude in decimal degrees. */
+    char longitude[GUI_LOCATION_TEXT_MAX_LEN + 1]; /*!< Longitude in decimal degrees. */
+} gui_location_settings_t;
+
+/**
  * @brief Aggregated model rendered by the GUI view layer.
  */
 typedef struct {
@@ -144,6 +154,7 @@ typedef struct {
     gui_bluetooth_state_t bluetooth_state;      /*!< Sidebar Bluetooth status indicator state. */
     gui_sd_card_state_t sd_card_state;          /*!< Sidebar SD card status indicator state. */
     gui_appearance_settings_t appearance;       /*!< Theme and background presentation settings. */
+    gui_location_settings_t location;           /*!< Editable location settings shown in System. */
 } gui_view_model_t;
 
 #endif

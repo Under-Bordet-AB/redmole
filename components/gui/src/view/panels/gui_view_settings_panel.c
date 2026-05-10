@@ -107,6 +107,21 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
     return night_switch_disabled != should_disable_night_switch;
 }
 
+static bool gui_view_location_settings_changed(gui_view_t *view,
+                                               const gui_location_settings_t *location)
+{
+    if ((view == NULL) || (location == NULL)) {
+        return false;
+    }
+
+    if (!view->has_last_location_settings) {
+        return true;
+    }
+
+    return (strcmp(view->last_location_settings.latitude, location->latitude) != 0) ||
+           (strcmp(view->last_location_settings.longitude, location->longitude) != 0);
+}
+
 static const char *gui_view_wifi_card_status_text(const gui_wifi_settings_t *wifi)
 {
     if (wifi == NULL) {
@@ -290,6 +305,48 @@ static lv_obj_t *gui_view_create_settings_action_row(lv_obj_t *parent)
     return row;
 }
 
+static lv_obj_t *gui_view_create_settings_field_row(lv_obj_t *parent, lv_obj_t **label_out,
+                                                    lv_obj_t **textarea_out,
+                                                    const char *label_text,
+                                                    const char *placeholder_text,
+                                                    lv_event_cb_t settings_event_cb,
+                                                    void *event_user_data)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+
+    lv_obj_set_width(row, LV_PCT(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_shadow_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_style_pad_row(row, 8, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    *label_out = lv_label_create(row);
+    lv_label_set_text(*label_out, label_text);
+    lv_obj_set_width(*label_out, LV_PCT(100));
+    lv_obj_set_style_text_color(*label_out, lv_color_hex(0x10213D), 0);
+
+    *textarea_out = lv_textarea_create(row);
+    lv_obj_set_size(*textarea_out, LV_PCT(100), 48);
+    lv_textarea_set_one_line(*textarea_out, true);
+    lv_textarea_set_placeholder_text(*textarea_out, placeholder_text);
+    lv_obj_add_event_cb(*textarea_out, settings_event_cb, LV_EVENT_ALL, event_user_data);
+    lv_obj_set_style_radius(*textarea_out, 14, 0);
+    lv_obj_set_style_shadow_width(*textarea_out, 0, 0);
+    lv_obj_set_style_border_width(*textarea_out, 1, 0);
+    lv_obj_set_style_border_color(*textarea_out, lv_color_hex(0xD7E1EE), 0);
+    lv_obj_set_style_bg_color(*textarea_out, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_bg_opa(*textarea_out, LV_OPA_COVER, 0);
+
+    return row;
+}
+
 static void gui_view_set_settings_subpage_visibility(gui_view_t *view,
                                                      gui_settings_subpage_t subpage)
 {
@@ -365,6 +422,10 @@ void gui_view_hide_wifi_dialogs_impl(gui_view_t *view)
     lv_obj_add_flag(view->password_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_keyboard_set_textarea(view->wifi_keyboard, NULL);
     lv_obj_add_flag(view->wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (view->location_keyboard != NULL) {
+        lv_keyboard_set_textarea(view->location_keyboard, NULL);
+        lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 void gui_view_show_network_dialog_impl(gui_view_t *view)
@@ -381,6 +442,10 @@ void gui_view_show_network_dialog_impl(gui_view_t *view)
     lv_obj_add_flag(view->password_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_keyboard_set_textarea(view->wifi_keyboard, NULL);
     lv_obj_add_flag(view->wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (view->location_keyboard != NULL) {
+        lv_keyboard_set_textarea(view->location_keyboard, NULL);
+        lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
     lv_obj_move_foreground(view->network_dialog);
 }
 
@@ -399,6 +464,10 @@ void gui_view_show_password_dialog_impl(gui_view_t *view)
     lv_obj_add_state(view->wifi_password_textarea, LV_STATE_FOCUSED);
     lv_keyboard_set_textarea(view->wifi_keyboard, view->wifi_password_textarea);
     lv_obj_clear_flag(view->wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (view->location_keyboard != NULL) {
+        lv_keyboard_set_textarea(view->location_keyboard, NULL);
+        lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
     lv_obj_move_foreground(view->password_dialog);
     lv_obj_move_foreground(view->wifi_keyboard);
 }
@@ -413,6 +482,10 @@ void gui_view_show_settings_subpage_impl(gui_view_t *view, gui_settings_subpage_
     lv_obj_add_flag(view->password_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_keyboard_set_textarea(view->wifi_keyboard, NULL);
     lv_obj_add_flag(view->wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (view->location_keyboard != NULL) {
+        lv_keyboard_set_textarea(view->location_keyboard, NULL);
+        lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
     gui_view_set_settings_subpage_visibility(view, subpage);
 }
 
@@ -434,6 +507,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_t *wifi_button_row;
     lv_obj_t *bluetooth_card;
     lv_obj_t *brightness_card;
+    lv_obj_t *location_card;
     lv_obj_t *theme_card;
     lv_obj_t *bluetooth_status;
     lv_obj_t *settings_text;
@@ -445,6 +519,12 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     }
 
     view->other_settings_card = NULL;
+    view->location_card = NULL;
+    view->location_latitude_label = NULL;
+    view->location_latitude_textarea = NULL;
+    view->location_longitude_label = NULL;
+    view->location_longitude_textarea = NULL;
+    view->location_keyboard = NULL;
 
     view->settings_panel = lv_obj_create(view->content);
     lv_obj_set_size(view->settings_panel, 734, 500);
@@ -770,10 +850,28 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
         page_action_row, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
 
-    (void)gui_view_create_setting_item_card(
-        system_stack, "Coming soon",
-        "Use this reserved page for system diagnostics, storage, or maintenance controls later.",
+    location_card = gui_view_create_setting_item_card(
+        system_stack, "Location", "Enter latitude and longitude in decimal degrees.",
         LV_SIZE_CONTENT);
+    view->location_card = location_card;
+    (void)gui_view_create_settings_field_row(location_card, &view->location_latitude_label,
+                                             &view->location_latitude_textarea, "Latitude",
+                                             "59.3293", settings_event_cb, event_user_data);
+    (void)gui_view_create_settings_field_row(location_card, &view->location_longitude_label,
+                                             &view->location_longitude_textarea, "Longitude",
+                                             "18.0686", settings_event_cb, event_user_data);
+
+    view->location_keyboard = lv_keyboard_create(view->settings_system_panel);
+    lv_obj_set_size(view->location_keyboard, LV_PCT(100), 180);
+    lv_obj_align(view->location_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_radius(view->location_keyboard, 18, 0);
+    lv_obj_set_style_bg_color(view->location_keyboard, lv_color_hex(0xE7EDF5), 0);
+    lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER, 0);
+    lv_obj_set_style_shadow_width(view->location_keyboard, 0, 0);
+    lv_obj_set_style_border_width(view->location_keyboard, 1, 0);
+    lv_obj_set_style_border_color(view->location_keyboard, lv_color_hex(0xD7E1EE), 0);
+    lv_obj_set_style_text_font(view->location_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
+    lv_keyboard_set_mode(view->location_keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
 
     view->dialog_scrim = NULL;
 
@@ -896,6 +994,7 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     const char *network_empty_text = "No networks found yet.";
     bool can_disconnect;
     bool is_connecting;
+    bool location_changed;
     bool wifi_changed;
     uint8_t network_index;
 
@@ -904,7 +1003,9 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     }
 
     wifi_changed = gui_view_wifi_settings_changed(view, &model->wifi);
-    if (!wifi_changed && !gui_view_appearance_settings_changed(view, &model->appearance)) {
+    location_changed = gui_view_location_settings_changed(view, &model->location);
+    if (!wifi_changed && !location_changed &&
+        !gui_view_appearance_settings_changed(view, &model->appearance)) {
         return;
     }
 
@@ -1017,6 +1118,16 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     if (!lv_obj_has_state(view->wifi_password_textarea, LV_STATE_FOCUSED)) {
         gui_view_set_textarea_text_if_changed(view->wifi_password_textarea, model->wifi.password);
     }
+    if ((view->location_latitude_textarea != NULL) &&
+        !lv_obj_has_state(view->location_latitude_textarea, LV_STATE_FOCUSED)) {
+        gui_view_set_textarea_text_if_changed(view->location_latitude_textarea,
+                                              model->location.latitude);
+    }
+    if ((view->location_longitude_textarea != NULL) &&
+        !lv_obj_has_state(view->location_longitude_textarea, LV_STATE_FOCUSED)) {
+        gui_view_set_textarea_text_if_changed(view->location_longitude_textarea,
+                                              model->location.longitude);
+    }
 
     if (model->wifi.network_count == 0U) {
         if (model->wifi.status_text[0] != '\0') {
@@ -1062,4 +1173,6 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
 
     view->last_wifi_settings = model->wifi;
     view->has_last_wifi_settings = true;
+    view->last_location_settings = model->location;
+    view->has_last_location_settings = true;
 }

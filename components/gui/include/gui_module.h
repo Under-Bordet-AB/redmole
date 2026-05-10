@@ -206,6 +206,23 @@ void gui_set_appearance_settings(gui_ctx_t *self, const gui_appearance_settings_
 bool gui_get_appearance_settings(gui_ctx_t *self, gui_appearance_settings_t *appearance);
 
 /**
+ * @brief Update the user-editable location settings.
+ *
+ * @param self Initialized GUI context.
+ * @param location Location settings snapshot to copy.
+ */
+void gui_set_location_settings(gui_ctx_t *self, const gui_location_settings_t *location);
+
+/**
+ * @brief Read back the current location settings.
+ *
+ * @param self Initialized GUI context.
+ * @param location Output pointer that receives the current location settings on success.
+ * @return True when the context is ready and the location settings were written.
+ */
+bool gui_get_location_settings(gui_ctx_t *self, gui_location_settings_t *location);
+
+/**
  * @brief Set the display brightness used by the GUI platform layer.
  *
  * @param self Initialized GUI context.

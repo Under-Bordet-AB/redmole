@@ -77,6 +77,12 @@ typedef struct {
     lv_obj_t *theme_night_switch;     /*!< Switch controlling the night variant setting. */
     lv_obj_t *brightness_slider;      /*!< Slider used to change display brightness. */
     lv_obj_t *brightness_value_label; /*!< Label showing the current brightness percentage. */
+    lv_obj_t *location_card;          /*!< Settings subsection containing location controls. */
+    lv_obj_t *location_latitude_label; /*!< Label for the latitude textarea. */
+    lv_obj_t *location_latitude_textarea; /*!< Text area used to edit latitude. */
+    lv_obj_t *location_longitude_label; /*!< Label for the longitude textarea. */
+    lv_obj_t *location_longitude_textarea; /*!< Text area used to edit longitude. */
+    lv_obj_t *location_keyboard;      /*!< On-screen keyboard dedicated to location input. */
 
     lv_obj_t *dialog_scrim;                    /*!< Shared modal scrim behind dialog content. */
     lv_obj_t *network_dialog;                  /*!< Wi-Fi network selection dialog container. */
@@ -113,6 +119,8 @@ typedef struct {
     bool has_last_energy_plan;               /*!< True when last_energy_plan contains a valid cached value. */
     gui_wifi_settings_t last_wifi_settings;  /*!< Last Wi-Fi settings model applied to the dialogs and cards. */
     bool has_last_wifi_settings;             /*!< True when last_wifi_settings contains a valid cached value. */
+    gui_location_settings_t last_location_settings; /*!< Last location settings model applied to the System page. */
+    bool has_last_location_settings;         /*!< True when last_location_settings contains a valid cached value. */
     gui_view_theme_t current_theme;          /*!< Theme currently applied to the view. */
     bool current_show_background_image;      /*!< Cached background image visibility setting. */
     bool current_night_variant_enabled;      /*!< Cached night variant setting. */

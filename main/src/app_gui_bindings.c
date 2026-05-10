@@ -10,6 +10,7 @@
 #include "app_gui_bindings.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -25,6 +26,8 @@ static const char *TAG = "APP_GUI_BINDINGS";
 #define GUI_NVS_KEY_BG          "gui_bg"
 #define GUI_NVS_KEY_NIGHT       "gui_night"
 #define GUI_NVS_KEY_BRIGHT      "gui_bright"
+#define GUI_NVS_KEY_LAT         "gui_lat"
+#define GUI_NVS_KEY_LON         "gui_lon"
 #define GUI_NVS_KEY_WIFI_SSID   "wifi_ssid"
 
 typedef struct {
@@ -42,6 +45,8 @@ typedef struct {
 
     bool has_last_appearance;
     gui_appearance_settings_t last_appearance;
+    bool has_last_location;
+    gui_location_settings_t last_location;
 
     bool has_last_brightness;
     int32_t last_brightness;
@@ -62,6 +67,7 @@ static void set_wifi_status(gui_ctx_t *gui, const char *status_text, gui_wifi_st
 static void copy_scan_results(gui_wifi_settings_t *wifi);
 static gui_sd_card_state_t get_sd_card_state(void);
 static int32_t clamp_saved_brightness(int32_t value);
+static bool parse_coordinate_in_range(const char *text, double min_value, double max_value);
 
 // UI sync
 static void sync_sensor(gui_ctx_t *gui);
@@ -73,6 +79,9 @@ static bool sync_sd_card_state(gui_ctx_t *gui);
 bool app_gui_bindings_load_saved_appearance(gui_init_config_t *config);
 static void cache_current_appearance(gui_ctx_t *gui);
 static bool save_appearance_if_changed(gui_ctx_t *gui);
+static void cache_current_location(gui_ctx_t *gui);
+static bool load_saved_location(gui_ctx_t *gui);
+static bool save_location_if_changed(gui_ctx_t *gui);
 
 // Wi-Fi metadata
 static bool load_saved_wifi_metadata(gui_ctx_t *gui);
@@ -338,6 +347,27 @@ static int32_t clamp_saved_brightness(int32_t value) {
     return value;
 }
 
+static bool parse_coordinate_in_range(const char *text, double min_value, double max_value)
+{
+    char *end = NULL;
+    double value;
+
+    if (text == NULL) {
+        return false;
+    }
+
+    if (text[0] == '\0') {
+        return true;
+    }
+
+    value = strtod(text, &end);
+    if ((end == text) || (end == NULL) || (*end != '\0')) {
+        return false;
+    }
+
+    return (value >= min_value) && (value <= max_value);
+}
+
 bool app_gui_bindings_load_saved_appearance(gui_init_config_t *config)
 {
     uint8_t value = 0;
@@ -390,6 +420,18 @@ static void cache_current_appearance(gui_ctx_t *gui)
     s_bindings.has_last_appearance = true;
     s_bindings.last_brightness = clamp_saved_brightness(brightness);
     s_bindings.has_last_brightness = true;
+}
+
+static void cache_current_location(gui_ctx_t *gui)
+{
+    gui_location_settings_t location;
+
+    if ((gui == NULL) || !gui_get_location_settings(gui, &location)) {
+        return;
+    }
+
+    s_bindings.last_location = location;
+    s_bindings.has_last_location = true;
 }
 
 static bool save_appearance_if_changed(gui_ctx_t *gui)
@@ -449,6 +491,106 @@ static bool save_appearance_if_changed(gui_ctx_t *gui)
         s_bindings.has_last_brightness = true;
     }
 
+    return true;
+}
+
+static bool load_saved_location(gui_ctx_t *gui)
+{
+    gui_location_settings_t location = { 0 };
+    size_t latitude_len = sizeof(location.latitude);
+    size_t longitude_len = sizeof(location.longitude);
+    bool loaded_any = false;
+
+    if (gui == NULL) {
+        return false;
+    }
+
+    if (rm_nvs_get_str(GUI_NVS_KEY_LAT, location.latitude, &latitude_len) == ESP_OK) {
+        loaded_any = true;
+    } else {
+        location.latitude[0] = '\0';
+    }
+
+    if (rm_nvs_get_str(GUI_NVS_KEY_LON, location.longitude, &longitude_len) == ESP_OK) {
+        loaded_any = true;
+    } else {
+        location.longitude[0] = '\0';
+    }
+
+    if (!loaded_any) {
+        return false;
+    }
+
+    if (!parse_coordinate_in_range(location.latitude, -90.0, 90.0)) {
+        location.latitude[0] = '\0';
+    }
+
+    if (!parse_coordinate_in_range(location.longitude, -180.0, 180.0)) {
+        location.longitude[0] = '\0';
+    }
+
+    gui_set_location_settings(gui, &location);
+    cache_current_location(gui);
+    return true;
+}
+
+static bool save_location_if_changed(gui_ctx_t *gui)
+{
+    gui_location_settings_t location;
+    gui_location_settings_t fallback_location = { 0 };
+    bool latitude_valid;
+    bool longitude_valid;
+    esp_err_t err;
+
+    if ((gui == NULL) || !gui_get_location_settings(gui, &location)) {
+        return false;
+    }
+
+    if (s_bindings.has_last_location) {
+        fallback_location = s_bindings.last_location;
+    }
+
+    latitude_valid = parse_coordinate_in_range(location.latitude, -90.0, 90.0);
+    longitude_valid = parse_coordinate_in_range(location.longitude, -180.0, 180.0);
+
+    if (!latitude_valid) {
+        snprintf(location.latitude, sizeof(location.latitude), "%s",
+                 fallback_location.latitude);
+    }
+
+    if (!longitude_valid) {
+        snprintf(location.longitude, sizeof(location.longitude), "%s",
+                 fallback_location.longitude);
+    }
+
+    if (!latitude_valid || !longitude_valid) {
+        gui_set_location_settings(gui, &location);
+    }
+
+    if (!latitude_valid && !longitude_valid && !s_bindings.has_last_location) {
+        return false;
+    }
+
+    if (s_bindings.has_last_location &&
+        (strcmp(location.latitude, s_bindings.last_location.latitude) == 0) &&
+        (strcmp(location.longitude, s_bindings.last_location.longitude) == 0)) {
+        return false;
+    }
+
+    err = rm_nvs_set_str(GUI_NVS_KEY_LAT, location.latitude);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "rm_nvs_set_str(%s) failed: %s", GUI_NVS_KEY_LAT, esp_err_to_name(err));
+        return false;
+    }
+
+    err = rm_nvs_set_str(GUI_NVS_KEY_LON, location.longitude);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "rm_nvs_set_str(%s) failed: %s", GUI_NVS_KEY_LON, esp_err_to_name(err));
+        return false;
+    }
+
+    s_bindings.last_location = location;
+    s_bindings.has_last_location = true;
     return true;
 }
 
@@ -660,6 +802,8 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
     gui_set_bindings(gui, &bindings);
 
     cache_current_appearance(gui);
+    cache_current_location(gui);
+    (void)load_saved_location(gui);
     (void)load_saved_wifi_metadata(gui);
     app_gui_bindings_sync(gui);
     (void)queue_saved_wifi_autoconnect(gui);
@@ -685,4 +829,5 @@ void app_gui_bindings_sync(gui_ctx_t *gui)
     }
 
     (void)save_appearance_if_changed(gui);
+    (void)save_location_if_changed(gui);
 }
