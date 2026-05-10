@@ -68,4 +68,19 @@ void gui_screen_hide_wifi_dialogs(gui_screen_t *screen);
  */
 void gui_screen_sync_brightness(gui_screen_t *screen, int32_t brightness_percent);
 
+/**
+ * @brief Switch the settings panel to a specific internal subpage.
+ *
+ * @param screen Initialized screen object.
+ * @param subpage Settings subpage to show.
+ */
+void gui_screen_show_settings_subpage(gui_screen_t *screen, gui_settings_subpage_t subpage);
+
+/**
+ * @brief Reset settings navigation to the category chooser home page.
+ *
+ * @param screen Initialized screen object.
+ */
+void gui_screen_reset_settings_navigation(gui_screen_t *screen);
+
 #endif

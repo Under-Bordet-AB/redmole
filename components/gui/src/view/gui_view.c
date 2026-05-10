@@ -512,6 +512,22 @@ static void gui_view_style_action_button(lv_obj_t *button, gui_view_theme_t them
     lv_obj_set_style_text_font(button, def->body_font, 0);
 }
 
+static lv_obj_t *gui_view_settings_page_header_card(lv_obj_t *page)
+{
+    lv_obj_t *stack;
+
+    if (page == NULL) {
+        return NULL;
+    }
+
+    stack = lv_obj_get_child(page, 0);
+    if (stack == NULL) {
+        return NULL;
+    }
+
+    return lv_obj_get_child(stack, 0);
+}
+
 static lv_obj_t *gui_view_create_nav_button(lv_obj_t *parent, lv_coord_t y, const char *label_text,
                                             lv_event_cb_t nav_event_cb, void *nav_user_data)
 {
@@ -766,6 +782,18 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                  subtitle_text, effective_theme);
     gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
                                  subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->settings_connectivity_button, card_bg, card_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->settings_display_button, card_bg, card_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->settings_system_button, card_bg, card_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(gui_view_settings_page_header_card(view->settings_display_panel),
+                                 item_bg, item_border, title_text, subtitle_text,
+                                 effective_theme);
+    gui_view_style_settings_card(gui_view_settings_page_header_card(view->settings_system_panel),
+                                 item_bg, item_border, title_text, subtitle_text,
+                                 effective_theme);
     gui_view_style_wifi_card(view, item_bg, item_border, title_text, subtitle_text,
                              effective_theme);
     gui_view_style_settings_card(view->bluetooth_card, item_bg, item_border, title_text,
@@ -899,6 +927,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
 
     gui_view_style_action_button(view->scan_button, effective_theme, true);
     gui_view_style_action_button(view->disconnect_button, effective_theme, false);
+    gui_view_style_action_button(view->settings_connectivity_back_button, effective_theme, false);
+    gui_view_style_action_button(view->settings_display_back_button, effective_theme, false);
+    gui_view_style_action_button(view->settings_system_back_button, effective_theme, false);
     gui_view_style_action_button(view->network_dialog_cancel_button, effective_theme, false);
     gui_view_style_action_button(view->password_dialog_cancel_button, effective_theme, false);
     gui_view_style_action_button(view->password_dialog_connect_button, effective_theme, true);
@@ -1017,6 +1048,16 @@ void gui_view_show_network_dialog(gui_view_t *view)
 void gui_view_show_password_dialog(gui_view_t *view)
 {
     gui_view_show_password_dialog_impl(view);
+}
+
+void gui_view_show_settings_subpage(gui_view_t *view, gui_settings_subpage_t subpage)
+{
+    gui_view_show_settings_subpage_impl(view, subpage);
+}
+
+void gui_view_reset_settings_navigation(gui_view_t *view)
+{
+    gui_view_reset_settings_navigation_impl(view);
 }
 
 void gui_view_update_sidebar_clock_labels(gui_view_t *view)
@@ -1197,6 +1238,8 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)
 
         if (model->active_panel != GUI_PANEL_SETTINGS) {
             gui_view_hide_wifi_dialogs(view);
+        } else {
+            gui_view_reset_settings_navigation(view);
         }
 
         view->last_active_panel = model->active_panel;

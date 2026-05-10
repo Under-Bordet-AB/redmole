@@ -10,6 +10,13 @@
 
 #include "../gui_defs.h"
 
+typedef enum {
+    GUI_SETTINGS_SUBPAGE_HOME = 0,
+    GUI_SETTINGS_SUBPAGE_CONNECTIVITY,
+    GUI_SETTINGS_SUBPAGE_DISPLAY,
+    GUI_SETTINGS_SUBPAGE_SYSTEM,
+} gui_settings_subpage_t;
+
 /**
  * @brief Concrete LVGL object tree for the GUI screen.
  *
@@ -42,6 +49,15 @@ typedef struct {
     lv_obj_t *settings_panel;     /*!< Root container for the settings panel. */
 
     lv_obj_t *settings_home_panel;    /*!< Top-level settings content container. */
+    lv_obj_t *settings_connectivity_panel; /*!< Settings subpage for connectivity controls. */
+    lv_obj_t *settings_display_panel; /*!< Settings subpage for display controls. */
+    lv_obj_t *settings_system_panel;  /*!< Settings subpage reserved for future system controls. */
+    lv_obj_t *settings_connectivity_button; /*!< Category button that opens the connectivity subpage. */
+    lv_obj_t *settings_display_button; /*!< Category button that opens the display subpage. */
+    lv_obj_t *settings_system_button;  /*!< Category button that opens the system subpage. */
+    lv_obj_t *settings_connectivity_back_button; /*!< Back button on the connectivity subpage. */
+    lv_obj_t *settings_display_back_button; /*!< Back button on the display subpage. */
+    lv_obj_t *settings_system_back_button; /*!< Back button on the system subpage. */
     lv_obj_t *connectivity_card;      /*!< Settings card containing connectivity controls. */
     lv_obj_t *other_settings_card;    /*!< Settings card containing non-connectivity options. */
     lv_obj_t *wifi_card;              /*!< Settings subsection for Wi-Fi controls. */
@@ -102,6 +118,7 @@ typedef struct {
     bool current_show_background_image;      /*!< Cached background image visibility setting. */
     bool current_night_variant_enabled;      /*!< Cached night variant setting. */
     bool has_current_appearance;             /*!< True when the cached appearance settings are initialized. */
+    gui_settings_subpage_t active_settings_subpage; /*!< Settings subpage currently visible inside the settings panel. */
 } gui_view_t;
 
 /**
@@ -188,5 +205,20 @@ void gui_view_show_network_dialog(gui_view_t *view);
  * @param view Initialized view object.
  */
 void gui_view_show_password_dialog(gui_view_t *view);
+
+/**
+ * @brief Switch the settings panel to a specific internal subpage.
+ *
+ * @param view Initialized view object.
+ * @param subpage Settings subpage to show.
+ */
+void gui_view_show_settings_subpage(gui_view_t *view, gui_settings_subpage_t subpage);
+
+/**
+ * @brief Reset the settings panel to the category chooser home page.
+ *
+ * @param view Initialized view object.
+ */
+void gui_view_reset_settings_navigation(gui_view_t *view);
 
 #endif

@@ -295,6 +295,35 @@ static void gui_handle_wifi_action_event(gui_runtime_t *runtime, lv_obj_t *targe
     }
 }
 
+static void gui_handle_settings_navigation_event(gui_runtime_t *runtime, lv_obj_t *target,
+                                                 lv_event_code_t event_code)
+{
+    if ((runtime == NULL) || (event_code != LV_EVENT_CLICKED)) {
+        return;
+    }
+
+    if (target == runtime->screen.settings_connectivity_button) {
+        gui_screen_show_settings_subpage(&runtime->screen, GUI_SETTINGS_SUBPAGE_CONNECTIVITY);
+        return;
+    }
+
+    if (target == runtime->screen.settings_display_button) {
+        gui_screen_show_settings_subpage(&runtime->screen, GUI_SETTINGS_SUBPAGE_DISPLAY);
+        return;
+    }
+
+    if (target == runtime->screen.settings_system_button) {
+        gui_screen_show_settings_subpage(&runtime->screen, GUI_SETTINGS_SUBPAGE_SYSTEM);
+        return;
+    }
+
+    if ((target == runtime->screen.settings_connectivity_back_button) ||
+        (target == runtime->screen.settings_display_back_button) ||
+        (target == runtime->screen.settings_system_back_button)) {
+        gui_screen_reset_settings_navigation(&runtime->screen);
+    }
+}
+
 static bool gui_handle_network_dialog_selection(gui_runtime_t *runtime, lv_obj_t *target,
                                                 lv_event_code_t event_code)
 {
@@ -351,6 +380,7 @@ static void gui_handle_settings_event(lv_event_t *event)
     gui_handle_theme_event(runtime, target, event_code);
     gui_handle_brightness_event(runtime, target, event_code);
     gui_handle_password_textarea_event(runtime, target, event_code);
+    gui_handle_settings_navigation_event(runtime, target, event_code);
     gui_handle_wifi_action_event(runtime, target, event_code);
     (void)gui_handle_network_dialog_selection(runtime, target, event_code);
 }
