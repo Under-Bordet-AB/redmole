@@ -35,7 +35,7 @@
 static uint8_t own_addr_type;
 
 struct gatt_value gatt_values[SERVER_MAX_VALUES];
-const static char *TAG = "BLUFI_EXAMPLE";
+const static char *TAG = "BLUFI";
 
 enum {
     GATT_VALUE_TYPE_CHR,

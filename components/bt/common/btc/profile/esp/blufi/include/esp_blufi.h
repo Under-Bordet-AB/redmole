@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 #define BLUFI_APP_UUID      0xFFFF
-#define BLUFI_DEVICE_NAME            "BLUFI_DEVICE"
+#define BLUFI_DEVICE_NAME            "BLUFI_REDMOLE"
 
 #ifdef CONFIG_BT_NIMBLE_ENABLED
 struct ble_hs_cfg;
