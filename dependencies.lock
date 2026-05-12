@@ -2,11 +2,11 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 6.0.1
+    version: 6.1.0
   lvgl/lvgl:
     dependencies: []
     source:
-      path: components\lvgl_port\lvgl__lvgl
+      path: components/lvgl_port/lvgl__lvgl
       type: local
     version: 8.4.0
 direct_dependencies:

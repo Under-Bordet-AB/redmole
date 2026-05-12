@@ -10,6 +10,8 @@
 #include "rm_nvs.h"
 #include "sensor_data.h"
 #include "http_client.h"
+#include "sdcard.h"
+#include "sdcard_log.h"
 
 static const char* TAG = "MAIN";
 static gui_ctx_t s_gui = {0};
@@ -41,7 +43,13 @@ static esp_err_t init_single_instance_modules(void) {
         ESP_LOGE(TAG, "sensor_data_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
-
+    
+    rv = sdcard_init();
+    if (rv != ESP_OK){
+        ESP_LOGE(TAG, "sdcard_init failed: %s", esp_err_to_name(rv));
+        return rv;
+    }
+    
     return ESP_OK;
 }
 
@@ -70,6 +78,11 @@ static esp_err_t init_runtime_modules(void) {
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "app_gui_bindings_init failed: %s", esp_err_to_name(rv));
         return rv;
+    }
+
+    rv = sdcard_log_init("/sdcard/logfile.txt"); // We don't capture startup logs this way - init this in a pre-init?
+    if (rv != ESP_OK){
+        ESP_LOGE(TAG, "sdcard_log_init failed: %s", esp_err_to_name(rv));
     }
 
     return ESP_OK;
