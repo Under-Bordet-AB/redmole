@@ -13,6 +13,7 @@
 #include "rm_nvs.h"
 #include "sensor_data.h"
 #include "http_client.h"
+#include "blufi_main.h"
 
 static const char* TAG = "MAIN";
 static bme280_hal s_sensor_hal = {0};
@@ -61,6 +62,8 @@ static esp_err_t init_runtime_modules(void) {
         ESP_LOGE(TAG, "bme280_hal_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
+
+    blufi_main();
 
     // Load previously saved GUI settings
     gui_init_config_t gui_init_config = {0};
