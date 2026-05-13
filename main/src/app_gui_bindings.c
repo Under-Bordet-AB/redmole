@@ -18,10 +18,6 @@
 #include "rm_nvs.h"
 #include "sensor_data.h"
 
-#include "protocomm.h"
-#include "protocomm_ble.h"
-#include "protocomm_security0.h"
-
 #include "blufi_main.h"
 
 static const char *TAG = "APP_GUI_BINDINGS";
@@ -642,97 +638,6 @@ static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data)
     return true;
 }
 
-esp_err_t wifi_req_handler(
-    uint32_t session_id,
-    const uint8_t *inbuf, ssize_t inlen,
-    uint8_t **outbuf, ssize_t *outlen,
-    void *priv_data)
-{
-    char ssid[33] = {0};
-    char password[65] = {0};
-
-    // Copy into temp buffer and ensure null termination
-    char *tmp = malloc(inlen + 1);
-    memcpy(tmp, inbuf, inlen);
-    tmp[inlen] = '\0';
-
-    printf("Raw: %s\n", tmp);
-
-    // Find comma manually (safe)
-    char *comma = strchr(tmp, ',');
-
-    if (!comma) {
-        printf("Invalid format\n");
-        free(tmp);
-        return ESP_FAIL;
-    }
-
-    *comma = '\0';
-
-    // Safe bounded copy
-    strncpy(ssid, tmp, sizeof(ssid) - 1);
-    strncpy(password, comma + 1, sizeof(password) - 1);
-
-    free(tmp);
-
-    printf("SSID: %s\n", ssid);
-    printf("PASS: %s\n", password);
-
-    nac_request_wifi_connect(ssid, password);
-
-    const char *response = "OK";
-    *outlen = strlen(response);
-    *outbuf = malloc(*outlen);
-    memcpy(*outbuf, response, *outlen);
-
-    return ESP_OK;
-}
-
-/* The example function for launching a secure protocomm instance over Bluetooth LE. */
-protocomm_t *start_pc()
-{
-    protocomm_t *pc = protocomm_new();
-
-    /* Endpoint UUIDs */
-    protocomm_ble_name_uuid_t nu_lookup_table[] = {
-        {"security_endpoint", 0xFF51},
-        {"wifi_req_endpoint", 0xFF53}
-    };
-
-    /* Config for protocomm_ble_start(). */
-    protocomm_ble_config_t config = {
-        .service_uuid = {
-            /* LSB <---------------------------------------
-            * ---------------------------------------> MSB */
-            0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80,
-            0x00, 0x10, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00,
-        },
-        .device_name = "Redmole ESP32 Device",
-        .nu_lookup_count = sizeof(nu_lookup_table)/sizeof(nu_lookup_table[0]),
-        .nu_lookup = nu_lookup_table
-    };
-
-    /* Start protocomm layer on top of Bluetooth LE. */
-    protocomm_ble_start(pc, &config);
-
-    /* For protocomm_security0, Proof of Possession is not used, and can be kept NULL. */
-    protocomm_set_security(pc, "security_endpoint", &protocomm_security0, NULL);
-    protocomm_add_endpoint(pc, "wifi_req_endpoint", wifi_req_handler, NULL);
-    return pc;
-}
-
-/* The example function for stopping a protocomm instance. */
-void stop_pc(protocomm_t *pc)
-{
-    protocomm_remove_endpoint(pc, "wifi_req_endpoint");
-    protocomm_unset_security(pc, "security_endpoint");
-
-    /* Stop the Bluetooth LE protocomm service. */
-    protocomm_ble_stop(pc);
-
-    protocomm_delete(pc);
-}
-
 // Basics
 //////////////////////////
 
@@ -756,7 +661,6 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
     bindings.on_wifi_disconnect_requested = on_wifi_disconnect_requested;
     gui_set_bindings(gui, &bindings);
 
-    //protocomm_t* test = start_pc();
     blufi_main();
 
     cache_current_appearance(gui);
