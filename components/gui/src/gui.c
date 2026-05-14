@@ -615,6 +615,32 @@ bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor)
     return true;
 }
 
+void gui_set_forecast_state(gui_ctx_t *self, const gui_forecast_state_t *forecast)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (forecast == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    if (gui_state_set_forecast(&runtime->state, forecast)) {
+        gui_render_runtime(runtime);
+    }
+    lvgl_port_unlock();
+}
+
+bool gui_get_forecast_state(gui_ctx_t *self, gui_forecast_state_t *forecast)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (forecast == NULL)) {
+        return false;
+    }
+
+    *forecast = runtime->state.forecast;
+    return true;
+}
+
 void gui_set_wifi_settings(gui_ctx_t *self, const gui_wifi_settings_t *wifi)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);

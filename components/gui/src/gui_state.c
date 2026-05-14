@@ -35,6 +35,51 @@ static void gui_state_clear_energy_plan(gui_energy_plan_t *energy_plan)
     memset(energy_plan, 0, sizeof(*energy_plan));
 }
 
+static void gui_state_init_forecast(gui_forecast_state_t *forecast)
+{
+    if (forecast == NULL) {
+        return;
+    }
+
+    memset(forecast, 0, sizeof(*forecast));
+    snprintf(forecast->title, sizeof(forecast->title), "%s", "Today");
+    snprintf(forecast->condition, sizeof(forecast->condition), "%s", "Mostly cloudy");
+    snprintf(forecast->current_temperature, sizeof(forecast->current_temperature), "%s", "18 C");
+    snprintf(forecast->range_text, sizeof(forecast->range_text), "%s", "High 21 C  |  Low 13 C");
+    snprintf(forecast->summary, sizeof(forecast->summary), "%s",
+             "Cool morning, brighter later, light winds.");
+    snprintf(forecast->details.rain_chance, sizeof(forecast->details.rain_chance), "%s",
+             "Rain chance: 20%%");
+    snprintf(forecast->details.wind, sizeof(forecast->details.wind), "%s", "Wind: 4 m/s NW");
+    snprintf(forecast->details.humidity, sizeof(forecast->details.humidity), "%s",
+             "Humidity: 61%%");
+    snprintf(forecast->details.uv_index, sizeof(forecast->details.uv_index), "%s",
+             "UV index: 3");
+
+    snprintf(forecast->days[0].label, sizeof(forecast->days[0].label), "%s", "Mon");
+    snprintf(forecast->days[0].condition, sizeof(forecast->days[0].condition), "%s", "Cloudy");
+    snprintf(forecast->days[0].range_text, sizeof(forecast->days[0].range_text), "%s",
+             "20 / 12 C");
+    snprintf(forecast->days[1].label, sizeof(forecast->days[1].label), "%s", "Tue");
+    snprintf(forecast->days[1].condition, sizeof(forecast->days[1].condition), "%s",
+             "Light rain");
+    snprintf(forecast->days[1].range_text, sizeof(forecast->days[1].range_text), "%s",
+             "17 / 10 C");
+    snprintf(forecast->days[2].label, sizeof(forecast->days[2].label), "%s", "Wed");
+    snprintf(forecast->days[2].condition, sizeof(forecast->days[2].condition), "%s", "Sunny");
+    snprintf(forecast->days[2].range_text, sizeof(forecast->days[2].range_text), "%s",
+             "22 / 11 C");
+    snprintf(forecast->days[3].label, sizeof(forecast->days[3].label), "%s", "Thu");
+    snprintf(forecast->days[3].condition, sizeof(forecast->days[3].condition), "%s", "Windy");
+    snprintf(forecast->days[3].range_text, sizeof(forecast->days[3].range_text), "%s",
+             "19 / 9 C");
+    snprintf(forecast->days[4].label, sizeof(forecast->days[4].label), "%s", "Fri");
+    snprintf(forecast->days[4].condition, sizeof(forecast->days[4].condition), "%s",
+             "Partly sunny");
+    snprintf(forecast->days[4].range_text, sizeof(forecast->days[4].range_text), "%s",
+             "21 / 13 C");
+}
+
 static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
                                     const gui_sensor_state_t *right)
 {
@@ -47,6 +92,16 @@ static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
            (left->pressure_deci_hpa == right->pressure_deci_hpa) &&
            (left->is_fresh == right->is_fresh) &&
            (left->update_count == right->update_count);
+}
+
+static bool gui_state_forecast_equals(const gui_forecast_state_t *left,
+                                      const gui_forecast_state_t *right)
+{
+    if ((left == NULL) || (right == NULL)) {
+        return false;
+    }
+
+    return memcmp(left, right, sizeof(*left)) == 0;
 }
 
 static bool gui_state_wifi_network_equals(const gui_wifi_network_t *left,
@@ -129,6 +184,7 @@ void gui_state_init(gui_state_t *state)
     state->wifi_state = GUI_WIFI_STATE_IDLE;
     state->bluetooth_state = GUI_BLUETOOTH_STATE_IDLE;
     state->sd_card_state = GUI_SD_CARD_STATE_IDLE;
+    gui_state_init_forecast(&state->forecast);
     gui_state_reset_wifi_scan(state);
     gui_state_copy_status(&state->wifi, "Press Scan to search for Wi-Fi networks.");
 }
@@ -151,6 +207,17 @@ bool gui_state_set_sensor(gui_state_t *state, const gui_sensor_state_t *sensor)
     }
 
     state->sensor = *sensor;
+    return true;
+}
+
+bool gui_state_set_forecast(gui_state_t *state, const gui_forecast_state_t *forecast)
+{
+    if ((state == NULL) || (forecast == NULL) ||
+        gui_state_forecast_equals(&state->forecast, forecast)) {
+        return false;
+    }
+
+    state->forecast = *forecast;
     return true;
 }
 
@@ -385,6 +452,7 @@ void gui_state_build_screen_model(const gui_state_t *state, gui_view_model_t *mo
     model->active_panel = state->active_panel;
     model->sensor = state->sensor;
     gui_state_clear_energy_plan(&model->energy_plan);
+    model->forecast = state->forecast;
     model->wifi = state->wifi;
     model->wifi_state = state->wifi_state;
     model->bluetooth_state = state->bluetooth_state;

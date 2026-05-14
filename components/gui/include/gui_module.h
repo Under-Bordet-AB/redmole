@@ -121,6 +121,23 @@ void gui_set_sensor_state(gui_ctx_t *self, const gui_sensor_state_t *sensor);
 bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor);
 
 /**
+ * @brief Update the latest forecast values used by the GUI.
+ *
+ * @param self Initialized GUI context.
+ * @param forecast Forecast values to copy into the GUI state.
+ */
+void gui_set_forecast_state(gui_ctx_t *self, const gui_forecast_state_t *forecast);
+
+/**
+ * @brief Read back the current forecast values stored by the GUI.
+ *
+ * @param self Initialized GUI context.
+ * @param forecast Output pointer that receives the current forecast state on success.
+ * @return True when the context is ready and the forecast state was written.
+ */
+bool gui_get_forecast_state(gui_ctx_t *self, gui_forecast_state_t *forecast);
+
+/**
  * @brief Replace the Wi-Fi settings model consumed by the GUI.
  *
  * @param self Initialized GUI context.

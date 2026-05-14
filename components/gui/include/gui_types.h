@@ -34,6 +34,10 @@ typedef enum {
 
 /** Hourly points stored in an energy plan day profile. */
 #define GUI_ENERGY_PLAN_POINT_COUNT 24
+/** Number of daily forecast entries rendered in the forecast panel. */
+#define GUI_FORECAST_DAY_COUNT 5
+/** Number of detail lines shown in the forecast details card. */
+#define GUI_FORECAST_DETAIL_COUNT 4
 /** Maximum number of scanned Wi-Fi networks shown in the selection dialog. */
 #define GUI_WIFI_NETWORK_COUNT 4
 /** Maximum number of saved Wi-Fi networks surfaced as known networks. */
@@ -46,6 +50,22 @@ typedef enum {
 #define GUI_WIFI_STATUS_TEXT_MAX_LEN 96
 /** Maximum length of a user-entered location coordinate string. */
 #define GUI_LOCATION_TEXT_MAX_LEN 24
+/** Maximum length of the forecast title label. */
+#define GUI_FORECAST_TITLE_MAX_LEN 24
+/** Maximum length of a forecast condition string. */
+#define GUI_FORECAST_CONDITION_MAX_LEN 32
+/** Maximum length of a forecast temperature string. */
+#define GUI_FORECAST_TEMP_TEXT_MAX_LEN 20
+/** Maximum length of the forecast range string. */
+#define GUI_FORECAST_RANGE_TEXT_MAX_LEN 32
+/** Maximum length of the forecast summary string. */
+#define GUI_FORECAST_SUMMARY_TEXT_MAX_LEN 96
+/** Maximum length of a forecast detail line. */
+#define GUI_FORECAST_DETAIL_TEXT_MAX_LEN 32
+/** Maximum length of a compact forecast day label. */
+#define GUI_FORECAST_DAY_LABEL_MAX_LEN 12
+/** Maximum length of a daily forecast range string. */
+#define GUI_FORECAST_DAY_RANGE_TEXT_MAX_LEN 20
 
 /**
  * @brief Latest sensor readings displayed by the GUI.
@@ -67,6 +87,39 @@ typedef struct {
     uint16_t charge_battery[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Battery charging values per hour. */
     uint16_t sell_excess[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Excess energy sold back per hour. */
 } gui_energy_plan_t;
+
+/**
+ * @brief Forecast details shown in the side card.
+ */
+typedef struct {
+    char rain_chance[GUI_FORECAST_DETAIL_TEXT_MAX_LEN]; /*!< Daily rain chance summary. */
+    char wind[GUI_FORECAST_DETAIL_TEXT_MAX_LEN]; /*!< Wind summary. */
+    char humidity[GUI_FORECAST_DETAIL_TEXT_MAX_LEN]; /*!< Current humidity summary. */
+    char uv_index[GUI_FORECAST_DETAIL_TEXT_MAX_LEN]; /*!< UV summary. */
+} gui_forecast_details_t;
+
+/**
+ * @brief Daily forecast entry shown in the forecast footer row.
+ */
+typedef struct {
+    char label[GUI_FORECAST_DAY_LABEL_MAX_LEN]; /*!< Day label such as Mon or Tue. */
+    char condition[GUI_FORECAST_CONDITION_MAX_LEN]; /*!< Short condition summary. */
+    char range_text[GUI_FORECAST_DAY_RANGE_TEXT_MAX_LEN]; /*!< Daily high/low temperature text. */
+} gui_forecast_day_t;
+
+/**
+ * @brief Forecast state rendered by the forecast panel.
+ */
+typedef struct {
+    bool has_data; /*!< True when the values came from a parsed forecast response. */
+    char title[GUI_FORECAST_TITLE_MAX_LEN]; /*!< Primary forecast heading. */
+    char condition[GUI_FORECAST_CONDITION_MAX_LEN]; /*!< Current condition text. */
+    char current_temperature[GUI_FORECAST_TEMP_TEXT_MAX_LEN]; /*!< Current temperature text. */
+    char range_text[GUI_FORECAST_RANGE_TEXT_MAX_LEN]; /*!< High/low summary text. */
+    char summary[GUI_FORECAST_SUMMARY_TEXT_MAX_LEN]; /*!< One-line forecast summary. */
+    gui_forecast_details_t details; /*!< Detail lines for the side card. */
+    gui_forecast_day_t days[GUI_FORECAST_DAY_COUNT]; /*!< Daily forecast entries shown below the summary cards. */
+} gui_forecast_state_t;
 
 /**
  * @brief Wi-Fi connection states surfaced by the GUI.
@@ -149,6 +202,7 @@ typedef struct {
     gui_panel_id_t active_panel;                /*!< Panel that should be visible in the content area. */
     gui_sensor_state_t sensor;                  /*!< Latest environmental sensor state. */
     gui_energy_plan_t energy_plan;              /*!< Energy plan series rendered on the chart panel. */
+    gui_forecast_state_t forecast;              /*!< Forecast data rendered on the forecast panel. */
     gui_wifi_settings_t wifi;                   /*!< Wi-Fi dialog and connection settings. */
     gui_wifi_state_t wifi_state;                /*!< Sidebar Wi-Fi status indicator state. */
     gui_bluetooth_state_t bluetooth_state;      /*!< Sidebar Bluetooth status indicator state. */
