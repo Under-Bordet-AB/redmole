@@ -74,6 +74,8 @@ esp_err_t http_request_get(const char *url, char *buf, size_t buf_len)
         .crt_bundle_attach = (mode == HTTP_CLIENT_TLS_BUNDLE) ? esp_crt_bundle_attach : NULL
     };
 
+    buf[0] = '\0';
+
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client == NULL)
     {
