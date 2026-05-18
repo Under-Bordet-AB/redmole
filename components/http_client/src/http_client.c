@@ -137,6 +137,7 @@ esp_err_t http_client_get(const char *url, char *buf, size_t buf_len)
 void http_client_deinit(void)
 {
     ESP_LOGD(TAG, "Deinitializing");
+    s_client.network_up = false;
     free(s_response_buf);
     s_response_buf = NULL;
     http_tls_deinit();
