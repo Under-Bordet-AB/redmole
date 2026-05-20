@@ -9,9 +9,10 @@
 
 #include "app_gui_bindings.h"
 
+#include <limits.h>
 #include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "cJSON.h"
@@ -32,7 +33,14 @@ static const char *TAG = "APP_GUI_BINDINGS";
 #define GUI_NVS_KEY_LON         "gui_lon"
 #define GUI_NVS_KEY_WIFI_SSID   "wifi_ssid"
 #define FORECAST_REFRESH_DELAY_MS 10000U
-#define FORECAST_HTTP_DELAY_MS    5000U
+#define LEOP_REFRESH_URL "http://127.0.0.1:10480/endpoints/result.json"
+#define LEOP_RAW_POINT_COUNT 96
+#define LEOP_POINTS_PER_HOUR 4
+/*
+ * Scale LEOP hourly totals into integer chart values using milli-units so the
+ * 15-minute inputs retain visible precision after aggregation.
+ */
+#define LEOP_VALUE_SCALE 1000.0
 
 typedef struct {
     gui_ctx_t *gui;
@@ -77,6 +85,9 @@ static const char *forecast_wind_direction_to_compass(double direction_degrees);
 static void forecast_format_day_label(const char *date_text, char *label, size_t label_len);
 static bool forecast_load_location(double *latitude, double *longitude);
 static bool forecast_parse_response(const char *response, gui_forecast_state_t *forecast);
+static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_plan);
+static bool leop_parse_series(const cJSON *series_array, uint16_t *values, const char *series_name);
+static uint16_t leop_scale_hourly_total(double hourly_total);
 
 // UI sync
 static void sync_sensor(gui_ctx_t *gui);
@@ -686,6 +697,123 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
 #undef FORECAST_PARSE_FAIL
 }
 
+static uint16_t leop_scale_hourly_total(double hourly_total)
+{
+    double scaled_value;
+
+    if (hourly_total <= 0.0) {
+        return 0U;
+    }
+
+    scaled_value = (hourly_total * LEOP_VALUE_SCALE) + 0.5;
+    if (scaled_value >= (double)UINT16_MAX) {
+        return UINT16_MAX;
+    }
+
+    return (uint16_t)scaled_value;
+}
+
+static bool leop_parse_series(const cJSON *series_array, uint16_t *values, const char *series_name)
+{
+    int hour_index;
+
+    if ((series_array == NULL) || (values == NULL) || (series_name == NULL)) {
+        return false;
+    }
+
+    if (!cJSON_IsArray(series_array)) {
+        ESP_LOGW(TAG, "LEOP parse error: %s is not an array", series_name);
+        return false;
+    }
+
+    if (cJSON_GetArraySize(series_array) < LEOP_RAW_POINT_COUNT) {
+        ESP_LOGW(TAG, "LEOP parse error: %s shorter than %d points", series_name,
+                 LEOP_RAW_POINT_COUNT);
+        return false;
+    }
+
+    for (hour_index = 0; hour_index < GUI_ENERGY_PLAN_POINT_COUNT; hour_index++) {
+        double hourly_total = 0.0;
+        int quarter_index;
+
+        for (quarter_index = 0; quarter_index < LEOP_POINTS_PER_HOUR; quarter_index++) {
+            const cJSON *sample = cJSON_GetArrayItem(series_array,
+                                                     (hour_index * LEOP_POINTS_PER_HOUR) +
+                                                     quarter_index);
+
+            if (!cJSON_IsNumber(sample)) {
+                ESP_LOGW(TAG, "LEOP parse error: %s[%d] is not numeric", series_name,
+                         (hour_index * LEOP_POINTS_PER_HOUR) + quarter_index);
+                return false;
+            }
+
+            hourly_total += sample->valuedouble;
+        }
+
+        values[hour_index] = leop_scale_hourly_total(hourly_total);
+    }
+
+    return true;
+}
+
+static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_plan)
+{
+    cJSON *root;
+    cJSON *result;
+    cJSON *buy_electricity;
+    cJSON *direct_use;
+    cJSON *charge_battery;
+    cJSON *sell_excess;
+    cJSON *timestamp;
+
+#define LEOP_PARSE_FAIL(fmt, ...)                                  \
+    do {                                                           \
+        ESP_LOGW(TAG, "LEOP parse error: " fmt, ##__VA_ARGS__);    \
+        cJSON_Delete(root);                                        \
+        return false;                                              \
+    } while (0)
+
+    if ((response == NULL) || (energy_plan == NULL)) {
+        return false;
+    }
+
+    root = cJSON_Parse(response);
+    if (root == NULL) {
+        ESP_LOGW(TAG, "LEOP parse error: invalid JSON payload");
+        return false;
+    }
+
+    result = cJSON_GetObjectItemCaseSensitive(root, "result");
+    if (!cJSON_IsObject(result)) {
+        LEOP_PARSE_FAIL("missing result object");
+    }
+
+    buy_electricity = cJSON_GetObjectItemCaseSensitive(result, "buy_electricity");
+    direct_use = cJSON_GetObjectItemCaseSensitive(result, "direct_use");
+    charge_battery = cJSON_GetObjectItemCaseSensitive(result, "charge_battery");
+    sell_excess = cJSON_GetObjectItemCaseSensitive(result, "sell_excess");
+    timestamp = cJSON_GetObjectItemCaseSensitive(result, "timestamp");
+
+    if (!cJSON_IsArray(timestamp) || (cJSON_GetArraySize(timestamp) < LEOP_RAW_POINT_COUNT)) {
+        LEOP_PARSE_FAIL("timestamp array shorter than %d points", LEOP_RAW_POINT_COUNT);
+    }
+
+    memset(energy_plan, 0, sizeof(*energy_plan));
+
+    if (!leop_parse_series(buy_electricity, energy_plan->buy_electricity, "buy_electricity") ||
+        !leop_parse_series(direct_use, energy_plan->use_solar_directly, "direct_use") ||
+        !leop_parse_series(charge_battery, energy_plan->charge_battery, "charge_battery") ||
+        !leop_parse_series(sell_excess, energy_plan->sell_excess, "sell_excess")) {
+        cJSON_Delete(root);
+        return false;
+    }
+
+    cJSON_Delete(root);
+    return true;
+
+#undef LEOP_PARSE_FAIL
+}
+
 bool app_gui_bindings_load_saved_appearance(gui_init_config_t *config)
 {
     uint8_t value = 0;
@@ -1101,6 +1229,7 @@ static task_node_t leop_task = {0};
 static task_node_t sensor_task = {0};
 
 task_status_t forecast_work(task_node_t *node) {
+    ESP_LOGE(TAG, "Fetching forecast...");
     char url[1024];
     double latitude;
     double longitude;
@@ -1167,8 +1296,51 @@ task_status_t forecast_work(task_node_t *node) {
 
 task_status_t leop_work(task_node_t *node) {
     ESP_LOGE(TAG, "Fetching LEOP...");
+    enum { RESPONSE_BUF_LEN = 8192 };
+    char *buf;
+    gui_energy_plan_t energy_plan;
+    esp_err_t http_rc;
+
+    if (node == NULL) {
+        return TASK_ERROR;
+    }
 
     node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(FORECAST_REFRESH_DELAY_MS);
+
+    if (s_bindings.gui == NULL) {
+        ESP_LOGW(TAG, "Skipping LEOP refresh without GUI context.");
+        return TASK_RUN_AGAIN;
+    }
+
+    buf = malloc(RESPONSE_BUF_LEN + 1U);
+
+    if (buf == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate LEOP response buffer");
+        return TASK_RUN_AGAIN;
+    }
+
+    buf[0] = '\0';
+    http_rc = http_client_get(LEOP_REFRESH_URL, buf, RESPONSE_BUF_LEN + 1U);
+    if (http_rc != ESP_OK) {
+        ESP_LOGW(TAG, "LEOP request failed: %s", esp_err_to_name(http_rc));
+        free(buf);
+        return TASK_RUN_AGAIN;
+    }
+
+    if (!gui_get_energy_plan_state(s_bindings.gui, &energy_plan)) {
+        ESP_LOGW(TAG, "Failed to load current LEOP GUI state.");
+        free(buf);
+        return TASK_RUN_AGAIN;
+    }
+
+    if (!leop_parse_response(buf, &energy_plan)) {
+        ESP_LOGW(TAG, "Failed to parse LEOP response.");
+        free(buf);
+        return TASK_RUN_AGAIN;
+    }
+
+    gui_set_energy_plan_state(s_bindings.gui, &energy_plan);
+    free(buf);
     return TASK_RUN_AGAIN;
 }
 
@@ -1213,19 +1385,19 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
     int rc = 0;
 
     forecast_task.work = forecast_work;
-    rc = task_scheduler_add(&forecast_task, FORECAST_HTTP_DELAY_MS);
+    rc = task_scheduler_add(&forecast_task, 5000U);
     if (rc < 0) {
         ESP_LOGE(TAG, "Failed to add forecast fetching task to scheduler.");
     }
 
     leop_task.work = leop_work;
-    rc = task_scheduler_add(&leop_task, FORECAST_HTTP_DELAY_MS);
+    rc = task_scheduler_add(&leop_task, 5000U);
     if (rc < 0) {
         ESP_LOGE(TAG, "Failed to add LEOP fetching task to scheduler.");
     }
 
     sensor_task.work = sensor_work;
-    rc = task_scheduler_add(&sensor_task, FORECAST_HTTP_DELAY_MS);
+    rc = task_scheduler_add(&sensor_task, 5000U);
     if (rc < 0) {
         ESP_LOGE(TAG, "Failed to add sensor fetching task to scheduler.");
     }
@@ -1235,20 +1407,19 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
 
 void app_gui_bindings_sync(gui_ctx_t *gui)
 {
-    bool wifi_state_changed;
-
     if (gui == NULL) {
         return;
+    }
+    
+    bool wifi_state_changed = sync_wifi_state(gui);
+    if (wifi_state_changed || s_bindings.wifi_scan_requested || s_bindings.wifi_connect_requested || s_bindings.wifi_disconnect_requested) {
+        sync_wifi(gui);
     }
 
     sync_sensor(gui);
     
-    wifi_state_changed = sync_wifi_state(gui);
-    
-    sync_sd_card_state(gui);
-
-    if (wifi_state_changed || s_bindings.wifi_scan_requested || s_bindings.wifi_connect_requested || s_bindings.wifi_disconnect_requested) {
-        sync_wifi(gui);
+    if (sync_sd_card_state(gui)) {
+        ESP_LOGE(TAG, "Syncing SD-card state failed.");
     }
 
     (void)save_appearance_if_changed(gui);

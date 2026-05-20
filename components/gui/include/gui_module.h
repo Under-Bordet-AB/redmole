@@ -121,6 +121,23 @@ void gui_set_sensor_state(gui_ctx_t *self, const gui_sensor_state_t *sensor);
 bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor);
 
 /**
+ * @brief Update the latest energy plan values used by the GUI.
+ *
+ * @param self Initialized GUI context.
+ * @param energy_plan Energy plan values to copy into the GUI state.
+ */
+void gui_set_energy_plan_state(gui_ctx_t *self, const gui_energy_plan_t *energy_plan);
+
+/**
+ * @brief Read back the current energy plan values stored by the GUI.
+ *
+ * @param self Initialized GUI context.
+ * @param energy_plan Output pointer that receives the current energy plan state on success.
+ * @return True when the context is ready and the energy plan state was written.
+ */
+bool gui_get_energy_plan_state(gui_ctx_t *self, gui_energy_plan_t *energy_plan);
+
+/**
  * @brief Update the latest forecast values used by the GUI.
  *
  * @param self Initialized GUI context.

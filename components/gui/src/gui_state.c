@@ -26,15 +26,6 @@ static void gui_state_reset_wifi_scan(gui_state_t *state)
     state->wifi.known_network_count = 0;
 }
 
-static void gui_state_clear_energy_plan(gui_energy_plan_t *energy_plan)
-{
-    if (energy_plan == NULL) {
-        return;
-    }
-
-    memset(energy_plan, 0, sizeof(*energy_plan));
-}
-
 static void gui_state_init_forecast(gui_forecast_state_t *forecast)
 {
     if (forecast == NULL) {
@@ -92,6 +83,16 @@ static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
            (left->pressure_deci_hpa == right->pressure_deci_hpa) &&
            (left->is_fresh == right->is_fresh) &&
            (left->update_count == right->update_count);
+}
+
+static bool gui_state_energy_plan_equals(const gui_energy_plan_t *left,
+                                         const gui_energy_plan_t *right)
+{
+    if ((left == NULL) || (right == NULL)) {
+        return false;
+    }
+
+    return memcmp(left, right, sizeof(*left)) == 0;
 }
 
 static bool gui_state_forecast_equals(const gui_forecast_state_t *left,
@@ -207,6 +208,17 @@ bool gui_state_set_sensor(gui_state_t *state, const gui_sensor_state_t *sensor)
     }
 
     state->sensor = *sensor;
+    return true;
+}
+
+bool gui_state_set_energy_plan(gui_state_t *state, const gui_energy_plan_t *energy_plan)
+{
+    if ((state == NULL) || (energy_plan == NULL) ||
+        gui_state_energy_plan_equals(&state->energy_plan, energy_plan)) {
+        return false;
+    }
+
+    state->energy_plan = *energy_plan;
     return true;
 }
 
@@ -451,7 +463,7 @@ void gui_state_build_screen_model(const gui_state_t *state, gui_view_model_t *mo
 
     model->active_panel = state->active_panel;
     model->sensor = state->sensor;
-    gui_state_clear_energy_plan(&model->energy_plan);
+    model->energy_plan = state->energy_plan;
     model->forecast = state->forecast;
     model->wifi = state->wifi;
     model->wifi_state = state->wifi_state;

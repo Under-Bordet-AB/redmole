@@ -615,6 +615,32 @@ bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor)
     return true;
 }
 
+void gui_set_energy_plan_state(gui_ctx_t *self, const gui_energy_plan_t *energy_plan)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (energy_plan == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    if (gui_state_set_energy_plan(&runtime->state, energy_plan)) {
+        gui_render_runtime(runtime);
+    }
+    lvgl_port_unlock();
+}
+
+bool gui_get_energy_plan_state(gui_ctx_t *self, gui_energy_plan_t *energy_plan)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (energy_plan == NULL)) {
+        return false;
+    }
+
+    *energy_plan = runtime->state.energy_plan;
+    return true;
+}
+
 void gui_set_forecast_state(gui_ctx_t *self, const gui_forecast_state_t *forecast)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
