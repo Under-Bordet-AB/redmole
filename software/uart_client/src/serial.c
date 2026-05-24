@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "serial.h"
 
 #include <errno.h>
@@ -14,63 +15,110 @@
 
 int serial_open(const char *path)
 {
-    // Open the device at path with O_RDWR | O_NOCTTY | O_SYNC
-    // If open() fails, print an error with strerror(errno) and return -1
+    int fd = open(path, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0)
+    {
+        fprintf(stderr, "serial_open: open %s: %s\n", path, strerror(errno));
+        return -1;
+    }
 
-    // Declare a struct termios and read the current port settings with tcgetattr()
-    // Call cfmakeraw() to disable all line discipline processing
-    // Set input and output baud rate to BAUD_RATE with cfsetispeed / cfsetospeed
-    // Set VMIN = 0 and VTIME = 0 for fully non-blocking reads
-    // Apply the new settings immediately with tcsetattr(..., TCSANOW, ...)
+    struct termios tty;
+    tcgetattr(fd, &tty);
+    cfmakeraw(&tty);
+    cfsetispeed(&tty, BAUD_RATE);
+    cfsetospeed(&tty, BAUD_RATE);
+    tty.c_cc[VMIN]  = 0;
+    tty.c_cc[VTIME] = 0;
+    tcsetattr(fd, TCSANOW, &tty);
+    tcflush(fd, TCIFLUSH);
 
-    // Return the file descriptor
+    return fd;
 }
 
 void serial_close(int fd)
 {
-    // Discard any pending bytes in both TX and RX kernel buffers with tcflush(..., TCIOFLUSH)
-    // Close the file descriptor
+    tcflush(fd, TCIOFLUSH);
+    close(fd);
 }
 
 int serial_read_exact(int fd, void *buf, size_t len, int timeout_ms)
 {
-    // Set up a pointer p into buf and a remaining byte counter starting at len
-    // Declare a result variable initialised to 0
+    uint8_t *p         = buf;
+    size_t   remaining = len;
+    int      result    = 0;
 
-    // Create a timerfd with CLOCK_MONOTONIC and TFD_CLOEXEC | TFD_NONBLOCK
-    // If timerfd_create() fails return -1
+    int tfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
+    if (tfd < 0)
+    {
+        fprintf(stderr, "serial_read_exact: timerfd_create: %s\n", strerror(errno));
+        return -1;
+    }
 
-    // Fill an itimerspec: it_value from timeout_ms (split into tv_sec and tv_nsec),
-    //   it_interval zero (one-shot, does not repeat)
-    // Arm the timer with timerfd_settime()
+    struct itimerspec ts = {
+        .it_value    = { .tv_sec  =  timeout_ms / 1000,
+                         .tv_nsec = (long)(timeout_ms % 1000) * 1000000L },
+        .it_interval = { 0 },
+    };
+    timerfd_settime(tfd, 0, &ts, NULL);
 
-    // Declare a pollfd array of 2: slot 0 is fd (POLLIN), slot 1 is tfd (POLLIN)
+    struct pollfd fds[2] = {
+        { .fd = fd,  .events = POLLIN },
+        { .fd = tfd, .events = POLLIN },
+    };
 
-    // Loop while remaining > 0:
-    //   Call poll() with timeout -1 (block forever — the timerfd is the deadline)
-    //   If poll() returns < 0, print the error, set result = -1, break
+    while (remaining > 0)
+    {
+        int ready = poll(fds, 2, -1);
+        if (ready < 0)
+        {
+            fprintf(stderr, "serial_read_exact: poll: %s\n", strerror(errno));
+            result = -1;
+            break;
+        }
 
-    //   Check slot 1 (timerfd) first — if POLLIN is set the deadline expired:
-    //     Read 8 bytes from tfd to drain it (the uint64_t expiration count)
-    //     Print a timeout message, set result = -1, break
+        if (fds[1].revents & POLLIN)
+        {
+            uint64_t exp;
+            (void)read(tfd, &exp, sizeof(exp));
+            fprintf(stderr, "serial_read_exact: timeout waiting for %zu bytes\n", remaining);
+            result = -1;
+            break;
+        }
 
-    //   Check slot 0 (serial fd) — if POLLIN is set:
-    //     Call read() into p for up to remaining bytes
-    //     If read() returns < 0, print the error, set result = -1, break
-    //     Advance p and subtract from remaining
+        if (fds[0].revents & POLLIN)
+        {
+            ssize_t n = read(fd, p, remaining);
+            if (n < 0)
+            {
+                fprintf(stderr, "serial_read_exact: read: %s\n", strerror(errno));
+                result = -1;
+                break;
+            }
+            p         += (size_t)n;
+            remaining -= (size_t)n;
+        }
+    }
 
-    // Close tfd (always — on both success and error paths)
-    // Return result
+    close(tfd);
+    return result;
 }
 
 int serial_write_exact(int fd, const void *buf, size_t len)
 {
-    // Set up a const uint8_t pointer into buf and a remaining counter
+    const uint8_t *p = buf;
+    size_t remaining = len;
 
-    // Loop while remaining > 0:
-    //   Call write() for up to remaining bytes
-    //   If write() returns < 0, print the error and return -1
-    //   Advance the pointer and subtract from remaining
+    while (remaining > 0)
+    {
+        ssize_t n = write(fd, p, remaining);
+        if (n < 0)
+        {
+            fprintf(stderr, "serial_write_exact: write: %s\n", strerror(errno));
+            return -1;
+        }
+        p         += (size_t)n;
+        remaining -= (size_t)n;
+    }
 
-    // Return 0
+    return 0;
 }

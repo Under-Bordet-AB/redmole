@@ -12,6 +12,7 @@ typedef enum
     TAG_SENSOR = 2,
     TAG_CONFIG = 3,
     TAG_DIAG   = 4,
+    TAG_TEST   = 5,
 } uart_pkg_tag_t;
 
 void     protocol_crc16_init(void);
@@ -25,5 +26,6 @@ void protocol_decode_server(const uint8_t *payload, uint16_t data_len);
 void protocol_decode_sensor(const uint8_t *payload, uint16_t data_len);
 void protocol_decode_config(const uint8_t *payload, uint16_t data_len);
 void protocol_decode_diag  (const uint8_t *payload, uint16_t data_len);
+void protocol_decode_test  (const uint8_t *payload, uint16_t data_len);
 
 #endif /* PROTOCOL_H */
