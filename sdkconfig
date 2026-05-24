@@ -975,6 +975,13 @@ CONFIG_REDMOLE_BME280_BACKEND_SIM=y
 # end of RedMole Sensor Configuration
 
 #
+# RedMole LEOP Configuration
+#
+# default:
+CONFIG_REDMOLE_LEOP_REFRESH_URL="http://127.0.0.1:10480/endpoints/result.json"
+# end of RedMole LEOP Configuration
+
+#
 # Compiler options
 #
 # CONFIG_COMPILER_OPTIMIZATION_DEBUG is not set

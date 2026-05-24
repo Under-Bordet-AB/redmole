@@ -21,6 +21,7 @@
 #include "nac.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
+#include "sdkconfig.h"
 
 static const char *TAG = "APP_GUI_BINDINGS";
 
@@ -32,10 +33,11 @@ static const char *TAG = "APP_GUI_BINDINGS";
 #define GUI_NVS_KEY_LAT         "gui_lat"
 #define GUI_NVS_KEY_LON         "gui_lon"
 #define GUI_NVS_KEY_WIFI_SSID   "wifi_ssid"
-#define FORECAST_REFRESH_DELAY_MS 10000U
-#define LEOP_REFRESH_URL "http://127.0.0.1:10480/endpoints/result.json"
+#define FORECAST_REFRESH_DELAY_MS 60000U
+#define LEOP_REFRESH_URL CONFIG_REDMOLE_LEOP_REFRESH_URL
 #define LEOP_RAW_POINT_COUNT 96
 #define LEOP_POINTS_PER_HOUR 4
+#define LEOP_REFRESH_DELAY_MS 60000U
 /*
  * Scale LEOP hourly totals into integer chart values using milli-units so the
  * 15-minute inputs retain visible precision after aggregation.
@@ -1481,7 +1483,7 @@ task_status_t leop_work(task_node_t *node) {
         return TASK_ERROR;
     }
 
-    node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(FORECAST_REFRESH_DELAY_MS);
+    node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(LEOP_REFRESH_DELAY_MS);
 
     if (s_bindings.gui == NULL) {
         ESP_LOGW(TAG, "Skipping LEOP refresh without GUI context.");
