@@ -81,6 +81,17 @@ static gui_sd_card_state_t get_sd_card_state(void);
 static int32_t clamp_saved_brightness(int32_t value);
 static bool parse_coordinate_in_range(const char *text, double min_value, double max_value);
 static const char *forecast_weather_code_to_condition(int weather_code);
+static int forecast_weather_code_to_sky_rank(int weather_code);
+static bool forecast_parse_hour(const char *time_text, char *date, size_t date_len, int *hour);
+static void forecast_format_later_today_summary(const cJSON *hourly_time,
+                                                const cJSON *hourly_temperature,
+                                                const cJSON *hourly_weather_code,
+                                                const char *today_date,
+                                                const char *current_time_text,
+                                                double current_temperature,
+                                                int current_weather_code,
+                                                char *summary,
+                                                size_t summary_len);
 static const char *forecast_wind_direction_to_compass(double direction_degrees);
 static void forecast_format_day_label(const char *date_text, char *label, size_t label_len);
 static bool forecast_load_location(double *latitude, double *longitude);
@@ -438,6 +449,154 @@ static const char *forecast_weather_code_to_condition(int weather_code)
     }
 }
 
+static int forecast_weather_code_to_sky_rank(int weather_code)
+{
+    switch (weather_code) {
+        case 0:
+        case 1:
+            return 0;
+        case 2:
+            return 1;
+        case 3:
+        case 45:
+        case 48:
+            return 2;
+        case 51:
+        case 53:
+        case 55:
+        case 56:
+        case 57:
+        case 61:
+        case 63:
+        case 65:
+        case 66:
+        case 67:
+        case 71:
+        case 73:
+        case 75:
+        case 77:
+        case 80:
+        case 81:
+        case 82:
+        case 85:
+        case 86:
+        case 95:
+        case 96:
+        case 99:
+            return 3;
+        default:
+            return 1;
+    }
+}
+
+static bool forecast_parse_hour(const char *time_text, char *date, size_t date_len, int *hour)
+{
+    int parsed_hour;
+
+    if ((time_text == NULL) || (date == NULL) || (date_len < 11U) || (hour == NULL)) {
+        return false;
+    }
+
+    if ((strlen(time_text) < 13U) || (time_text[10] != 'T') ||
+        (sscanf(&time_text[11], "%2d", &parsed_hour) != 1) ||
+        (parsed_hour < 0) || (parsed_hour > 23)) {
+        return false;
+    }
+
+    memcpy(date, time_text, 10U);
+    date[10] = '\0';
+    *hour = parsed_hour;
+    return true;
+}
+
+static void forecast_format_later_today_summary(const cJSON *hourly_time,
+                                                const cJSON *hourly_temperature,
+                                                const cJSON *hourly_weather_code,
+                                                const char *today_date,
+                                                const char *current_time_text,
+                                                double current_temperature,
+                                                int current_weather_code,
+                                                char *summary,
+                                                size_t summary_len)
+{
+    enum { FORECAST_TARGET_EVENING_HOUR = 18 };
+    char current_date[11];
+    char point_date[11];
+    int current_hour;
+    int point_hour;
+    int selected_index = -1;
+    int selected_distance = INT_MAX;
+    int hourly_count;
+    int index;
+    cJSON *selected_temperature;
+    cJSON *selected_weather_code;
+    double later_temperature;
+    int temperature_delta;
+    int current_sky_rank;
+    int later_sky_rank;
+
+    if ((summary == NULL) || (summary_len == 0U)) {
+        return;
+    }
+
+    snprintf(summary, summary_len, "%s", "Forecast continues through the day.");
+
+    if (!cJSON_IsArray(hourly_time) || !cJSON_IsArray(hourly_temperature) ||
+        !cJSON_IsArray(hourly_weather_code) || (today_date == NULL) ||
+        !forecast_parse_hour(current_time_text, current_date, sizeof(current_date),
+                             &current_hour) ||
+        (strcmp(current_date, today_date) != 0)) {
+        return;
+    }
+
+    hourly_count = cJSON_GetArraySize(hourly_time);
+    for (index = 0; index < hourly_count; index++) {
+        cJSON *time_item = cJSON_GetArrayItem(hourly_time, index);
+        int distance;
+
+        if (!cJSON_IsString(time_item) ||
+            !forecast_parse_hour(time_item->valuestring, point_date, sizeof(point_date),
+                                 &point_hour) ||
+            (strcmp(point_date, today_date) != 0) || (point_hour <= current_hour)) {
+            continue;
+        }
+
+        if (!cJSON_IsNumber(cJSON_GetArrayItem(hourly_temperature, index)) ||
+            !cJSON_IsNumber(cJSON_GetArrayItem(hourly_weather_code, index))) {
+            continue;
+        }
+
+        distance = abs(point_hour - FORECAST_TARGET_EVENING_HOUR);
+        if ((selected_index < 0) || (distance < selected_distance)) {
+            selected_index = index;
+            selected_distance = distance;
+        }
+    }
+
+    if (selected_index < 0) {
+        return;
+    }
+
+    selected_temperature = cJSON_GetArrayItem(hourly_temperature, selected_index);
+    selected_weather_code = cJSON_GetArrayItem(hourly_weather_code, selected_index);
+    later_temperature = selected_temperature->valuedouble;
+    temperature_delta = (int)(later_temperature - current_temperature);
+    current_sky_rank = forecast_weather_code_to_sky_rank(current_weather_code);
+    later_sky_rank = forecast_weather_code_to_sky_rank(selected_weather_code->valueint);
+
+    if (later_sky_rank >= (current_sky_rank + 2)) {
+        snprintf(summary, summary_len, "%s", "Cloudier by evening.");
+    } else if (current_sky_rank >= (later_sky_rank + 2)) {
+        snprintf(summary, summary_len, "%s", "Clearer by evening.");
+    } else if (temperature_delta >= 2) {
+        snprintf(summary, summary_len, "%s", "Warmer later today.");
+    } else if (temperature_delta <= -2) {
+        snprintf(summary, summary_len, "%s", "Cooler this evening.");
+    } else {
+        snprintf(summary, summary_len, "%s", "Stays mild later today.");
+    }
+}
+
 static const char *forecast_wind_direction_to_compass(double direction_degrees)
 {
     static const char *labels[] = {
@@ -524,9 +683,14 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     cJSON *root;
     cJSON *current;
     cJSON *daily;
+    cJSON *hourly;
+    cJSON *current_time;
     cJSON *current_temperature;
     cJSON *current_humidity;
     cJSON *current_weather_code;
+    cJSON *hourly_time;
+    cJSON *hourly_temperature;
+    cJSON *hourly_weather_code;
     cJSON *daily_time;
     cJSON *daily_weather_code;
     cJSON *daily_temperature_max;
@@ -541,6 +705,7 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     cJSON *today_uv_index_max;
     cJSON *today_wind_speed_max;
     cJSON *today_wind_direction_dominant;
+    cJSON *today_date;
     int day_count;
     int day_index;
 
@@ -563,9 +728,14 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
 
     current = cJSON_GetObjectItemCaseSensitive(root, "current");
     daily = cJSON_GetObjectItemCaseSensitive(root, "daily");
+    hourly = cJSON_GetObjectItemCaseSensitive(root, "hourly");
+    current_time = cJSON_GetObjectItemCaseSensitive(current, "time");
     current_temperature = cJSON_GetObjectItemCaseSensitive(current, "temperature_2m");
     current_humidity = cJSON_GetObjectItemCaseSensitive(current, "relative_humidity_2m");
     current_weather_code = cJSON_GetObjectItemCaseSensitive(current, "weather_code");
+    hourly_time = cJSON_GetObjectItemCaseSensitive(hourly, "time");
+    hourly_temperature = cJSON_GetObjectItemCaseSensitive(hourly, "temperature_2m");
+    hourly_weather_code = cJSON_GetObjectItemCaseSensitive(hourly, "weather_code");
     daily_time = cJSON_GetObjectItemCaseSensitive(daily, "time");
     daily_weather_code = cJSON_GetObjectItemCaseSensitive(daily, "weather_code");
     daily_temperature_max = cJSON_GetObjectItemCaseSensitive(daily, "temperature_2m_max");
@@ -610,6 +780,7 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
         FORECAST_PARSE_FAIL("daily arrays shorter than expected: day_count=%d", day_count);
     }
 
+    today_date = cJSON_GetArrayItem(daily_time, 0);
     today_temp_max = cJSON_GetArrayItem(daily_temperature_max, 0);
     today_temp_min = cJSON_GetArrayItem(daily_temperature_min, 0);
     today_precip_probability_max = cJSON_IsArray(daily_precipitation_probability_max) ?
@@ -620,8 +791,9 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
         cJSON_GetArrayItem(daily_wind_speed_max, 0) : NULL;
     today_wind_direction_dominant = cJSON_IsArray(daily_wind_direction_dominant) ?
         cJSON_GetArrayItem(daily_wind_direction_dominant, 0) : NULL;
-    if (!cJSON_IsNumber(today_temp_max) || !cJSON_IsNumber(today_temp_min)) {
-        FORECAST_PARSE_FAIL("today max/min temperature missing");
+    if (!cJSON_IsString(today_date) ||
+        !cJSON_IsNumber(today_temp_max) || !cJSON_IsNumber(today_temp_min)) {
+        FORECAST_PARSE_FAIL("today core fields missing");
     }
 
     forecast->has_data = true;
@@ -633,10 +805,13 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     snprintf(forecast->range_text, sizeof(forecast->range_text),
              "High %.0f C  |  Low %.0f C",
              today_temp_max->valuedouble, today_temp_min->valuedouble);
-    snprintf(forecast->summary, sizeof(forecast->summary),
-             "%s today. High %.0f C, low %.0f C.",
-             forecast_weather_code_to_condition(current_weather_code->valueint),
-             today_temp_max->valuedouble, today_temp_min->valuedouble);
+    forecast_format_later_today_summary(hourly_time, hourly_temperature, hourly_weather_code,
+                                        today_date->valuestring,
+                                        cJSON_IsString(current_time) ?
+                                            current_time->valuestring : NULL,
+                                        current_temperature->valuedouble,
+                                        current_weather_code->valueint,
+                                        forecast->summary, sizeof(forecast->summary));
 
     if (cJSON_IsNumber(today_precip_probability_max)) {
         snprintf(forecast->details.rain_chance, sizeof(forecast->details.rain_chance),
@@ -1233,7 +1408,7 @@ task_status_t forecast_work(task_node_t *node) {
     char url[1024];
     double latitude;
     double longitude;
-    enum { RESPONSE_BUF_LEN = 8192 };
+    enum { RESPONSE_BUF_LEN = 16384 };
     char *buf;
     gui_forecast_state_t forecast;
     esp_err_t http_rc;
@@ -1258,6 +1433,7 @@ task_status_t forecast_work(task_node_t *node) {
              "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f"
              "&timezone=auto"
              "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m"
+             "&hourly=temperature_2m,weather_code"
              "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant"
              "&forecast_days=5",
              latitude, longitude);
