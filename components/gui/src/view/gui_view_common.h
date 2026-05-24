@@ -71,13 +71,17 @@ int32_t gui_view_abs_i32(int32_t value);
  * @param x X coordinate relative to parent.
  * @param y Y coordinate relative to parent.
  * @param width Button width.
+ * @param height Button height.
  * @param text Null-terminated button label.
  * @param event_code LVGL event code to react to.
  * @param event_cb Callback bound to the button.
  * @param event_user_data User data forwarded to the callback.
  * @return Newly created LVGL button object.
  */
-lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t width, const char *text, lv_event_code_t event_code, lv_event_cb_t event_cb, void *event_user_data);
+lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
+                                        lv_coord_t width, lv_coord_t height, const char *text,
+                                        lv_event_code_t event_code, lv_event_cb_t event_cb,
+                                        void *event_user_data);
 
 /**
  * @brief Create a chart legend item composed of a colored dot and text label.

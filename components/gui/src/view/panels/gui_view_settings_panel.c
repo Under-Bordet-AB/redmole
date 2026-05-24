@@ -584,7 +584,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     page_action_row = gui_view_create_settings_action_row(page_stack);
     view->settings_connectivity_back_button = gui_view_create_action_button(
-        page_action_row, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        page_action_row, 0, 0, 150, 58, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
 
     wifi_card = gui_view_create_setting_item_card_shell(connectivity_stack, LV_SIZE_CONTENT);
@@ -639,11 +639,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_column(wifi_button_row, 12, 0);
     lv_obj_clear_flag(wifi_button_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    view->scan_button = gui_view_create_action_button(wifi_button_row, 0, 0, 120, "Scan",
+    view->scan_button = gui_view_create_action_button(wifi_button_row, 0, 0, 120, 40, "Scan",
                                                       LV_EVENT_CLICKED, settings_event_cb,
                                                       event_user_data);
     view->disconnect_button = gui_view_create_action_button(
-        wifi_button_row, 0, 0, 120, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
+        wifi_button_row, 0, 0, 120, 40, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     lv_obj_add_flag(view->disconnect_button, LV_OBJ_FLAG_HIDDEN);
 
@@ -678,7 +678,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     page_action_row = gui_view_create_settings_action_row(page_stack);
     view->settings_display_back_button = gui_view_create_action_button(
-        page_action_row, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        page_action_row, 0, 0, 150, 58, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
 
     brightness_card = gui_view_create_setting_item_card(
@@ -847,7 +847,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     page_action_row = gui_view_create_settings_action_row(page_stack);
     view->settings_system_back_button = gui_view_create_action_button(
-        page_action_row, 0, 0, 112, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        page_action_row, 0, 0, 150, 58, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
 
     location_card = gui_view_create_setting_item_card(
@@ -922,7 +922,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_align(view->network_empty_label, LV_ALIGN_CENTER, 0, 0);
 
     view->network_dialog_cancel_button = gui_view_create_action_button(
-        view->network_dialog, 562, 444, 136, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        view->network_dialog, 562, 444, 128, 48, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
 
     view->password_dialog = gui_view_create_settings_page(view->settings_panel);
@@ -969,14 +969,14 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
 
     view->password_dialog_cancel_button = gui_view_create_action_button(
-        view->password_dialog, 282, 148, 128, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 282, 148, 128, 48, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     view->password_dialog_disconnect_button = gui_view_create_action_button(
-        view->password_dialog, 426, 148, 128, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 426, 148, 128, 40, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     lv_obj_add_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
     view->password_dialog_connect_button = gui_view_create_action_button(
-        view->password_dialog, 570, 148, 132, "Connect", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 570, 148, 132, 40, "Connect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     lv_obj_set_style_bg_color(view->password_dialog_connect_button, lv_color_hex(0x1D4ED8), 0);
     lv_obj_set_style_text_color(view->password_dialog_connect_button, lv_color_hex(0xFFFFFF), 0);
