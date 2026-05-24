@@ -19,7 +19,13 @@ esp_err_t sdcard_init(void);
 void sdcard_dispose(void);
 
 /**
- * Write text data to a file
+ * Creates folder relative to root, does nothing if it already exists
+ * @param path Path to folder to be created
+*/
+esp_err_t sdcard_mkdir(const char *path);
+
+/**
+ * Write text data to a file (creates file if it doesn't exist)
  * @param path Path relative to mount point (e.g. "/sdcard/file.txt")
  */
 esp_err_t sdcard_write_file(const char *path, const char *data);
@@ -31,7 +37,7 @@ esp_err_t sdcard_write_file(const char *path, const char *data);
 esp_err_t sdcard_append_file(const char *path, const char *data);
 
 /**
- * Read entire file into buffer
+ * Read file into buffer
  * @param path Path to file
  * @param out_buffer Caller-provided buffer
  * @param max_len Buffer size

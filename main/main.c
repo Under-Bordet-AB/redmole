@@ -47,7 +47,7 @@ static esp_err_t init_single_instance_modules(void) {
     rv = sdcard_init();
     if (rv != ESP_OK){
         ESP_LOGE(TAG, "sdcard_init failed: %s", esp_err_to_name(rv));
-        return rv;
+        //return rv;
     }
     
     return ESP_OK;
@@ -80,7 +80,7 @@ static esp_err_t init_runtime_modules(void) {
         return rv;
     }
 
-    rv = sdcard_log_init("/sdcard/logfile.txt"); // We don't capture startup logs this way - init this in a pre-init?
+    rv = sdcard_log_init("logs");
     if (rv != ESP_OK){
         ESP_LOGE(TAG, "sdcard_log_init failed: %s", esp_err_to_name(rv));
     }

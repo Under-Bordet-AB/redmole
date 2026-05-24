@@ -8,17 +8,12 @@ extern "C" {
 #endif
 
 /**
- * Initialize logging system (optionally creates log file)
+ * Initialize logging system
  */
-esp_err_t sdcard_log_init(const char *log_path);
+esp_err_t sdcard_log_init(const char *dir_path);
 
 /**
- * Append a log line (adds newline automatically)
- */
-esp_err_t sdcard_log_write(const char *message);
-
-/**
- * Flush or close logging (optional depending on design)
+ * Flush or close logging
  */
 void sdcard_log_dispose(void);
 

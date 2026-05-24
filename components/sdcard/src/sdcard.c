@@ -1,6 +1,9 @@
 #include "sdcard.h"
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <unistd.h>
 
 #include "esp_log.h"
 #include "esp_vfs_fat.h"
@@ -101,18 +104,43 @@ void sdcard_dispose(void)
     initialized = false;
 }
 
+esp_err_t sdcard_mkdir(const char *path){
+    struct stat st;
+
+    char full_path[128];
+    int n = snprintf(full_path, sizeof(full_path), "%s/%s", MOUNT_POINT, path);
+
+    if (n < 0 || n >= (int) sizeof(full_path)){
+        return ESP_ERR_INVALID_SIZE; // Path too long
+    }
+
+    if (stat(full_path, &st) == 0){
+        return ESP_OK; // Folder exists
+    }
+
+    rmdir(full_path);
+    if (mkdir(full_path, 0755) == 0){
+        return ESP_OK; // Folder created
+    }
+
+    return ESP_FAIL;
+}
+
 bool sdcard_is_initialized(void)
 {
     return initialized;
 }
 
-esp_err_t sdcard_write_file(const char *path, const char *data)
+esp_err_t sdcard_write_file(const char *relative_path, const char *data)
 {
     if (!initialized) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    FILE *f = fopen(path, "w");
+    char full_path[256];
+    snprintf(full_path, sizeof(full_path), "%s/%s", MOUNT_POINT, relative_path);
+
+    FILE *f = fopen(full_path, "w");
     if (f == NULL) {
         ESP_LOGE(TAG, "Failed to open file for writing");
         return ESP_FAIL;
@@ -124,15 +152,17 @@ esp_err_t sdcard_write_file(const char *path, const char *data)
     return ESP_OK;
 }
 
-esp_err_t sdcard_append_file(const char *path, const char *data)
+esp_err_t sdcard_append_file(const char *relative_path, const char *data)
 {
     if (!initialized) {
         return ESP_ERR_INVALID_STATE;
     }
+    char full_path[256];
+    snprintf(full_path, sizeof(full_path), "%s/%s", MOUNT_POINT, relative_path);
 
-    FILE *f = fopen(path, "a");
+    FILE *f = fopen(full_path, "a");
     if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for writing");
+        ESP_LOGE(TAG, "Failed to open file for writing, errno: %d", errno);
         return ESP_FAIL;
     }
 
@@ -142,13 +172,16 @@ esp_err_t sdcard_append_file(const char *path, const char *data)
     return ESP_OK;
 }
 
-esp_err_t sdcard_read_file(const char *path, char *out_buffer, size_t max_len)
+esp_err_t sdcard_read_file(const char *relative_path, char *out_buffer, size_t max_len)
 {
     if (!initialized) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    FILE *f = fopen(path, "r");
+    char full_path[256];
+    snprintf(full_path, sizeof(full_path), "%s/%s", MOUNT_POINT, relative_path);
+
+    FILE *f = fopen(full_path, "r");
     if (f == NULL) {
         ESP_LOGE(TAG, "Failed to open file for reading");
         return ESP_FAIL;
@@ -159,6 +192,6 @@ esp_err_t sdcard_read_file(const char *path, char *out_buffer, size_t max_len)
 
     fclose(f);
 
-    ESP_LOGI(TAG, "File read: %s (%zu bytes)", path, read_bytes);
+    ESP_LOGI(TAG, "File read: %s (%zu bytes)", full_path, read_bytes);
     return ESP_OK;
 }
