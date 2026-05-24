@@ -7,6 +7,7 @@
 #define GUI_VIEW_ENERGY_PANEL_MARGIN 24
 #define GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH 300
 #define GUI_VIEW_ENERGY_LEGEND_ROW_GAP 8
+#define GUI_VIEW_ENERGY_CHART_HORIZONTAL_INSET 12
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE 52
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_MIN 10
 
@@ -43,6 +44,7 @@ static void gui_view_layout_energy_panel(gui_view_t *view)
     lv_obj_t *time_row;
     lv_coord_t panel_width;
     lv_coord_t panel_height;
+    lv_coord_t chart_width;
 
     if ((view == NULL) || (view->content == NULL) || (view->energy_plan_panel == NULL)) {
         return;
@@ -67,7 +69,12 @@ static void gui_view_layout_energy_panel(gui_view_t *view)
     }
 
     if (view->energy_plan_chart != NULL) {
-        lv_obj_set_width(view->energy_plan_chart, LV_PCT(100));
+        chart_width = lv_obj_get_content_width(view->energy_plan_panel) -
+                      (GUI_VIEW_ENERGY_CHART_HORIZONTAL_INSET * 2);
+        if (chart_width > 0) {
+            lv_obj_set_width(view->energy_plan_chart, chart_width);
+            lv_obj_align(view->energy_plan_chart, LV_ALIGN_CENTER, 0, 0);
+        }
     }
 
     if (time_row != NULL) {
