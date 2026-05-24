@@ -22,8 +22,10 @@
  * 5. Send packages over UART and free allocated memory.
  * 6. Repeat steps 3-5
  *
- * IMPORTANT: One thing to be aware of: esp_crc16_le is CRC-16/IBM (polynomial 0x8005, reflected).
- * CRC-16 has several incompatible variants (CCITT, Modbus, IBM) that all produce different results on the same data.
+ * IMPORTANT: esp_crc16_le(0, buf, len) computes CRC-16/X25 (poly 0x1021 reflected = 0x8408, init=0xFFFF, xorout=0xFFFF).
+ * Internally it runs ~crc_raw(~init, buf, len), so passing init=0 yields ~crc_raw(0xFFFF, buf, len).
+ * The client must mirror this: ~protocol_crc16_update(0xFFFF, buf, len) with polynomial 0x8408.
+ * CRC-16 has several incompatible variants (CCITT, X25, Modbus, IBM) that all produce different results on the same data.
  */
 
 #ifndef UART_MOLE_H
@@ -60,6 +62,7 @@ typedef enum
     UART_SENSOR_PKG = 2,
     UART_CONFIG_PKG = 3,
     UART_DIAG_PKG   = 4,
+    UART_TEST_PKG   = 5,
 } uart_pkg_tag_t;
 
 /* UART packages */

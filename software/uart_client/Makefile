@@ -1,6 +1,6 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -std=c99 -g -Iinclude
-SRCS    = main.c src/serial.c src/protocol.c
+SRCS    = main.c src/app.c src/serial.c src/protocol.c src/uart_client.c
 TARGET  = rmuc
 
 $(TARGET): $(SRCS)

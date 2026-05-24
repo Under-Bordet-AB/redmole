@@ -12,7 +12,7 @@
 
 #define BAUD_RATE B115200
 
-int open_serial(const char *path)
+int serial_open(const char *path)
 {
     // Open the device at path with O_RDWR | O_NOCTTY | O_SYNC
     // If open() fails, print an error with strerror(errno) and return -1
@@ -26,13 +26,13 @@ int open_serial(const char *path)
     // Return the file descriptor
 }
 
-void close_serial(int fd)
+void serial_close(int fd)
 {
     // Discard any pending bytes in both TX and RX kernel buffers with tcflush(..., TCIOFLUSH)
     // Close the file descriptor
 }
 
-int read_exact(int fd, void *buf, size_t len, int timeout_ms)
+int serial_read_exact(int fd, void *buf, size_t len, int timeout_ms)
 {
     // Set up a pointer p into buf and a remaining byte counter starting at len
     // Declare a result variable initialised to 0
@@ -63,7 +63,7 @@ int read_exact(int fd, void *buf, size_t len, int timeout_ms)
     // Return result
 }
 
-int write_exact(int fd, const void *buf, size_t len)
+int serial_write_exact(int fd, const void *buf, size_t len)
 {
     // Set up a const uint8_t pointer into buf and a remaining counter
 
