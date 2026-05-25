@@ -49,12 +49,17 @@
 #define SET_WIFI_ONLINE             (1 << 0)
 #define SET_LEOP_SERVER_ONLINE      (1 << 1)
 #define SET_BME280_SENSOR_ONLINE    (1 << 2)
+#define SET_GUI_ONLINE              (1 << 3)
+#define SET_SDCARD_ONLINE           (1 << 4)
 
 /* Event group bits injected from main.
  * NAC sets/clears WIFI, sensor_data sets/clears SENSOR, http_client sets/clears SERVER. */
 #define UART_MOLE_WIFI_CONNECTED_BIT    BIT0
-#define UART_MOLE_SENSOR_FRESH_BIT      BIT1
+#define UART_MOLE_SENSOR_ONLINE_BIT     BIT1
 #define UART_MOLE_SERVER_ONLINE_BIT     BIT2
+#define UART_MOLE_GUI_ONLINE_BIT        BIT3
+#define UART_MOLE_SDCARD_ONLINE_BIT     BIT4
+
 
 /* Result bits for UART config packages */
 #define SET_CONFIG_OK               (1 << 0)

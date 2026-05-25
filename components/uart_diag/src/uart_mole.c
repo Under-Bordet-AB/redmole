@@ -298,11 +298,25 @@ static void uart_mole_listener_task(void *pvParameters)
                 EventBits_t event_bits = xEventGroupGetBits(*self->event_group);
                 uint8_t status = 0;
                 if (event_bits & UART_MOLE_WIFI_CONNECTED_BIT)
+                {
                     status |= SET_WIFI_ONLINE;
-                if (event_bits & UART_MOLE_SENSOR_FRESH_BIT)
+                }
+                if (event_bits & UART_MOLE_SENSOR_ONLINE_BIT)
+                {
                     status |= SET_BME280_SENSOR_ONLINE;
+                }
                 if (event_bits & UART_MOLE_SERVER_ONLINE_BIT)
+                {
                     status |= SET_LEOP_SERVER_ONLINE;
+                }
+                if (event_bits & UART_MOLE_GUI_ONLINE_BIT)
+                {
+                    status |= SET_GUI_ONLINE;
+                }
+                if (event_bits & UART_MOLE_SDCARD_ONLINE_BIT)
+                {
+                    status |= SET_SDCARD_ONLINE;
+                }
 
                 pkg->tag_bit     = UART_STATUS_PKG;
                 pkg->data_len    = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);
