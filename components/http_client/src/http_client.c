@@ -68,7 +68,7 @@ static task_status_t http_poll(task_node_t *node)
     http_client_ctx_t *self = container_of(node, http_client_ctx_t, task_node);
     (void)self;
 
-    if (http_client_get("https://jsonplaceholder.typicode.com/todos/1", s_response_buf, CONFIG_REDMOLE_HTTP_RESPONSE_BUF_SIZE) != ESP_OK)
+    if (http_client_get("http://ubdev.emk530.net:10480/result.json", s_response_buf, CONFIG_REDMOLE_HTTP_RESPONSE_BUF_SIZE) != ESP_OK)
     {
         ESP_LOGW(TAG, "Poll request failed");
     }

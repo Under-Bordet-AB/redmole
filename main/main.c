@@ -17,7 +17,7 @@ static const char *TAG = "MAIN";
 static gui_ctx_t        s_gui         = {0};
 static EventGroupHandle_t s_event_group = NULL;
 
-static esp_err_t init_single_instance_modules(void) {
+static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
     esp_err_t rv = rm_nvs_init("app");
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "rm_nvs_init failed: %s", esp_err_to_name(rv));
@@ -29,12 +29,12 @@ static esp_err_t init_single_instance_modules(void) {
         return rv;
     }
 
-    if (nac_init() != ESP_OK) {
+    if (nac_init(event_group) != ESP_OK) {
         ESP_LOGE(TAG, "nac_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
-    if (http_client_init(HTTP_CLIENT_TLS_BUNDLE, NULL) != ESP_OK) {
+    if (http_client_init(HTTP_CLIENT_TLS_NONE, NULL) != ESP_OK) {
         ESP_LOGE(TAG, "http_client_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
@@ -45,7 +45,7 @@ static esp_err_t init_single_instance_modules(void) {
         return rv;
     }
 
-    rv = uart_mole_init(&s_event_group);
+    rv = uart_mole_init(event_group);
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "uart_mole_init failed: %s", esp_err_to_name(rv));
         return rv;
@@ -59,7 +59,7 @@ static esp_err_t init_runtime_modules(void) {
         ESP_LOGE(TAG, "task_scheduler_init failed");
         return ESP_FAIL;
     }
-    ESP_LOGI(TAG, "task_scheduler_init started"); */
+        ESP_LOGI(TAG, "task_scheduler_init started"); */
 
     esp_err_t rv = local_sensor_service_init();
     if (rv != ESP_OK) {
@@ -108,7 +108,7 @@ void app_main(void) {
     }
 
     ESP_LOGI(TAG, "Initializing single-instance modules");
-    if (init_single_instance_modules() != ESP_OK) {
+    if (init_single_instance_modules(&s_event_group) != ESP_OK) {
         goto fatal_error;
     }
 
