@@ -10,5 +10,5 @@ idf_component_register(
         "${BME280_BACKEND_SRC}"
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "src"
-    REQUIRES esp_timer log
+    REQUIRES board_i2c esp_timer freertos log
 )

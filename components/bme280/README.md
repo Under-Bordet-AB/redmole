@@ -1,76 +1,97 @@
 # BME280 Component
 
-This component exposes one public local sensor API:
+`bme280` owns the BME280 sensor protocol.
+
+It exposes one public API:
 
 - `bme280_hal`
 
-The public HAL stays the same while the private backend changes underneath it.
+The public HAL stays stable while the selected backend changes underneath it.
 
-## Current Status
+## Responsibility
 
-The hardware backend is not implemented yet.
+This component owns:
 
-Today:
+- BME280 address selection
+- BME280 chip ID verification
+- register reads and writes
+- reset and measurement configuration
+- factory calibration loading
+- raw ADC readout
+- Bosch compensation math
+- conversion into scaled integer measurements
 
-- `bme280_hal_init()` initializes the selected backend
-- `bme280_hal_read()` returns scaled integer measurements
-- the sim backend generates plausible fake measurements
-- the hardware backend exists as named internal stubs
+It does not own:
 
-This is intentional. The higher layers can already be built and tested before the real BME280 bus/device code exists.
+- I2C bus creation
+- the polling FreeRTOS task
+- app-wide latest sample storage
+- GUI state
+- sea-level pressure correction
+- user calibration offsets
 
-## Public Shape
+## Runtime Flow
 
-The app only talks to:
+Hardware path:
 
-- `bme280_hal_init(...)`
-- `bme280_hal_read(...)`
-- `bme280_hal_get_period_ms(...)`
-- `bme280_hal_deinit(...)`
+```text
+board_i2c -> hardware backend -> bme280_hal -> local_sensor_service -> sensor_data
+```
 
-The app does not call a simulator directly.
+Simulator path:
 
-## Internal Shape
+```text
+sim backend -> bme280_hal -> local_sensor_service -> sensor_data
+```
 
-Private backend files live under:
+Everything above `bme280_hal` uses the same public API in both modes.
 
-- `components/bme280/src/hal_internal/`
+## Hardware Backend
 
-Current internal backends:
+The hardware backend:
 
-- `bme280_hal_backend_sim.c`
-- `bme280_hal_backend.c`
+1. probes `0x76`
+2. probes `0x77` if `0x76` is absent
+3. creates an I2C device handle through `board_i2c`
+4. reads chip ID register `0xD0`
+5. requires chip ID `0x60`
+6. resets the chip
+7. waits until calibration copy is complete
+8. reads calibration registers
+9. configures normal measurement mode
+10. reads raw pressure, temperature, and humidity registers
+11. applies compensation formulas
 
-Current flow:
+I2C presence alone is not considered enough. The backend only treats the device as a real BME280 after chip ID verification.
 
-- sim path: `sim backend -> bme280_hal -> sensor_data`
-- hardware path: `hardware -> hardware backend -> bme280_hal -> sensor_data`
+## Missing Hardware
 
-So everything above the HAL stays the same.
+Missing hardware is not fatal.
+
+If the BME280 is absent during init, `bme280_hal_init()` still succeeds so the rest of the firmware can run in degraded mode.
+
+Later reads retry initialization. This allows the sensor to be plugged in after boot.
 
 ## Compile-Time Switch
 
 Use:
 
-`idf.py menuconfig`
+```bash
+idf.py menuconfig
+```
 
 Then open:
 
-`RedMole Sensor Configuration -> BME280 HAL backend`
+```text
+RedMole Sensor Configuration -> BME280 HAL backend
+```
 
 Current choices:
 
-- `CONFIG_REDMOLE_BME280_BACKEND_SIM`
 - `CONFIG_REDMOLE_BME280_BACKEND_HW`
+- `CONFIG_REDMOLE_BME280_BACKEND_SIM`
 
-Default is sim backend.
-
-Current behavior:
-
-- sim backend: `bme280_hal_read()` returns fake measurements
-- hardware backend: `bme280_hal_read()` calls the hardware backend
-
-Because the hardware backend is still stubbed, hardware mode compiles but logs read failures until the real implementation is added.
+Default is hardware backend.
 
 ## Measurement Format
 
@@ -82,37 +103,28 @@ Measurements use scaled integers:
 
 Examples:
 
-- `112` means `11.2 C`
-- `503` means `50.3 %`
-- `10132` means `1013.2 hPa`
+- `237` means `23.7 C`
+- `453` means `45.3 %`
+- `10134` means `1013.4 hPa`
 
-## Intended Hardware Work
+The pressure value is local/station pressure. Sea-level correction belongs in an application calibration layer, not in the BME280 driver.
 
-When real hardware support is added, keep the ownership boundaries the same:
+## Backend State
 
-- HAL owns bus/device details
-- app code polls the public HAL
-- `sensor_data` owns the latest published local sample
+`bme280_hal` is caller-owned, but backend state is private.
 
-The hardware backend should eventually own:
+The public struct contains an opaque `backend_state` pointer. Only backend implementation files should access it.
 
-- bus/device configuration details
-- chip communication
-- calibration reads
-- raw measurement conversion
-- hardware error reporting
+This keeps simulator state and hardware state out of the public API while preserving a simple caller-owned context.
 
-It should not own:
+## Validation
 
-- app-wide latest sample storage
-- GUI state
-- API data
-- graph/history ownership
+The compensation logic should be validated against Bosch reference code or known calibration/raw test vectors.
 
-The expected hardware backend work is:
+Good validation targets:
 
-1. initialize the chosen bus
-2. initialize the BME280 device
-3. perform chip-id / reset / calibration setup
-4. read raw measurements
-5. convert raw measurements into `bme280_measurement`
+- chip ID is `0x60`
+- calibration registers are non-zero and stable
+- temperature roughly matches a nearby reference after thermal settling
+- pressure plus altitude correction matches local weather service trends
+- humidity is plausible but should not be treated as calibrated lab data

@@ -7,4 +7,8 @@ components/bme280/src/hal_internal/bme280_hal_backend.c
 components/bme280/src/hal_internal/bme280_hal_backend_sim.c
 components/sensor_data/include/sensor_data.h
 components/sensor_data/src/sensor_data.c
+components/board_i2c/include/board_i2c.h
+components/board_i2c/src/board_i2c.c
+components/local_sensor_service/include/local_sensor_service.h
+components/local_sensor_service/src/local_sensor_service.c
 main/main.c

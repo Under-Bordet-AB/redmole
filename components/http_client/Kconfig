@@ -6,4 +6,10 @@ menu "RedMole HTTP Client"
         help
             How often the HTTP client polls the remote API in milliseconds.
 
+    config REDMOLE_HTTP_RESPONSE_BUF_SIZE
+        int "Size of response buffer (bytes)"
+        default 10240
+        help
+            How big the buffer used for storing the response.json string should be
+
 endmenu

@@ -17,7 +17,7 @@
 #ifndef __IO_EXTENSION_H
 #define __IO_EXTENSION_H
 
-#include "i2c.h"  // Include I2C header for I2C communication functions
+#include "board_i2c.h"
 
 /* 
  * IO EXTENSION GPIO control via I2C - Register and Command Definitions

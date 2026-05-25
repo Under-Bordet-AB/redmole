@@ -73,7 +73,7 @@ flowchart TD
     init2 --> preload[Load saved appearance into gui_init config]
     preload --> guiinit[gui_init & app_gui_bindings_init]
     guiinit --> start[start_runtime_modules]
-    start --> sensorTask[sensor_local_source_task]
+    start --> sensorTask[local_sensor_service]
     start --> loop[main loop]
 
     sensorTask --> sensorData[sensor_data_submit_local]

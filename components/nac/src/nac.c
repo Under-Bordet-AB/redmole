@@ -7,6 +7,7 @@
  */
 
 #include "http_client.h"
+#include "sntp.h"
 #include "nac.h"
 #include "esp_attr.h"
 #include "esp_log_level.h"
@@ -528,6 +529,10 @@ static void wifi_disconnect(wifi_ctx_t *self)
     self->state = WIFI_STATE_IDLE;
     http_client_notify_network_down();
     ESP_LOGI(self->tag, "Notified http client of incoming disconnect");
+
+    sntp_sync_stop();
+    ESP_LOGI(self->tag, "Stopped SNTP client");
+
     if (wifi_bring_hw_offline(self) != 0)
     {
         ESP_LOGE(self->tag, "Failed to bring WiFi hardware offline");
@@ -645,6 +650,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
         http_client_notify_network_up();
         ESP_LOGI(self->tag, "Notified http client that we got an IP");
+
+        sntp_sync_start();
+        ESP_LOGI(self->tag, "Started SNTP client");
 
         if (self->saved_to_nvs == 0 && s_wifi_ssid[0] != '\0')
         {
