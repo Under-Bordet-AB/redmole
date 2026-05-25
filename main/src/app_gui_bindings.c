@@ -1411,7 +1411,7 @@ static task_node_t leop_task = {0};
 static task_node_t sensor_task = {0};
 
 task_status_t forecast_work(task_node_t *node) {
-    ESP_LOGE(TAG, "Fetching forecast...");
+    ESP_LOGI(TAG, "Fetching forecast...");
     char url[1024];
     double latitude;
     double longitude;
@@ -1478,7 +1478,7 @@ task_status_t forecast_work(task_node_t *node) {
 }
 
 task_status_t leop_work(task_node_t *node) {
-    ESP_LOGE(TAG, "Fetching LEOP...");
+    ESP_LOGI(TAG, "Fetching LEOP...");
     enum { RESPONSE_BUF_LEN = 8192 };
     char *buf;
     gui_energy_plan_t energy_plan;
@@ -1528,7 +1528,7 @@ task_status_t leop_work(task_node_t *node) {
 }
 
 task_status_t sensor_work(task_node_t *node) {
-    ESP_LOGE(TAG, "Fetching sensor...");
+    ESP_LOGI(TAG, "Fetching sensor...");
 
     node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(FORECAST_REFRESH_DELAY_MS);
     return TASK_RUN_AGAIN;

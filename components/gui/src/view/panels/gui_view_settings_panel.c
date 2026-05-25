@@ -561,7 +561,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
         home_stack, "Display", "Brightness, theme selection, and appearance toggles.",
         settings_event_cb, event_user_data);
     view->settings_system_button = gui_view_create_settings_category_button(
-        home_stack, "System", "Reserved space for device-wide settings and diagnostics.",
+        home_stack, "System", "Device-wide settings and diagnostics.",
         settings_event_cb, event_user_data);
 
     view->settings_connectivity_panel = gui_view_create_settings_page(view->settings_panel);
