@@ -2,6 +2,34 @@
 
 #include "../gui_view_common.h"
 
+static void gui_view_forecast_set_label_text(lv_obj_t *parent, uint32_t child_index,
+                                             const char *text)
+{
+    lv_obj_t *label;
+
+    if ((parent == NULL) || (text == NULL)) {
+        return;
+    }
+
+    label = lv_obj_get_child(parent, (int32_t)child_index);
+    if (label == NULL) {
+        return;
+    }
+
+    lv_label_set_text(label, text);
+}
+
+static void gui_view_forecast_apply_day_card(lv_obj_t *card, const gui_forecast_day_t *day)
+{
+    if ((card == NULL) || (day == NULL)) {
+        return;
+    }
+
+    gui_view_forecast_set_label_text(card, 0, day->label);
+    gui_view_forecast_set_label_text(card, 1, day->condition);
+    gui_view_forecast_set_label_text(card, 3, day->range_text);
+}
+
 static void gui_view_layout_forecast_panel(gui_view_t *view)
 {
     lv_obj_t *top_row;
@@ -244,7 +272,44 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
 
 void gui_view_apply_forecast_panel(gui_view_t *view, const gui_view_model_t *model)
 {
+    lv_obj_t *top_row;
+    lv_obj_t *today_card;
+    lv_obj_t *details_card;
+    lv_obj_t *days_row;
+    uint32_t day_index;
+
     gui_view_layout_forecast_panel(view);
-    (void)view;
-    (void)model;
+
+    if ((view == NULL) || (model == NULL) || (view->forecast_panel == NULL)) {
+        return;
+    }
+
+    top_row = lv_obj_get_child(view->forecast_panel, 0);
+    days_row = lv_obj_get_child(view->forecast_panel, 1);
+    if ((top_row == NULL) || (days_row == NULL)) {
+        return;
+    }
+
+    today_card = lv_obj_get_child(top_row, 0);
+    details_card = lv_obj_get_child(top_row, 1);
+    if ((today_card == NULL) || (details_card == NULL)) {
+        return;
+    }
+
+    gui_view_forecast_set_label_text(today_card, 0, model->forecast.title);
+    gui_view_forecast_set_label_text(today_card, 1, model->forecast.condition);
+    gui_view_forecast_set_label_text(today_card, 2, model->forecast.current_temperature);
+    gui_view_forecast_set_label_text(today_card, 3, model->forecast.range_text);
+    gui_view_forecast_set_label_text(today_card, 4, model->forecast.summary);
+
+    gui_view_forecast_set_label_text(details_card, 0, "Forecast details");
+    gui_view_forecast_set_label_text(details_card, 1, model->forecast.details.rain_chance);
+    gui_view_forecast_set_label_text(details_card, 2, model->forecast.details.wind);
+    gui_view_forecast_set_label_text(details_card, 3, model->forecast.details.humidity);
+    gui_view_forecast_set_label_text(details_card, 4, model->forecast.details.uv_index);
+
+    for (day_index = 0; day_index < GUI_FORECAST_DAY_COUNT; day_index++) {
+        gui_view_forecast_apply_day_card(lv_obj_get_child(days_row, (int32_t)day_index),
+                                         &model->forecast.days[day_index]);
+    }
 }

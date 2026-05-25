@@ -17,11 +17,14 @@
 typedef struct {
     gui_panel_id_t active_panel;                /*!< Panel currently selected by the user. */
     gui_sensor_state_t sensor;                  /*!< Latest sensor values known to the GUI. */
+    gui_energy_plan_t energy_plan;              /*!< Latest energy plan values known to the GUI. */
+    gui_forecast_state_t forecast;              /*!< Latest forecast values known to the GUI. */
     gui_wifi_settings_t wifi;                   /*!< Wi-Fi dialog state and connection workflow data. */
     gui_wifi_state_t wifi_state;                /*!< Sidebar Wi-Fi indicator state. */
     gui_bluetooth_state_t bluetooth_state;      /*!< Sidebar Bluetooth indicator state. */
     gui_sd_card_state_t sd_card_state;          /*!< Sidebar SD card indicator state. */
     gui_appearance_settings_t appearance;       /*!< Appearance settings used to theme the screen. */
+    gui_location_settings_t location;           /*!< Editable location settings used by the System page. */
 } gui_state_t;
 
 /**
@@ -48,6 +51,24 @@ bool gui_state_set_active_panel(gui_state_t *state, gui_panel_id_t panel);
  * @return True when the stored value changed.
  */
 bool gui_state_set_sensor(gui_state_t *state, const gui_sensor_state_t *sensor);
+
+/**
+ * @brief Update the stored energy plan state.
+ *
+ * @param state State object to update.
+ * @param energy_plan Energy plan snapshot to copy.
+ * @return True when the stored value changed.
+ */
+bool gui_state_set_energy_plan(gui_state_t *state, const gui_energy_plan_t *energy_plan);
+
+/**
+ * @brief Update the stored forecast state.
+ *
+ * @param state State object to update.
+ * @param forecast Forecast state snapshot to copy.
+ * @return True when the stored value changed.
+ */
+bool gui_state_set_forecast(gui_state_t *state, const gui_forecast_state_t *forecast);
 
 /**
  * @brief Update the stored Wi-Fi settings model.
@@ -111,6 +132,15 @@ bool gui_state_set_background_image_enabled(gui_state_t *state, bool enabled);
  * @return True when the stored value changed.
  */
 bool gui_state_set_night_variant_enabled(gui_state_t *state, bool enabled);
+
+/**
+ * @brief Update the stored location settings.
+ *
+ * @param state State object to update.
+ * @param location Location settings snapshot to copy.
+ * @return True when the stored value changed.
+ */
+bool gui_state_set_location_settings(gui_state_t *state, const gui_location_settings_t *location);
 
 /**
  * @brief Mark the Wi-Fi state as actively scanning.

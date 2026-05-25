@@ -107,6 +107,21 @@ static bool gui_view_appearance_settings_changed(gui_view_t *view,
     return night_switch_disabled != should_disable_night_switch;
 }
 
+static bool gui_view_location_settings_changed(gui_view_t *view,
+                                               const gui_location_settings_t *location)
+{
+    if ((view == NULL) || (location == NULL)) {
+        return false;
+    }
+
+    if (!view->has_last_location_settings) {
+        return true;
+    }
+
+    return (strcmp(view->last_location_settings.latitude, location->latitude) != 0) ||
+           (strcmp(view->last_location_settings.longitude, location->longitude) != 0);
+}
+
 static const char *gui_view_wifi_card_status_text(const gui_wifi_settings_t *wifi)
 {
     if (wifi == NULL) {
@@ -128,44 +143,6 @@ static const char *gui_view_wifi_card_status_text(const gui_wifi_settings_t *wif
         default:
             return "Not connected";
     }
-}
-
-static lv_obj_t *gui_view_create_settings_card(lv_obj_t *parent, const char *title_text,
-                                               const char *subtitle_text, lv_coord_t height)
-{
-    lv_obj_t *card = lv_obj_create(parent);
-
-    lv_obj_set_width(card, LV_PCT(100));
-    lv_obj_set_height(card, height);
-    lv_obj_set_layout(card, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
-    lv_obj_set_style_radius(card, 22, 0);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(card, 1, 0);
-    lv_obj_set_style_border_color(card, lv_color_hex(0xD7E1EE), 0);
-    lv_obj_set_style_shadow_width(card, 0, 0);
-    lv_obj_set_style_pad_top(card, 18, 0);
-    lv_obj_set_style_pad_left(card, 18, 0);
-    lv_obj_set_style_pad_right(card, 18, 0);
-    lv_obj_set_style_pad_bottom(card, 18, 0);
-    lv_obj_set_style_pad_row(card, 8, 0);
-    lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *title = lv_label_create(card);
-    lv_label_set_text(title, title_text);
-    lv_obj_set_width(title, LV_PCT(100));
-    lv_obj_set_style_text_color(title, lv_color_hex(0x10213D), 0);
-
-    lv_obj_t *subtitle = lv_label_create(card);
-    lv_label_set_text(subtitle, subtitle_text);
-    lv_obj_set_width(subtitle, LV_PCT(100));
-    lv_label_set_long_mode(subtitle, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_color(subtitle, lv_color_hex(0x607089), 0);
-
-    return card;
 }
 
 static lv_obj_t *gui_view_create_setting_item_card(lv_obj_t *parent, const char *title_text,
@@ -249,6 +226,169 @@ static lv_obj_t *gui_view_create_settings_page(lv_obj_t *parent)
     return page;
 }
 
+static lv_obj_t *gui_view_create_settings_category_button(lv_obj_t *parent,
+                                                          const char *title_text,
+                                                          const char *subtitle_text,
+                                                          lv_event_cb_t settings_event_cb,
+                                                          void *event_user_data)
+{
+    lv_obj_t *button = lv_btn_create(parent);
+    lv_obj_t *title;
+    lv_obj_t *subtitle;
+
+    lv_obj_set_width(button, LV_PCT(100));
+    lv_obj_set_height(button, 112);
+    lv_obj_set_layout(button, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(button, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(button, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_radius(button, 22, 0);
+    lv_obj_set_style_shadow_width(button, 0, 0);
+    lv_obj_set_style_pad_top(button, 18, 0);
+    lv_obj_set_style_pad_left(button, 18, 0);
+    lv_obj_set_style_pad_right(button, 18, 0);
+    lv_obj_set_style_pad_bottom(button, 18, 0);
+    lv_obj_set_style_pad_row(button, 8, 0);
+    lv_obj_add_event_cb(button, settings_event_cb, LV_EVENT_CLICKED, event_user_data);
+
+    title = lv_label_create(button);
+    lv_label_set_text(title, title_text);
+    lv_obj_set_width(title, LV_PCT(100));
+    lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_LEFT, 0);
+
+    subtitle = lv_label_create(button);
+    lv_label_set_text(subtitle, subtitle_text);
+    lv_obj_set_width(subtitle, LV_PCT(100));
+    lv_label_set_long_mode(subtitle, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(subtitle, LV_TEXT_ALIGN_LEFT, 0);
+
+    return button;
+}
+
+static lv_obj_t *gui_view_create_settings_subpage_stack(lv_obj_t *parent)
+{
+    lv_obj_t *stack = lv_obj_create(parent);
+
+    lv_obj_set_size(stack, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_pos(stack, 0, 0);
+    lv_obj_set_layout(stack, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(stack, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(stack, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(stack, 0, 0);
+    lv_obj_set_style_shadow_width(stack, 0, 0);
+    lv_obj_set_style_pad_all(stack, 0, 0);
+    lv_obj_set_style_pad_row(stack, 14, 0);
+    lv_obj_clear_flag(stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    return stack;
+}
+
+static lv_obj_t *gui_view_create_settings_action_row(lv_obj_t *parent)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+
+    lv_obj_set_width(row, LV_PCT(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_shadow_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_style_pad_column(row, 12, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    return row;
+}
+
+static lv_obj_t *gui_view_create_settings_field_row(lv_obj_t *parent, lv_obj_t **label_out,
+                                                    lv_obj_t **textarea_out,
+                                                    const char *label_text,
+                                                    const char *placeholder_text,
+                                                    lv_event_cb_t settings_event_cb,
+                                                    void *event_user_data)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+
+    lv_obj_set_width(row, LV_PCT(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_shadow_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_style_pad_row(row, 8, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    *label_out = lv_label_create(row);
+    lv_label_set_text(*label_out, label_text);
+    lv_obj_set_width(*label_out, LV_PCT(100));
+    lv_obj_set_style_text_color(*label_out, lv_color_hex(0x10213D), 0);
+
+    *textarea_out = lv_textarea_create(row);
+    lv_obj_set_size(*textarea_out, LV_PCT(100), 48);
+    lv_textarea_set_one_line(*textarea_out, true);
+    lv_textarea_set_placeholder_text(*textarea_out, placeholder_text);
+    lv_obj_add_event_cb(*textarea_out, settings_event_cb, LV_EVENT_ALL, event_user_data);
+    lv_obj_set_style_radius(*textarea_out, 14, 0);
+    lv_obj_set_style_shadow_width(*textarea_out, 0, 0);
+    lv_obj_set_style_border_width(*textarea_out, 1, 0);
+    lv_obj_set_style_border_color(*textarea_out, lv_color_hex(0xD7E1EE), 0);
+    lv_obj_set_style_bg_color(*textarea_out, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_bg_opa(*textarea_out, LV_OPA_COVER, 0);
+
+    return row;
+}
+
+static void gui_view_set_settings_subpage_visibility(gui_view_t *view,
+                                                     gui_settings_subpage_t subpage)
+{
+    if (view == NULL) {
+        return;
+    }
+
+    if (view->settings_home_panel != NULL) {
+        if (subpage == GUI_SETTINGS_SUBPAGE_HOME) {
+            lv_obj_clear_flag(view->settings_home_panel, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->settings_home_panel, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (view->settings_connectivity_panel != NULL) {
+        if (subpage == GUI_SETTINGS_SUBPAGE_CONNECTIVITY) {
+            lv_obj_clear_flag(view->settings_connectivity_panel, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->settings_connectivity_panel, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (view->settings_display_panel != NULL) {
+        if (subpage == GUI_SETTINGS_SUBPAGE_DISPLAY) {
+            lv_obj_clear_flag(view->settings_display_panel, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->settings_display_panel, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (view->settings_system_panel != NULL) {
+        if (subpage == GUI_SETTINGS_SUBPAGE_SYSTEM) {
+            lv_obj_clear_flag(view->settings_system_panel, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->settings_system_panel, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    view->active_settings_subpage = subpage;
+}
+
 static void gui_view_layout_password_dialog_buttons(gui_view_t *view, bool show_disconnect)
 {
     if ((view == NULL) || (view->password_dialog_cancel_button == NULL) ||
@@ -277,11 +417,15 @@ void gui_view_hide_wifi_dialogs_impl(gui_view_t *view)
     if (view->dialog_scrim != NULL) {
         lv_obj_add_flag(view->dialog_scrim, LV_OBJ_FLAG_HIDDEN);
     }
-    lv_obj_clear_flag(view->settings_home_panel, LV_OBJ_FLAG_HIDDEN);
+    gui_view_set_settings_subpage_visibility(view, view->active_settings_subpage);
     lv_obj_add_flag(view->network_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(view->password_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_keyboard_set_textarea(view->wifi_keyboard, NULL);
     lv_obj_add_flag(view->wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (view->location_keyboard != NULL) {
+        lv_keyboard_set_textarea(view->location_keyboard, NULL);
+        lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 void gui_view_show_network_dialog_impl(gui_view_t *view)
@@ -293,11 +437,15 @@ void gui_view_show_network_dialog_impl(gui_view_t *view)
     if (view->dialog_scrim != NULL) {
         lv_obj_add_flag(view->dialog_scrim, LV_OBJ_FLAG_HIDDEN);
     }
-    lv_obj_add_flag(view->settings_home_panel, LV_OBJ_FLAG_HIDDEN);
+    gui_view_set_settings_subpage_visibility(view, GUI_SETTINGS_SUBPAGE_CONNECTIVITY);
     lv_obj_clear_flag(view->network_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(view->password_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_keyboard_set_textarea(view->wifi_keyboard, NULL);
     lv_obj_add_flag(view->wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (view->location_keyboard != NULL) {
+        lv_keyboard_set_textarea(view->location_keyboard, NULL);
+        lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
     lv_obj_move_foreground(view->network_dialog);
 }
 
@@ -310,28 +458,56 @@ void gui_view_show_password_dialog_impl(gui_view_t *view)
     if (view->dialog_scrim != NULL) {
         lv_obj_add_flag(view->dialog_scrim, LV_OBJ_FLAG_HIDDEN);
     }
-    lv_obj_add_flag(view->settings_home_panel, LV_OBJ_FLAG_HIDDEN);
+    gui_view_set_settings_subpage_visibility(view, GUI_SETTINGS_SUBPAGE_CONNECTIVITY);
     lv_obj_add_flag(view->network_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(view->password_dialog, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_state(view->wifi_password_textarea, LV_STATE_FOCUSED);
     lv_keyboard_set_textarea(view->wifi_keyboard, view->wifi_password_textarea);
     lv_obj_clear_flag(view->wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (view->location_keyboard != NULL) {
+        lv_keyboard_set_textarea(view->location_keyboard, NULL);
+        lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
     lv_obj_move_foreground(view->password_dialog);
     lv_obj_move_foreground(view->wifi_keyboard);
+}
+
+void gui_view_show_settings_subpage_impl(gui_view_t *view, gui_settings_subpage_t subpage)
+{
+    if (view == NULL) {
+        return;
+    }
+
+    lv_obj_add_flag(view->network_dialog, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(view->password_dialog, LV_OBJ_FLAG_HIDDEN);
+    lv_keyboard_set_textarea(view->wifi_keyboard, NULL);
+    lv_obj_add_flag(view->wifi_keyboard, LV_OBJ_FLAG_HIDDEN);
+    if (view->location_keyboard != NULL) {
+        lv_keyboard_set_textarea(view->location_keyboard, NULL);
+        lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
+    gui_view_set_settings_subpage_visibility(view, subpage);
+}
+
+void gui_view_reset_settings_navigation_impl(gui_view_t *view)
+{
+    gui_view_show_settings_subpage_impl(view, GUI_SETTINGS_SUBPAGE_HOME);
 }
 
 void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event_cb,
                                   void *event_user_data)
 {
-    lv_obj_t *settings_grid;
-    lv_obj_t *connectivity_card;
+    lv_obj_t *home_stack;
+    lv_obj_t *page_stack;
+    lv_obj_t *page_action_row;
     lv_obj_t *connectivity_stack;
-    lv_obj_t *other_settings_card;
-    lv_obj_t *other_settings_stack;
+    lv_obj_t *display_stack;
+    lv_obj_t *system_stack;
     lv_obj_t *wifi_card;
     lv_obj_t *wifi_button_row;
     lv_obj_t *bluetooth_card;
     lv_obj_t *brightness_card;
+    lv_obj_t *location_card;
     lv_obj_t *theme_card;
     lv_obj_t *bluetooth_status;
     lv_obj_t *settings_text;
@@ -341,6 +517,14 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     if (view == NULL) {
         return;
     }
+
+    view->other_settings_card = NULL;
+    view->location_card = NULL;
+    view->location_latitude_label = NULL;
+    view->location_latitude_textarea = NULL;
+    view->location_longitude_label = NULL;
+    view->location_longitude_textarea = NULL;
+    view->location_keyboard = NULL;
 
     view->settings_panel = lv_obj_create(view->content);
     lv_obj_set_size(view->settings_panel, 734, 500);
@@ -356,41 +540,37 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
 
     view->settings_home_panel = gui_view_create_settings_page(view->settings_panel);
 
-    settings_grid = lv_obj_create(view->settings_home_panel);
-    lv_obj_set_size(settings_grid, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_pos(settings_grid, 0, 0);
-    lv_obj_set_style_bg_opa(settings_grid, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(settings_grid, 0, 0);
-    lv_obj_set_style_shadow_width(settings_grid, 0, 0);
-    lv_obj_set_style_pad_all(settings_grid, 0, 0);
-    lv_obj_set_style_pad_column(settings_grid, 14, 0);
-    lv_obj_set_style_pad_row(settings_grid, 0, 0);
-    lv_obj_clear_flag(settings_grid, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_layout(settings_grid, LV_LAYOUT_GRID);
-    {
-        static const lv_coord_t grid_columns[] = {LV_GRID_FR(1), LV_GRID_FR(1),
-                              LV_GRID_TEMPLATE_LAST};
-        static const lv_coord_t grid_rows[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-        lv_obj_set_style_grid_column_dsc_array(settings_grid, grid_columns, 0);
-        lv_obj_set_style_grid_row_dsc_array(settings_grid, grid_rows, 0);
-    }
+    home_stack = lv_obj_create(view->settings_home_panel);
+    lv_obj_set_size(home_stack, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_pos(home_stack, 0, 0);
+    lv_obj_set_layout(home_stack, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(home_stack, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(home_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(home_stack, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(home_stack, 0, 0);
+    lv_obj_set_style_shadow_width(home_stack, 0, 0);
+    lv_obj_set_style_pad_all(home_stack, 0, 0);
+    lv_obj_set_style_pad_row(home_stack, 14, 0);
+    lv_obj_clear_flag(home_stack, LV_OBJ_FLAG_SCROLLABLE);
 
-    connectivity_card = gui_view_create_settings_card(settings_grid, "Connectivity",
-                                                      "Manage connections to devices and networks.",
-                                                      LV_SIZE_CONTENT);
-    view->connectivity_card = connectivity_card;
-    lv_obj_set_grid_cell(connectivity_card, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_START, 0,
-                         1);
+    view->settings_connectivity_button = gui_view_create_settings_category_button(
+        home_stack, "Connectivity", "Wi-Fi, Bluetooth, and network-related controls.",
+        settings_event_cb, event_user_data);
+    view->settings_display_button = gui_view_create_settings_category_button(
+        home_stack, "Display", "Brightness, theme selection, and appearance toggles.",
+        settings_event_cb, event_user_data);
+    view->settings_system_button = gui_view_create_settings_category_button(
+        home_stack, "System", "Reserved space for device-wide settings and diagnostics.",
+        settings_event_cb, event_user_data);
 
-    other_settings_card = gui_view_create_settings_card(
-        settings_grid, "Display settings",
-        "Control brightness and interface appearance.", LV_SIZE_CONTENT);
-    view->other_settings_card = other_settings_card;
-    lv_obj_set_grid_cell(other_settings_card, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_START,
-                         0, 1);
+    view->settings_connectivity_panel = gui_view_create_settings_page(view->settings_panel);
+    page_stack = gui_view_create_settings_subpage_stack(view->settings_connectivity_panel);
 
-    connectivity_stack = lv_obj_create(connectivity_card);
-    lv_obj_set_size(connectivity_stack, LV_PCT(100), LV_SIZE_CONTENT);
+    connectivity_stack = lv_obj_create(page_stack);
+    lv_obj_set_width(connectivity_stack, LV_PCT(100));
+    lv_obj_set_height(connectivity_stack, 0);
+    lv_obj_set_flex_grow(connectivity_stack, 1);
     lv_obj_set_layout(connectivity_stack, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(connectivity_stack, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(connectivity_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
@@ -401,6 +581,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_all(connectivity_stack, 0, 0);
     lv_obj_set_style_pad_row(connectivity_stack, 12, 0);
     lv_obj_clear_flag(connectivity_stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    page_action_row = gui_view_create_settings_action_row(page_stack);
+    view->settings_connectivity_back_button = gui_view_create_action_button(
+        page_action_row, 0, 0, 150, 58, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
 
     wifi_card = gui_view_create_setting_item_card_shell(connectivity_stack, LV_SIZE_CONTENT);
     view->wifi_card = wifi_card;
@@ -454,11 +639,11 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_pad_column(wifi_button_row, 12, 0);
     lv_obj_clear_flag(wifi_button_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    view->scan_button = gui_view_create_action_button(wifi_button_row, 0, 0, 120, "Scan",
+    view->scan_button = gui_view_create_action_button(wifi_button_row, 0, 0, 120, 40, "Scan",
                                                       LV_EVENT_CLICKED, settings_event_cb,
                                                       event_user_data);
     view->disconnect_button = gui_view_create_action_button(
-        wifi_button_row, 0, 0, 120, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
+        wifi_button_row, 0, 0, 120, 40, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     lv_obj_add_flag(view->disconnect_button, LV_OBJ_FLAG_HIDDEN);
 
@@ -473,21 +658,31 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_width(bluetooth_status, LV_PCT(100));
     lv_obj_set_style_text_color(bluetooth_status, lv_color_hex(0x4A5C78), 0);
 
-    other_settings_stack = lv_obj_create(other_settings_card);
-    lv_obj_set_size(other_settings_stack, LV_PCT(100), LV_SIZE_CONTENT);
-    lv_obj_set_layout(other_settings_stack, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(other_settings_stack, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(other_settings_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+    view->settings_display_panel = gui_view_create_settings_page(view->settings_panel);
+    page_stack = gui_view_create_settings_subpage_stack(view->settings_display_panel);
+
+    display_stack = lv_obj_create(page_stack);
+    lv_obj_set_width(display_stack, LV_PCT(100));
+    lv_obj_set_height(display_stack, 0);
+    lv_obj_set_flex_grow(display_stack, 1);
+    lv_obj_set_layout(display_stack, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(display_stack, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(display_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
                           LV_FLEX_ALIGN_START);
-    lv_obj_set_style_bg_opa(other_settings_stack, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(other_settings_stack, 0, 0);
-    lv_obj_set_style_shadow_width(other_settings_stack, 0, 0);
-    lv_obj_set_style_pad_all(other_settings_stack, 0, 0);
-    lv_obj_set_style_pad_row(other_settings_stack, 12, 0);
-    lv_obj_clear_flag(other_settings_stack, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_opa(display_stack, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(display_stack, 0, 0);
+    lv_obj_set_style_shadow_width(display_stack, 0, 0);
+    lv_obj_set_style_pad_all(display_stack, 0, 0);
+    lv_obj_set_style_pad_row(display_stack, 12, 0);
+    lv_obj_clear_flag(display_stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    page_action_row = gui_view_create_settings_action_row(page_stack);
+    view->settings_display_back_button = gui_view_create_action_button(
+        page_action_row, 0, 0, 150, 58, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
 
     brightness_card = gui_view_create_setting_item_card(
-        other_settings_stack, "Screen brightness",
+        display_stack, "Screen brightness",
         "Adjust the backlight level.",
         LV_SIZE_CONTENT);
     view->brightness_card = brightness_card;
@@ -530,7 +725,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_align(view->brightness_value_label, LV_TEXT_ALIGN_RIGHT, 0);
 
     theme_card = gui_view_create_setting_item_card(
-        other_settings_stack, "Theme",
+        display_stack, "Theme",
         "Choose interface style.", LV_SIZE_CONTENT);
     view->theme_card = theme_card;
 
@@ -632,6 +827,52 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
                               LV_PART_KNOB);
     lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_KNOB);
 
+    view->settings_system_panel = gui_view_create_settings_page(view->settings_panel);
+    page_stack = gui_view_create_settings_subpage_stack(view->settings_system_panel);
+
+    system_stack = lv_obj_create(page_stack);
+    lv_obj_set_width(system_stack, LV_PCT(100));
+    lv_obj_set_height(system_stack, 0);
+    lv_obj_set_flex_grow(system_stack, 1);
+    lv_obj_set_layout(system_stack, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(system_stack, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(system_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(system_stack, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(system_stack, 0, 0);
+    lv_obj_set_style_shadow_width(system_stack, 0, 0);
+    lv_obj_set_style_pad_all(system_stack, 0, 0);
+    lv_obj_set_style_pad_row(system_stack, 12, 0);
+    lv_obj_clear_flag(system_stack, LV_OBJ_FLAG_SCROLLABLE);
+
+    page_action_row = gui_view_create_settings_action_row(page_stack);
+    view->settings_system_back_button = gui_view_create_action_button(
+        page_action_row, 0, 0, 150, 58, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        event_user_data);
+
+    location_card = gui_view_create_setting_item_card(
+        system_stack, "Location", "Enter latitude and longitude in decimal degrees.",
+        LV_SIZE_CONTENT);
+    view->location_card = location_card;
+    (void)gui_view_create_settings_field_row(location_card, &view->location_latitude_label,
+                                             &view->location_latitude_textarea, "Latitude",
+                                             "59.3293", settings_event_cb, event_user_data);
+    (void)gui_view_create_settings_field_row(location_card, &view->location_longitude_label,
+                                             &view->location_longitude_textarea, "Longitude",
+                                             "18.0686", settings_event_cb, event_user_data);
+
+    view->location_keyboard = lv_keyboard_create(view->settings_system_panel);
+    lv_obj_set_size(view->location_keyboard, LV_PCT(100), 180);
+    lv_obj_align(view->location_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_style_radius(view->location_keyboard, 18, 0);
+    lv_obj_set_style_bg_color(view->location_keyboard, lv_color_hex(0xE7EDF5), 0);
+    lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER, 0);
+    lv_obj_set_style_shadow_width(view->location_keyboard, 0, 0);
+    lv_obj_set_style_border_width(view->location_keyboard, 1, 0);
+    lv_obj_set_style_border_color(view->location_keyboard, lv_color_hex(0xD7E1EE), 0);
+    lv_obj_set_style_text_font(view->location_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
+    lv_keyboard_set_mode(view->location_keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
+
     view->dialog_scrim = NULL;
 
     view->network_dialog = gui_view_create_settings_page(view->settings_panel);
@@ -681,7 +922,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_align(view->network_empty_label, LV_ALIGN_CENTER, 0, 0);
 
     view->network_dialog_cancel_button = gui_view_create_action_button(
-        view->network_dialog, 562, 444, 136, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        view->network_dialog, 562, 444, 128, 48, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
 
     view->password_dialog = gui_view_create_settings_page(view->settings_panel);
@@ -728,14 +969,14 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
 
     view->password_dialog_cancel_button = gui_view_create_action_button(
-        view->password_dialog, 282, 148, 128, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 282, 148, 128, 48, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     view->password_dialog_disconnect_button = gui_view_create_action_button(
-        view->password_dialog, 426, 148, 128, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 426, 148, 128, 40, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     lv_obj_add_flag(view->password_dialog_disconnect_button, LV_OBJ_FLAG_HIDDEN);
     view->password_dialog_connect_button = gui_view_create_action_button(
-        view->password_dialog, 570, 148, 132, "Connect", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 570, 148, 132, 40, "Connect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     lv_obj_set_style_bg_color(view->password_dialog_connect_button, lv_color_hex(0x1D4ED8), 0);
     lv_obj_set_style_text_color(view->password_dialog_connect_button, lv_color_hex(0xFFFFFF), 0);
@@ -743,6 +984,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_border_width(view->password_dialog_connect_button, 0, 0);
     gui_view_layout_password_dialog_buttons(view, false);
 
+    view->active_settings_subpage = GUI_SETTINGS_SUBPAGE_HOME;
     gui_view_hide_wifi_dialogs_impl(view);
 }
 
@@ -752,6 +994,7 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     const char *network_empty_text = "No networks found yet.";
     bool can_disconnect;
     bool is_connecting;
+    bool location_changed;
     bool wifi_changed;
     uint8_t network_index;
 
@@ -760,7 +1003,9 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     }
 
     wifi_changed = gui_view_wifi_settings_changed(view, &model->wifi);
-    if (!wifi_changed && !gui_view_appearance_settings_changed(view, &model->appearance)) {
+    location_changed = gui_view_location_settings_changed(view, &model->location);
+    if (!wifi_changed && !location_changed &&
+        !gui_view_appearance_settings_changed(view, &model->appearance)) {
         return;
     }
 
@@ -873,6 +1118,16 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     if (!lv_obj_has_state(view->wifi_password_textarea, LV_STATE_FOCUSED)) {
         gui_view_set_textarea_text_if_changed(view->wifi_password_textarea, model->wifi.password);
     }
+    if ((view->location_latitude_textarea != NULL) &&
+        !lv_obj_has_state(view->location_latitude_textarea, LV_STATE_FOCUSED)) {
+        gui_view_set_textarea_text_if_changed(view->location_latitude_textarea,
+                                              model->location.latitude);
+    }
+    if ((view->location_longitude_textarea != NULL) &&
+        !lv_obj_has_state(view->location_longitude_textarea, LV_STATE_FOCUSED)) {
+        gui_view_set_textarea_text_if_changed(view->location_longitude_textarea,
+                                              model->location.longitude);
+    }
 
     if (model->wifi.network_count == 0U) {
         if (model->wifi.status_text[0] != '\0') {
@@ -918,4 +1173,6 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
 
     view->last_wifi_settings = model->wifi;
     view->has_last_wifi_settings = true;
+    view->last_location_settings = model->location;
+    view->has_last_location_settings = true;
 }

@@ -46,4 +46,19 @@ void gui_view_show_network_dialog_impl(gui_view_t *view);
  */
 void gui_view_show_password_dialog_impl(gui_view_t *view);
 
+/**
+ * @brief Switch the settings panel to a specific internal subpage.
+ *
+ * @param view Initialized view object.
+ * @param subpage Settings subpage to show.
+ */
+void gui_view_show_settings_subpage_impl(gui_view_t *view, gui_settings_subpage_t subpage);
+
+/**
+ * @brief Reset settings navigation to the category chooser home page.
+ *
+ * @param view Initialized view object.
+ */
+void gui_view_reset_settings_navigation_impl(gui_view_t *view);
+
 #endif

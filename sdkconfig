@@ -972,6 +972,13 @@ CONFIG_REDMOLE_BME280_BACKEND_HW=y
 # end of RedMole Sensor Configuration
 
 #
+# RedMole LEOP Configuration
+#
+# default:
+CONFIG_REDMOLE_LEOP_REFRESH_URL="http://127.0.0.1:10480/endpoints/result.json"
+# end of RedMole LEOP Configuration
+
+#
 # Compiler options
 #
 # CONFIG_COMPILER_OPTIMIZATION_DEBUG is not set
@@ -4165,6 +4172,13 @@ CONFIG_LV_BUILD_EXAMPLES=y
 # CONFIG_LV_USE_DEMO_MUSIC is not set
 # end of Demos
 # end of LVGL configuration
+
+#
+# cJSON
+#
+CONFIG_CJSON_NESTING_LIMIT=1000
+CONFIG_CJSON_CIRCULAR_LIMIT=10000
+# end of cJSON
 # end of Component config
 
 CONFIG_IDF_EXPERIMENTAL_FEATURES=y
