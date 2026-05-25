@@ -9,33 +9,29 @@
 #define GUI_VIEW_ENERGY_LEGEND_ROW_GAP 8
 #define GUI_VIEW_ENERGY_CHART_HORIZONTAL_INSET 12
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE 52
-#define GUI_VIEW_ENERGY_CHART_Y_AXIS_MIN 10
+#define GUI_VIEW_ENERGY_CHART_Y_AXIS_MIN 0
+#define GUI_VIEW_ENERGY_CHART_Y_AXIS_MAX 1000
+#define GUI_VIEW_ENERGY_CHART_VALUE_SCALE 1000
 
-static uint16_t gui_view_energy_plan_max_value(const gui_energy_plan_t *energy_plan)
+static void gui_view_energy_chart_draw_event_cb(lv_event_t *event)
 {
-    uint16_t max_value = 0;
-    uint16_t point_index;
+    lv_obj_draw_part_dsc_t *draw_part;
 
-    if (energy_plan == NULL) {
-        return 0;
+    if (event == NULL) {
+        return;
     }
 
-    for (point_index = 0; point_index < GUI_ENERGY_PLAN_POINT_COUNT; point_index++) {
-        if (energy_plan->buy_electricity[point_index] > max_value) {
-            max_value = energy_plan->buy_electricity[point_index];
-        }
-        if (energy_plan->use_solar_directly[point_index] > max_value) {
-            max_value = energy_plan->use_solar_directly[point_index];
-        }
-        if (energy_plan->charge_battery[point_index] > max_value) {
-            max_value = energy_plan->charge_battery[point_index];
-        }
-        if (energy_plan->sell_excess[point_index] > max_value) {
-            max_value = energy_plan->sell_excess[point_index];
-        }
+    draw_part = lv_event_get_draw_part_dsc(event);
+    if (!lv_obj_draw_part_check_type(draw_part, &lv_chart_class,
+                                     LV_CHART_DRAW_PART_TICK_LABEL) ||
+        (draw_part->id != LV_CHART_AXIS_PRIMARY_Y) || (draw_part->text == NULL)) {
+        return;
     }
 
-    return max_value;
+    lv_snprintf(draw_part->text, draw_part->text_length, "%d.%d",
+                (int)(draw_part->value / GUI_VIEW_ENERGY_CHART_VALUE_SCALE),
+                (int)((draw_part->value % GUI_VIEW_ENERGY_CHART_VALUE_SCALE) /
+                      (GUI_VIEW_ENERGY_CHART_VALUE_SCALE / 10)));
 }
 
 static void gui_view_layout_energy_panel(gui_view_t *view)
@@ -156,11 +152,15 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_size(view->energy_plan_chart, 0, LV_PART_INDICATOR);
     lv_chart_set_type(view->energy_plan_chart, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(view->energy_plan_chart, GUI_ENERGY_PLAN_POINT_COUNT);
-    lv_chart_set_range(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 100);
+    lv_chart_set_range(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_Y,
+                       GUI_VIEW_ENERGY_CHART_Y_AXIS_MIN,
+                       GUI_VIEW_ENERGY_CHART_Y_AXIS_MAX);
     lv_chart_set_axis_tick(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_Y, 6, 3, 6, 1, true,
                            GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE);
     lv_chart_set_axis_tick(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_X, 6, 3, 5, 5, false,
                            20);
+    lv_obj_add_event_cb(view->energy_plan_chart, gui_view_energy_chart_draw_event_cb,
+                        LV_EVENT_DRAW_PART_BEGIN, NULL);
     lv_obj_set_flex_grow(view->energy_plan_chart, 1);
 
     view->buy_series = lv_chart_add_series(view->energy_plan_chart, lv_color_hex(0x1D4ED8),
@@ -217,14 +217,6 @@ void gui_view_apply_energy_panel(gui_view_t *view, const gui_view_model_t *model
 
     if (!gui_view_energy_plan_changed(view, &model->energy_plan)) {
         return;
-    }
-
-    {
-        uint16_t max_value = gui_view_energy_plan_max_value(&model->energy_plan);
-        uint16_t axis_max = (max_value < GUI_VIEW_ENERGY_CHART_Y_AXIS_MIN) ?
-            GUI_VIEW_ENERGY_CHART_Y_AXIS_MIN : max_value;
-
-        lv_chart_set_range(view->energy_plan_chart, LV_CHART_AXIS_PRIMARY_Y, 0, axis_max);
     }
 
     gui_view_apply_energy_series(view->energy_plan_chart, view->buy_series,
