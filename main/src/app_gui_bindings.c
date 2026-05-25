@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -38,6 +39,7 @@ static const char *TAG = "APP_GUI_BINDINGS";
 #define LEOP_RAW_POINT_COUNT 96
 #define LEOP_POINTS_PER_HOUR 4
 #define LEOP_REFRESH_DELAY_MS 60000U
+#define GUI_VALID_TIME_THRESHOLD 1700000000
 /*
  * Scale LEOP hourly totals into integer chart values using milli-units so the
  * 15-minute inputs retain visible precision after aggregation.
@@ -66,6 +68,7 @@ typedef struct {
     int32_t last_brightness;
 
     bool boot_autoconnect_queued;
+    bool startup_clock_refresh_pending;
     char requested_ssid[GUI_WIFI_SSID_MAX_LEN];
 } app_gui_bindings_ctx_t;
 
@@ -106,6 +109,7 @@ static uint16_t leop_scale_hourly_total(double hourly_total);
 static void sync_sensor(gui_ctx_t *gui);
 static bool sync_wifi_state(gui_ctx_t *gui);
 static void sync_wifi(gui_ctx_t *gui);
+static void sync_startup_sidebar_clock(gui_ctx_t *gui, nac_wifi_status_t wifi_status);
 static bool sync_sd_card_state(gui_ctx_t *gui);
 
 // UI caching
@@ -364,6 +368,24 @@ static void sync_wifi(gui_ctx_t *gui)
     }
 
     gui_set_wifi_settings(gui, &wifi);
+}
+
+static void sync_startup_sidebar_clock(gui_ctx_t *gui, nac_wifi_status_t wifi_status)
+{
+    time_t now;
+
+    if ((gui == NULL) || !s_bindings.startup_clock_refresh_pending ||
+        (wifi_status != NAC_WIFI_CONNECTED)) {
+        return;
+    }
+
+    now = time(NULL);
+    if (now < GUI_VALID_TIME_THRESHOLD) {
+        return;
+    }
+
+    gui_refresh_sidebar_clock(gui);
+    s_bindings.startup_clock_refresh_pending = false;
 }
 
 // Loading & saving
@@ -1406,7 +1428,7 @@ static task_node_t leop_task = {0};
 static task_node_t sensor_task = {0};
 
 task_status_t forecast_work(task_node_t *node) {
-    ESP_LOGE(TAG, "Fetching forecast...");
+    ESP_LOGI(TAG, "Fetching forecast...");
     char url[1024];
     double latitude;
     double longitude;
@@ -1473,7 +1495,7 @@ task_status_t forecast_work(task_node_t *node) {
 }
 
 task_status_t leop_work(task_node_t *node) {
-    ESP_LOGE(TAG, "Fetching LEOP...");
+    ESP_LOGI(TAG, "Fetching LEOP...");
     enum { RESPONSE_BUF_LEN = 8192 };
     char *buf;
     gui_energy_plan_t energy_plan;
@@ -1523,7 +1545,7 @@ task_status_t leop_work(task_node_t *node) {
 }
 
 task_status_t sensor_work(task_node_t *node) {
-    ESP_LOGE(TAG, "Fetching sensor...");
+    ESP_LOGI(TAG, "Fetching sensor...");
 
     node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(FORECAST_REFRESH_DELAY_MS);
     return TASK_RUN_AGAIN;
@@ -1542,6 +1564,7 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
 
     memset(&s_bindings, 0, sizeof(s_bindings));
     s_bindings.gui = gui;
+    s_bindings.startup_clock_refresh_pending = true;
 
     bindings.user_data = &s_bindings;
     bindings.on_panel_changed = on_panel_changed;
@@ -1585,10 +1608,15 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
 
 void app_gui_bindings_sync(gui_ctx_t *gui)
 {
+    nac_wifi_status_t wifi_status;
+
     if (gui == NULL) {
         return;
     }
-    
+
+    wifi_status = nac_get_wifi_status();
+    sync_startup_sidebar_clock(gui, wifi_status);
+
     bool wifi_state_changed = sync_wifi_state(gui);
     if (wifi_state_changed || s_bindings.wifi_scan_requested || s_bindings.wifi_connect_requested || s_bindings.wifi_disconnect_requested) {
         sync_wifi(gui);

@@ -563,6 +563,18 @@ void gui_refresh(gui_ctx_t *self)
     lvgl_port_unlock();
 }
 
+void gui_refresh_sidebar_clock(gui_ctx_t *self)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    gui_screen_update_sidebar_clock(&runtime->screen);
+    lvgl_port_unlock();
+}
+
 void gui_set_active_panel(gui_ctx_t *self, gui_panel_id_t panel)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);

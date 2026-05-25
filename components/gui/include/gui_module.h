@@ -87,6 +87,13 @@ void gui_set_bindings(gui_ctx_t *self, const gui_module_bindings_t *bindings);
 void gui_refresh(gui_ctx_t *self);
 
 /**
+ * @brief Refresh the sidebar clock and date labels from the current system time.
+ *
+ * @param self Initialized GUI context.
+ */
+void gui_refresh_sidebar_clock(gui_ctx_t *self);
+
+/**
  * @brief Set the currently visible top-level panel.
  *
  * @param self Initialized GUI context.
