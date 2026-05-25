@@ -121,6 +121,40 @@ void gui_set_sensor_state(gui_ctx_t *self, const gui_sensor_state_t *sensor);
 bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor);
 
 /**
+ * @brief Update the latest energy plan values used by the GUI.
+ *
+ * @param self Initialized GUI context.
+ * @param energy_plan Energy plan values to copy into the GUI state.
+ */
+void gui_set_energy_plan_state(gui_ctx_t *self, const gui_energy_plan_t *energy_plan);
+
+/**
+ * @brief Read back the current energy plan values stored by the GUI.
+ *
+ * @param self Initialized GUI context.
+ * @param energy_plan Output pointer that receives the current energy plan state on success.
+ * @return True when the context is ready and the energy plan state was written.
+ */
+bool gui_get_energy_plan_state(gui_ctx_t *self, gui_energy_plan_t *energy_plan);
+
+/**
+ * @brief Update the latest forecast values used by the GUI.
+ *
+ * @param self Initialized GUI context.
+ * @param forecast Forecast values to copy into the GUI state.
+ */
+void gui_set_forecast_state(gui_ctx_t *self, const gui_forecast_state_t *forecast);
+
+/**
+ * @brief Read back the current forecast values stored by the GUI.
+ *
+ * @param self Initialized GUI context.
+ * @param forecast Output pointer that receives the current forecast state on success.
+ * @return True when the context is ready and the forecast state was written.
+ */
+bool gui_get_forecast_state(gui_ctx_t *self, gui_forecast_state_t *forecast);
+
+/**
  * @brief Replace the Wi-Fi settings model consumed by the GUI.
  *
  * @param self Initialized GUI context.
@@ -204,6 +238,23 @@ void gui_set_appearance_settings(gui_ctx_t *self, const gui_appearance_settings_
  * @return True when the context is ready and the appearance settings were written.
  */
 bool gui_get_appearance_settings(gui_ctx_t *self, gui_appearance_settings_t *appearance);
+
+/**
+ * @brief Update the user-editable location settings.
+ *
+ * @param self Initialized GUI context.
+ * @param location Location settings snapshot to copy.
+ */
+void gui_set_location_settings(gui_ctx_t *self, const gui_location_settings_t *location);
+
+/**
+ * @brief Read back the current location settings.
+ *
+ * @param self Initialized GUI context.
+ * @param location Output pointer that receives the current location settings on success.
+ * @return True when the context is ready and the location settings were written.
+ */
+bool gui_get_location_settings(gui_ctx_t *self, gui_location_settings_t *location);
 
 /**
  * @brief Set the display brightness used by the GUI platform layer.

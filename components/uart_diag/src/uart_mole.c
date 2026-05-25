@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/idf_additions.h"
+#include "http_client.h"
 #include "nac.h"
 #include "sensor_data.h"
 #include "task_scheduler.h"
@@ -20,7 +21,7 @@
 #define UART_MOLE_PORT          UART_NUM_0
 #define UART_MOLE_TX            43
 #define UART_MOLE_RX            44
-#define UART_MOLE_RX_BUF_SIZE   128
+#define UART_MOLE_RX_BUF_SIZE   256
 #define UART_MOLE_TX_BUF_SIZE   1024
 #define UART_MOLE_BAUD_RATE     115200
 #define UART_MOLE_STACK_SIZE    4096
@@ -156,6 +157,8 @@ static task_status_t uart_mole_work(task_node_t *node)
     uart_ctx_t *self = container_of(node, uart_ctx_t, task_node);
     uart_port_t port = (uart_port_t)self->uart_mole_port;
 
+    ESP_LOGI(TAG, "tx pkg tag=0x%02x", (unsigned)self->pkg_tag);
+
     switch (self->pkg_tag)
     {
         case UART_STATUS_PKG:
@@ -217,6 +220,11 @@ static task_status_t uart_mole_work(task_node_t *node)
             memset(pkg, 0, sizeof(*pkg));
             break;
         }
+        case UART_TEST_PKG:
+        {
+            // Handled directly in uart_mole_listener_task
+            break;
+        }
     }
 
     return TASK_DONE;
@@ -258,6 +266,8 @@ static void uart_mole_listener_task(void *pvParameters)
 
         if (uart_read_bytes(UART_MOLE_PORT, &cmd, 1, pdMS_TO_TICKS(20)) != 1)
             continue;
+
+        ESP_LOGI(TAG, "rx cmd 0x%02x", cmd);
 
         if (s_uart_mole.task_node.active)
         {
@@ -379,25 +389,50 @@ static void uart_mole_listener_task(void *pvParameters)
 
             case UART_SERVER_PKG:
             {
-                /* json_buf is allocated at init and persists for the application lifetime.
-                 * When the http_client getter API is available:
-                 *
-                 *   size_t json_len;
-                 *   http_client_get_cached(s_uart_mole.json_buf, UART_MOLE_JSON_BUF_SIZE, &json_len);
-                 *
-                 *   uart_server_pkg_t *pkg = &s_uart_mole.pkg_buf.server;
-                 *   pkg->json_data   = s_uart_mole.json_buf;
-                 *   pkg->tag_bit     = UART_SERVER_PKG;
-                 *   pkg->data_len    = json_len + sizeof(pkg->timestamp_s) + sizeof(pkg->crc16);
-                 *   pkg->timestamp_s = (uint32_t)time(NULL);
-                 *   uint16_t crc     = esp_crc16_le(0, (uint8_t *)pkg->json_data, json_len);
-                 *   pkg->crc16       = esp_crc16_le(crc, (uint8_t *)&pkg->timestamp_s,
-                 *                                   sizeof(pkg->timestamp_s));
-                 *   s_uart_mole.pkg_tag = UART_SERVER_PKG;
-                 *   s_uart_mole.stats.uart_mole_server_pkg++;
-                 *   task_scheduler_add(&s_uart_mole.task_node, 0);
-                 */
-                ESP_LOGW(TAG, "SERVER pkg not yet implemented");
+                const char *response = http_client_get_response();
+                if (!response || response[0] == '\0')
+                {
+                    ESP_LOGW(TAG, "no server data available");
+                    break;
+                }
+
+                size_t json_len = strnlen(response, UART_MOLE_JSON_BUF_SIZE - 1);
+                memcpy(s_uart_mole.json_buf, response, json_len);
+
+                uart_server_pkg_t *pkg = &s_uart_mole.pkg_buf.server;
+                pkg->json_data   = s_uart_mole.json_buf;
+                pkg->tag_bit     = UART_SERVER_PKG;
+                pkg->data_len    = (uint16_t)(json_len + sizeof(pkg->timestamp_s) + sizeof(pkg->crc16));
+                pkg->timestamp_s = (uint32_t)time(NULL);
+
+                uint16_t crc = esp_crc16_le(0, (uint8_t *)pkg->json_data, (uint32_t)json_len);
+                pkg->crc16   = esp_crc16_le(crc, (uint8_t *)&pkg->timestamp_s, sizeof(pkg->timestamp_s));
+
+                s_uart_mole.pkg_tag = UART_SERVER_PKG;
+                s_uart_mole.stats.uart_mole_server_pkg++;
+                task_scheduler_add(&s_uart_mole.task_node, 0);
+                break;
+            }
+
+            case UART_TEST_PKG:
+            {
+                /* Fixed-content packet: [tag][data_len_lo][data_len_hi]
+                 *                       [0xDE][0xAD][0xBE][0xEF][crc_lo][crc_hi]
+                 * Sent directly — no scheduler needed for a hardcoded response. */
+                static const uint8_t magic[4] = {0xDE, 0xAD, 0xBE, 0xEF};
+                uint16_t crc = esp_crc16_le(0, magic, sizeof(magic));
+                uint8_t pkt[9];
+                pkt[0] = UART_TEST_PKG;
+                pkt[1] = 6;                        /* data_len = 4 magic + 2 crc */
+                pkt[2] = 0;
+                pkt[3] = 0xDE;
+                pkt[4] = 0xAD;
+                pkt[5] = 0xBE;
+                pkt[6] = 0xEF;
+                pkt[7] = (uint8_t)(crc & 0xFF);
+                pkt[8] = (uint8_t)(crc >> 8);
+                uart_mole_uart_write_wrapper(UART_MOLE_PORT, pkt, sizeof(pkt));
+                ESP_LOGI(TAG, "tx test pkg crc=0x%04x", crc);
                 break;
             }
 

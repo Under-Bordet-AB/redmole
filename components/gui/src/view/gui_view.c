@@ -762,10 +762,14 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                   card_border, title_text, subtitle_text, accent_color,
                                   effective_theme);
 
-    gui_view_style_settings_card(view->connectivity_card, card_bg, card_border, title_text,
-                                 subtitle_text, effective_theme);
     gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
                                  subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->settings_connectivity_button, card_bg, card_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->settings_display_button, card_bg, card_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->settings_system_button, card_bg, card_border,
+                                 title_text, subtitle_text, effective_theme);
     gui_view_style_wifi_card(view, item_bg, item_border, title_text, subtitle_text,
                              effective_theme);
     gui_view_style_settings_card(view->bluetooth_card, item_bg, item_border, title_text,
@@ -773,6 +777,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     gui_view_style_settings_card(view->brightness_card, item_bg, item_border, title_text,
                                  subtitle_text, effective_theme);
     gui_view_style_settings_card(view->theme_card, item_bg, item_border, title_text,
+                                 subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->location_card, item_bg, item_border, title_text,
                                  subtitle_text, effective_theme);
     if (view->wifi_status_label != NULL) {
         gui_wifi_state_t wifi_state = view->has_last_wifi_settings
@@ -838,6 +844,14 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_color(view->theme_night_label, title_text, 0);
         lv_obj_set_style_text_font(view->theme_night_label, body_font, 0);
     }
+    if (view->location_latitude_label != NULL) {
+        lv_obj_set_style_text_color(view->location_latitude_label, title_text, 0);
+        lv_obj_set_style_text_font(view->location_latitude_label, body_font, 0);
+    }
+    if (view->location_longitude_label != NULL) {
+        lv_obj_set_style_text_color(view->location_longitude_label, title_text, 0);
+        lv_obj_set_style_text_font(view->location_longitude_label, body_font, 0);
+    }
 
     if (view->sidebar_clock_label != NULL) {
         lv_obj_set_style_text_color(view->sidebar_clock_label, title_text, 0);
@@ -899,6 +913,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
 
     gui_view_style_action_button(view->scan_button, effective_theme, true);
     gui_view_style_action_button(view->disconnect_button, effective_theme, false);
+    gui_view_style_action_button(view->settings_connectivity_back_button, effective_theme, false);
+    gui_view_style_action_button(view->settings_display_back_button, effective_theme, false);
+    gui_view_style_action_button(view->settings_system_back_button, effective_theme, false);
     gui_view_style_action_button(view->network_dialog_cancel_button, effective_theme, false);
     gui_view_style_action_button(view->password_dialog_cancel_button, effective_theme, false);
     gui_view_style_action_button(view->password_dialog_connect_button, effective_theme, true);
@@ -955,6 +972,29 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_text_font(view->wifi_password_textarea, body_font,
                                 LV_PART_TEXTAREA_PLACEHOLDER);
 
+    if (view->location_latitude_textarea != NULL) {
+        lv_obj_set_style_bg_color(view->location_latitude_textarea, dropdown_bg, 0);
+        lv_obj_set_style_bg_opa(view->location_latitude_textarea, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(view->location_latitude_textarea, dropdown_border, 0);
+        lv_obj_set_style_text_color(view->location_latitude_textarea, title_text, 0);
+        lv_obj_set_style_text_color(view->location_latitude_textarea, subtitle_text,
+                                    LV_PART_TEXTAREA_PLACEHOLDER);
+        lv_obj_set_style_text_font(view->location_latitude_textarea, body_font, 0);
+        lv_obj_set_style_text_font(view->location_latitude_textarea, body_font,
+                                   LV_PART_TEXTAREA_PLACEHOLDER);
+    }
+    if (view->location_longitude_textarea != NULL) {
+        lv_obj_set_style_bg_color(view->location_longitude_textarea, dropdown_bg, 0);
+        lv_obj_set_style_bg_opa(view->location_longitude_textarea, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(view->location_longitude_textarea, dropdown_border, 0);
+        lv_obj_set_style_text_color(view->location_longitude_textarea, title_text, 0);
+        lv_obj_set_style_text_color(view->location_longitude_textarea, subtitle_text,
+                                    LV_PART_TEXTAREA_PLACEHOLDER);
+        lv_obj_set_style_text_font(view->location_longitude_textarea, body_font, 0);
+        lv_obj_set_style_text_font(view->location_longitude_textarea, body_font,
+                                   LV_PART_TEXTAREA_PLACEHOLDER);
+    }
+
     lv_obj_set_style_bg_color(view->wifi_keyboard, keyboard_bg, 0);
     lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(view->wifi_keyboard, keyboard_border, 0);
@@ -992,6 +1032,45 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_special_text,
                                 LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
 
+    if (view->location_keyboard != NULL) {
+        lv_obj_set_style_bg_color(view->location_keyboard, keyboard_bg, 0);
+        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(view->location_keyboard, keyboard_border, 0);
+        lv_obj_set_style_bg_color(view->location_keyboard, keyboard_key_bg, LV_PART_ITEMS);
+        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER, LV_PART_ITEMS);
+        lv_obj_set_style_border_color(view->location_keyboard, keyboard_border, LV_PART_ITEMS);
+        lv_obj_set_style_text_color(view->location_keyboard, keyboard_key_text, LV_PART_ITEMS);
+        lv_obj_set_style_text_font(view->location_keyboard, emphasis_font, LV_PART_ITEMS);
+        lv_obj_set_style_bg_color(view->location_keyboard,
+                                  lv_color_darken(keyboard_key_bg, LV_OPA_40),
+                                  LV_PART_ITEMS | LV_STATE_PRESSED);
+        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER,
+                                LV_PART_ITEMS | LV_STATE_PRESSED);
+        lv_obj_set_style_border_color(view->location_keyboard,
+                                      lv_color_darken(keyboard_border, LV_OPA_40),
+                                      LV_PART_ITEMS | LV_STATE_PRESSED);
+        lv_obj_set_style_text_color(view->location_keyboard, keyboard_key_text,
+                                    LV_PART_ITEMS | LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(view->location_keyboard, keyboard_special_bg,
+                                  LV_PART_ITEMS | LV_STATE_CHECKED);
+        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER,
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
+        lv_obj_set_style_border_color(view->location_keyboard, keyboard_special_border,
+                                      LV_PART_ITEMS | LV_STATE_CHECKED);
+        lv_obj_set_style_text_color(view->location_keyboard, keyboard_special_text,
+                                    LV_PART_ITEMS | LV_STATE_CHECKED);
+        lv_obj_set_style_bg_color(view->location_keyboard,
+                                  lv_color_darken(keyboard_special_bg, LV_OPA_40),
+                                  LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER,
+                                LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+        lv_obj_set_style_border_color(view->location_keyboard,
+                                      lv_color_darken(keyboard_special_border, LV_OPA_40),
+                                      LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+        lv_obj_set_style_text_color(view->location_keyboard, keyboard_special_text,
+                                    LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+    }
+
     if (view->has_last_active_panel) {
         gui_view_style_nav_button(view->bme280_button, view->current_theme,
                                   view->last_active_panel == GUI_PANEL_BME280);
@@ -1017,6 +1096,16 @@ void gui_view_show_network_dialog(gui_view_t *view)
 void gui_view_show_password_dialog(gui_view_t *view)
 {
     gui_view_show_password_dialog_impl(view);
+}
+
+void gui_view_show_settings_subpage(gui_view_t *view, gui_settings_subpage_t subpage)
+{
+    gui_view_show_settings_subpage_impl(view, subpage);
+}
+
+void gui_view_reset_settings_navigation(gui_view_t *view)
+{
+    gui_view_reset_settings_navigation_impl(view);
 }
 
 void gui_view_update_sidebar_clock_labels(gui_view_t *view)
@@ -1197,6 +1286,8 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)
 
         if (model->active_panel != GUI_PANEL_SETTINGS) {
             gui_view_hide_wifi_dialogs(view);
+        } else {
+            gui_view_reset_settings_navigation(view);
         }
 
         view->last_active_panel = model->active_panel;

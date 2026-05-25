@@ -108,12 +108,12 @@ int8_t gui_view_find_known_network_index(const gui_view_model_t *model, const ch
 }
 
 lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
-                                        lv_coord_t width, const char *text,
+                                        lv_coord_t width, lv_coord_t height, const char *text,
                                         lv_event_code_t event_code, lv_event_cb_t event_cb,
                                         void *event_user_data)
 {
     lv_obj_t *button = lv_btn_create(parent);
-    lv_obj_set_size(button, width, 40);
+    lv_obj_set_size(button, width, height);
     lv_obj_set_pos(button, x, y);
     lv_obj_set_style_radius(button, 14, 0);
     lv_obj_set_style_shadow_width(button, 0, 0);

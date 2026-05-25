@@ -1,4 +1,5 @@
 #include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
@@ -12,9 +13,11 @@
 #include "http_client.h"
 #include "sdcard.h"
 #include "sdcard_log.h"
+#include "uart_mole.h"
 
-static const char* TAG = "MAIN";
-static gui_ctx_t s_gui = {0};
+static const char *TAG = "MAIN";
+static gui_ctx_t        s_gui         = {0};
+static EventGroupHandle_t s_event_group = NULL;
 
 static esp_err_t init_single_instance_modules(void) {
     esp_err_t rv = rm_nvs_init("app");
@@ -33,7 +36,7 @@ static esp_err_t init_single_instance_modules(void) {
         return rv;
     }
 
-    if (http_client_init(HTTP_CLIENT_TLS_NONE, NULL) != ESP_OK) {
+    if (http_client_init(HTTP_CLIENT_TLS_BUNDLE, NULL) != ESP_OK) {
         ESP_LOGE(TAG, "http_client_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
@@ -47,18 +50,24 @@ static esp_err_t init_single_instance_modules(void) {
     rv = sdcard_init();
     if (rv != ESP_OK){
         ESP_LOGE(TAG, "sdcard_init failed: %s", esp_err_to_name(rv));
-        //return rv;
     }
     
+
+    rv = uart_mole_init(&s_event_group);
+    if (rv != ESP_OK) {
+        ESP_LOGE(TAG, "uart_mole_init failed: %s", esp_err_to_name(rv));
+        return rv;
+    }
+
     return ESP_OK;
 }
 
 static esp_err_t init_runtime_modules(void) {
-    if (task_scheduler_init() != ESP_OK) {
+/*     if (task_scheduler_init() != ESP_OK) {
         ESP_LOGE(TAG, "task_scheduler_init failed");
         return ESP_FAIL;
     }
-    ESP_LOGI(TAG, "task_scheduler_init started");
+    ESP_LOGI(TAG, "task_scheduler_init started"); */
 
     esp_err_t rv = local_sensor_service_init();
     if (rv != ESP_OK) {
@@ -104,6 +113,12 @@ static esp_err_t start_runtime_modules() {
 
 void app_main(void) {
     ESP_LOGI(TAG, "app_main entered");
+
+    s_event_group = xEventGroupCreate();
+    if (!s_event_group) {
+        ESP_LOGE(TAG, "xEventGroupCreate failed");
+        goto fatal_error;
+    }
 
     ESP_LOGI(TAG, "Initializing single-instance modules");
     if (init_single_instance_modules() != ESP_OK) {
