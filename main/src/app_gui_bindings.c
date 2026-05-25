@@ -39,8 +39,8 @@ static const char *TAG = "APP_GUI_BINDINGS";
 #define LEOP_POINTS_PER_HOUR 4
 #define LEOP_REFRESH_DELAY_MS 60000U
 /*
- * Scale LEOP hourly totals into integer chart values using milli-units so the
- * 15-minute inputs retain visible precision after aggregation.
+ * Scale LEOP normalized hourly averages into integer chart values using
+ * milli-units so the chart can render one decimal place on its 0.0-1.0 axis.
  */
 #define LEOP_VALUE_SCALE 1000.0
 
@@ -100,7 +100,7 @@ static bool forecast_load_location(double *latitude, double *longitude);
 static bool forecast_parse_response(const char *response, gui_forecast_state_t *forecast);
 static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_plan);
 static bool leop_parse_series(const cJSON *series_array, uint16_t *values, const char *series_name);
-static uint16_t leop_scale_hourly_total(double hourly_total);
+static uint16_t leop_scale_hourly_average(double hourly_average);
 
 // UI sync
 static void sync_sensor(gui_ctx_t *gui);
@@ -874,15 +874,15 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
 #undef FORECAST_PARSE_FAIL
 }
 
-static uint16_t leop_scale_hourly_total(double hourly_total)
+static uint16_t leop_scale_hourly_average(double hourly_average)
 {
     double scaled_value;
 
-    if (hourly_total <= 0.0) {
+    if (hourly_average <= 0.0) {
         return 0U;
     }
 
-    scaled_value = (hourly_total * LEOP_VALUE_SCALE) + 0.5;
+    scaled_value = (hourly_average * LEOP_VALUE_SCALE) + 0.5;
     if (scaled_value >= (double)UINT16_MAX) {
         return UINT16_MAX;
     }
@@ -910,7 +910,7 @@ static bool leop_parse_series(const cJSON *series_array, uint16_t *values, const
     }
 
     for (hour_index = 0; hour_index < GUI_ENERGY_PLAN_POINT_COUNT; hour_index++) {
-        double hourly_total = 0.0;
+        double hourly_sum = 0.0;
         int quarter_index;
 
         for (quarter_index = 0; quarter_index < LEOP_POINTS_PER_HOUR; quarter_index++) {
@@ -918,16 +918,21 @@ static bool leop_parse_series(const cJSON *series_array, uint16_t *values, const
                                                      (hour_index * LEOP_POINTS_PER_HOUR) +
                                                      quarter_index);
 
+            if (cJSON_IsNull(sample)) {
+                continue;
+            }
+
             if (!cJSON_IsNumber(sample)) {
                 ESP_LOGW(TAG, "LEOP parse error: %s[%d] is not numeric", series_name,
                          (hour_index * LEOP_POINTS_PER_HOUR) + quarter_index);
                 return false;
             }
 
-            hourly_total += sample->valuedouble;
+            hourly_sum += sample->valuedouble;
         }
 
-        values[hour_index] = leop_scale_hourly_total(hourly_total);
+        values[hour_index] =
+            leop_scale_hourly_average(hourly_sum / (double)LEOP_POINTS_PER_HOUR);
     }
 
     return true;

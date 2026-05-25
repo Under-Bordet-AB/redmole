@@ -25,7 +25,7 @@ menu "RedMole LEOP Configuration"
 
     config REDMOLE_LEOP_REFRESH_URL
         string "LEOP refresh URL"
-        default "http://127.0.0.1:10480/endpoints/result.json"
+        default "http://ubdev.emk530.net:10480/result.json"
         help
             URL used to refresh the LEOP energy plan data.
 
