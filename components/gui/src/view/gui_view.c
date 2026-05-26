@@ -718,7 +718,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_shadow_color(view->sidebar, sidebar_shadow, 0);
     brand = lv_obj_get_child(view->sidebar, 0);
     if (brand != NULL) {
-        lv_obj_set_style_text_color(brand, brand_text, 0);
+        //lv_obj_set_style_text_color(brand, brand_text, 0);
+        lv_obj_set_style_text_color(brand, accent_color, 0);
         lv_obj_set_style_text_font(brand, emphasis_font, 0);
     }
 
@@ -1202,7 +1203,8 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_label_set_text(view->sidebar_date_label, "--- -- ---");
     lv_obj_set_style_text_font(view->sidebar_date_label, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(view->sidebar_date_label, lv_color_hex(0x94A3B8), 0);
-    lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 84);
+    //lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 88);
 
     view->bme280_button = gui_view_create_nav_button(sidebar, 140, "BME280", nav_event_cb,
                                                        event_user_data);

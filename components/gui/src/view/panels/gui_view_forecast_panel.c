@@ -7,7 +7,7 @@
 #include "../gui_theme_defs.h"
 #include "../gui_view_common.h"
 
-#define FORECAST_TODAY_ICON_SIZE 142
+#define FORECAST_TODAY_ICON_SIZE 136
 #define FORECAST_DAY_ICON_SIZE   76
 #define FORECAST_ENABLE_TODAY_ICON 1
 #define FORECAST_ENABLE_DAY_ICONS  1
