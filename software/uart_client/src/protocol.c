@@ -141,9 +141,9 @@ void protocol_decode_sensor(const uint8_t *payload, uint16_t data_len)
     printf("  Timestamp:   %u s\n", ts);
 }
 
-void protocol_decode_config(const uint8_t *payload, uint16_t data_len)
+void protocol_decode_restart(const uint8_t *payload, uint16_t data_len)
 {
-    if (data_len < 7) { fprintf(stderr, "decode_config: short payload\n"); return; }
+    if (data_len < 7) { fprintf(stderr, "decode_restart: short payload\n"); return; }
 
     uint8_t  rslt = payload[0];
     uint32_t ts   = (uint32_t)( payload[1]
@@ -151,7 +151,7 @@ void protocol_decode_config(const uint8_t *payload, uint16_t data_len)
                   | ((uint32_t)payload[3] << 16)
                   | ((uint32_t)payload[4] << 24));
 
-    printf("--- CONFIG ---\n");
+    printf("--- RESTART ---\n");
     printf("  Result:    %s\n", (rslt & (1 << 0)) ? "OK" : (rslt & (1 << 1)) ? "FAILED" : "unknown");
     printf("  Timestamp: %u s\n", ts);
 }

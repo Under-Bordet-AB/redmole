@@ -1,4 +1,4 @@
-# uart_diag — ESP32-S3 UART Diagnostic Server
+# uart_mole — ESP32-S3 UART Diagnostic Server
 
 This document explains how the `uart_diag` component works: what it does, why it is structured the way it is, and what you need to understand about the ESP32-S3 hardware and FreeRTOS to follow the code.
 
@@ -128,12 +128,12 @@ Each package type corresponds to a command byte. The mapping is defined by `uart
 
 | Tag | Value | Description |
 |-----|-------|-------------|
-| `UART_STATUS_PKG` | 0 | WiFi, server, and sensor online flags + uptime + timestamp |
-| `UART_SERVER_PKG` | 1 | Last HTTP response body as JSON + timestamp |
-| `UART_SENSOR_PKG` | 2 | Temperature, humidity, pressure (×100 integer) + timestamp |
-| `UART_CONFIG_PKG` | 3 | Configuration result flags + timestamp |
-| `UART_DIAG_PKG` | 4 | Task count, stack high-water mark, stack used + timestamp |
-| `UART_TEST_PKG` | 5 | Fixed magic bytes `0xDEADBEEF` + CRC (used for wire testing) |
+| `UART_STATUS_PKG`  | 0 | WiFi, server, sensor, GUI, SD card online flags + uptime + timestamp |
+| `UART_SERVER_PKG`  | 1 | Last HTTP response body as JSON + timestamp |
+| `UART_SENSOR_PKG`  | 2 | Temperature, humidity, pressure (×100 integer) + timestamp |
+| `UART_RESTART_PKG` | 3 | Restart acknowledgement — ACK is sent, FIFO is drained, then `esp_restart()` is called |
+| `UART_DIAG_PKG`    | 4 | Task count, stack high-water mark, stack used + timestamp |
+| `UART_TEST_PKG`    | 5 | Fixed magic bytes `0xDEADBEEF` + CRC (used for wire testing) |
 
 All fixed-layout packages are declared as packed structs:
 
@@ -159,7 +159,7 @@ All package types share a single memory region via a union:
 union {
     uart_status_pkg_t  status;
     uart_sensor_pkg_t  sensor;
-    uart_config_pkg_t  config;
+    uart_restart_pkg_t restart;
     uart_diag_pkg_t    diag;
     uart_server_pkg_t  server;
 } pkg_buf;
@@ -284,7 +284,36 @@ The `task_node.active` flag is set by the scheduler while the node is queued or 
 
 ---
 
-## 8. The TEST Package
+## 8. The RESTART Package
+
+`UART_RESTART_PKG` (tag 3) causes the ESP32 to reset itself cleanly after acknowledging the command. The sequencing is critical: the chip must not reset before the client has received the response, otherwise the client gets a timeout instead of a confirmation.
+
+The listener builds the ACK normally and hands it to the scheduler:
+
+```c
+pkg->tag_bit     = UART_RESTART_PKG;
+pkg->data_len    = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);
+pkg->rslt_bit    = SET_RESTART_OK;
+pkg->timestamp_s = (uint32_t)time(NULL);
+pkg->crc16       = esp_crc16_le(0, &pkg->rslt_bit, pkg->data_len - sizeof(pkg->crc16));
+task_scheduler_add(&s_uart_mole.task_node, 0);
+```
+
+`uart_mole_work` sends the bytes and then drains the hardware TX FIFO before resetting:
+
+```c
+uart_mole_uart_write_wrapper(port, pkg, hdr_len);
+uart_mole_uart_write_wrapper(port, payload, pkg->data_len);
+uart_wait_tx_done(port, pdMS_TO_TICKS(200));   // block until FIFO is empty
+ESP_LOGI(TAG, "restarting now");
+esp_restart();
+```
+
+`uart_wait_tx_done` is essential. `uart_write_bytes` copies bytes into the driver's DMA buffer and returns immediately — the bytes have not been clocked out yet. Calling `esp_restart()` at that point would cut the packet short. With `uart_wait_tx_done`, the function blocks until the UART peripheral confirms the TX FIFO is empty and the last bit has left the GPIO pin. At 115200 baud the 9-byte ACK takes under 1 ms; the 200 ms timeout is purely defensive.
+
+---
+
+## 9. The TEST Package
 
 `UART_TEST_PKG` (tag 5) is a hardcoded diagnostic packet that does not use the scheduler or `pkg_buf`. It is built inline and sent directly from the listener task:
 
@@ -300,7 +329,7 @@ Its purpose is to verify the complete wire path — baud rate, framing, CRC algo
 
 ---
 
-## 9. Logging
+## 10. Logging
 
 The module logs key events at `ESP_LOGI` level:
 

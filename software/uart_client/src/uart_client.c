@@ -18,7 +18,7 @@ static int s_fd = -1;
 typedef struct { uart_base_t base; } pkg_status_t;
 typedef struct { uart_base_t base; } pkg_server_t;
 typedef struct { uart_base_t base; } pkg_sensor_t;
-typedef struct { uart_base_t base; } pkg_config_t;
+typedef struct { uart_base_t base; } pkg_restart_t;
 typedef struct { uart_base_t base; } pkg_diag_t;
 
 /* --- vtable implementations ------------------------------------------------ */
@@ -50,12 +50,12 @@ static int8_t read_sensor(uart_package_t self)
     return 0;
 }
 
-static int8_t read_config(uart_package_t self)
+static int8_t read_restart(uart_package_t self)
 {
     (void)self;
     uint8_t tag; uint8_t payload[MAX_PACKET_PAYLOAD]; uint16_t data_len;
     if (protocol_recv_packet(s_fd, &tag, payload, &data_len) < 0) return -1;
-    protocol_decode_config(payload, data_len);
+    protocol_decode_restart(payload, data_len);
     return 0;
 }
 
@@ -80,7 +80,7 @@ static int8_t read_test(uart_package_t self)
 static struct uart_api s_vtable_status = { read_status, NULL };
 static struct uart_api s_vtable_server = { read_server, NULL };
 static struct uart_api s_vtable_sensor = { read_sensor, NULL };
-static struct uart_api s_vtable_config = { read_config, NULL };
+static struct uart_api s_vtable_restart = { read_restart, NULL };
 static struct uart_api s_vtable_diag   = { read_diag,   NULL };
 static struct uart_api s_vtable_test   = { read_test,   NULL };
 
@@ -96,7 +96,7 @@ uart_package_t uart_client_create_package(uart_pkg_tag_t tag)
         case TAG_STATUS: sz = sizeof(pkg_status_t); vtable = &s_vtable_status; break;
         case TAG_SERVER: sz = sizeof(pkg_server_t); vtable = &s_vtable_server; break;
         case TAG_SENSOR: sz = sizeof(pkg_sensor_t); vtable = &s_vtable_sensor; break;
-        case TAG_CONFIG: sz = sizeof(pkg_config_t); vtable = &s_vtable_config; break;
+        case TAG_RESTART: sz = sizeof(pkg_restart_t); vtable = &s_vtable_restart; break;
         case TAG_DIAG:   sz = sizeof(pkg_diag_t);   vtable = &s_vtable_diag;   break;
         case TAG_TEST:   sz = sizeof(pkg_diag_t);   vtable = &s_vtable_test;   break;
         default:
@@ -183,7 +183,7 @@ void uart_client_work(uart_client_t *self)
 
     for (;;)
     {
-        printf("\n[0] STATUS  [1] SERVER  [2] SENSOR  [3] CONFIG  [4] DIAG  [5] TEST  [q] Quit\n> ");
+        printf("\n[0] STATUS  [1] SERVER  [2] SENSOR  [3] RESTART  [4] DIAG  [5] TEST  [q] Quit\n> ");
         fflush(stdout);
 
         int ch = fgetc(stdin);
@@ -202,7 +202,7 @@ void uart_client_work(uart_client_t *self)
             case '0': tag = TAG_STATUS; break;
             case '1': tag = TAG_SERVER; break;
             case '2': tag = TAG_SENSOR; break;
-            case '3': tag = TAG_CONFIG; break;
+            case '3': tag = TAG_RESTART; break;
             case '4': tag = TAG_DIAG;   break;
             case '5': tag = TAG_TEST;   break;
             default:
