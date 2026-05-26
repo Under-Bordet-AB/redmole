@@ -130,16 +130,16 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
 
     view->energy_legend_dots[0] = gui_view_create_legend_item(
         legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x1D4ED8),
-        "Buy electricity");
+        "Buy electricity", &view->energy_legend_labels[0]);
     view->energy_legend_dots[1] = gui_view_create_legend_item(
         legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xF59E0B),
-        "Use solar directly");
+        "Use solar directly", &view->energy_legend_labels[1]);
     view->energy_legend_dots[2] = gui_view_create_legend_item(
-        legend_container, 0, 0,
-        GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x10B981), "Charge battery");
+        legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x10B981),
+        "Charge battery", &view->energy_legend_labels[2]);
     view->energy_legend_dots[3] = gui_view_create_legend_item(
         legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xEF4444),
-        "Sell excess");
+        "Sell excess", &view->energy_legend_labels[3]);
 
     view->energy_plan_chart = lv_chart_create(view->energy_plan_panel);
     lv_obj_set_size(view->energy_plan_chart, LV_PCT(100), 0);

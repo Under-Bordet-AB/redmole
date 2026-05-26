@@ -317,6 +317,23 @@ static void gui_view_style_energy_labels(lv_obj_t *parent, lv_color_t text_color
     }
 }
 
+static void gui_view_style_energy_legend_labels(gui_view_t *view, lv_color_t text_color)
+{
+    uint32_t index;
+
+    if (view == NULL) {
+        return;
+    }
+
+    for (index = 0;
+         index < (sizeof(view->energy_legend_labels) / sizeof(view->energy_legend_labels[0]));
+         index++) {
+        if (view->energy_legend_labels[index] != NULL) {
+            lv_obj_set_style_text_color(view->energy_legend_labels[index], text_color, 0);
+        }
+    }
+}
+
 static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
                                              lv_color_t card_border, lv_color_t title_color,
                                              lv_color_t subtitle_color,
@@ -792,6 +809,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     }
     lv_obj_set_style_text_font(view->energy_plan_panel, body_font, 0);
     gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, effective_theme);
+    //gui_view_style_energy_legend_labels(view, accent_soft_color);
+    gui_view_style_energy_legend_labels(view, subtitle_text);
 
     gui_view_style_forecast_panel(view, panel_bg, panel_border, panel_bg_opa, card_bg,
                                   card_border, title_text, subtitle_text, accent_color,
