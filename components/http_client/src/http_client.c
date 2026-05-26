@@ -68,10 +68,10 @@ static task_status_t http_poll(task_node_t *node)
     http_client_ctx_t *self = container_of(node, http_client_ctx_t, task_node);
     (void)self;
 
-    // if (http_client_get("https://jsonplaceholder.typicode.com/todos/1", s_response_buf, CONFIG_REDMOLE_HTTP_RESPONSE_BUF_SIZE) != ESP_OK)
-    // {
-    //     ESP_LOGW(TAG, "Poll request failed");
-    // }
+    if (http_client_get("https://jsonplaceholder.typicode.com/todos/1", s_response_buf, CONFIG_REDMOLE_HTTP_RESPONSE_BUF_SIZE) != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Poll request failed");
+    }
 
     node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(CONFIG_REDMOLE_HTTP_POLL_INTERVAL_MS);
     return TASK_RUN_AGAIN;
