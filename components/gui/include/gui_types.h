@@ -32,6 +32,21 @@ typedef enum {
     GUI_VIEW_THEME_SPONGEBOB,
 } gui_view_theme_t;
 
+/**
+ * @brief Weather icon identifiers rendered by the forecast panel.
+ */
+typedef enum {
+    GUI_WEATHER_ICON_CLEAR = 0,
+    GUI_WEATHER_ICON_PARTLY_CLOUDY,
+    GUI_WEATHER_ICON_CLOUDY,
+    GUI_WEATHER_ICON_FOG,
+    GUI_WEATHER_ICON_DRIZZLE,
+    GUI_WEATHER_ICON_RAIN,
+    GUI_WEATHER_ICON_SNOW,
+    GUI_WEATHER_ICON_THUNDERSTORM,
+    GUI_WEATHER_ICON_COUNT,
+} gui_weather_icon_t;
+
 /** Hourly points stored in an energy plan day profile. */
 #define GUI_ENERGY_PLAN_POINT_COUNT 24
 /** Number of daily forecast entries rendered in the forecast panel. */
@@ -64,6 +79,8 @@ typedef enum {
 #define GUI_FORECAST_DETAIL_TEXT_MAX_LEN 32
 /** Maximum length of a compact forecast day label. */
 #define GUI_FORECAST_DAY_LABEL_MAX_LEN 12
+/** Maximum length of a daily forecast date string. */
+#define GUI_FORECAST_DAY_DATE_TEXT_MAX_LEN 16
 /** Maximum length of a daily forecast range string. */
 #define GUI_FORECAST_DAY_RANGE_TEXT_MAX_LEN 20
 
@@ -103,7 +120,8 @@ typedef struct {
  */
 typedef struct {
     char label[GUI_FORECAST_DAY_LABEL_MAX_LEN]; /*!< Day label such as Mon or Tue. */
-    char condition[GUI_FORECAST_CONDITION_MAX_LEN]; /*!< Short condition summary. */
+    char date_text[GUI_FORECAST_DAY_DATE_TEXT_MAX_LEN]; /*!< Calendar date such as May 26. */
+    gui_weather_icon_t icon; /*!< Icon matching the daily weather condition. */
     char range_text[GUI_FORECAST_DAY_RANGE_TEXT_MAX_LEN]; /*!< Daily high/low temperature text. */
 } gui_forecast_day_t;
 
@@ -114,6 +132,7 @@ typedef struct {
     bool has_data; /*!< True when the values came from a parsed forecast response. */
     char title[GUI_FORECAST_TITLE_MAX_LEN]; /*!< Primary forecast heading. */
     char condition[GUI_FORECAST_CONDITION_MAX_LEN]; /*!< Current condition text. */
+    gui_weather_icon_t current_icon; /*!< Icon matching the current weather condition. */
     char current_temperature[GUI_FORECAST_TEMP_TEXT_MAX_LEN]; /*!< Current temperature text. */
     char range_text[GUI_FORECAST_RANGE_TEXT_MAX_LEN]; /*!< High/low summary text. */
     char summary[GUI_FORECAST_SUMMARY_TEXT_MAX_LEN]; /*!< One-line forecast summary. */
