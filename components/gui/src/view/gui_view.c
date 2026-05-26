@@ -719,7 +719,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     brand = lv_obj_get_child(view->sidebar, 0);
     if (brand != NULL) {
         lv_obj_set_style_text_color(brand, brand_text, 0);
-        lv_obj_set_style_text_font(brand, body_font, 0);
+        lv_obj_set_style_text_font(brand, emphasis_font, 0);
     }
 
     lv_obj_set_style_bg_color(view->content, content_bg, 0);
@@ -1188,7 +1188,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 
     brand = lv_label_create(sidebar);
     lv_label_set_text(brand, "Redmole");
-    lv_obj_set_style_text_font(brand, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(brand, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(brand, lv_color_hex(0xF8FAFC), 0);
     lv_obj_align(brand, LV_ALIGN_TOP_MID, 0, 28);
 
