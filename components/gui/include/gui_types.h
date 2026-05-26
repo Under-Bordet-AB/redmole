@@ -71,6 +71,8 @@ typedef enum {
 #define GUI_FORECAST_CONDITION_MAX_LEN 32
 /** Maximum length of a forecast temperature string. */
 #define GUI_FORECAST_TEMP_TEXT_MAX_LEN 20
+/** Maximum length of the forecast feels-like temperature string. */
+#define GUI_FORECAST_FEELS_LIKE_TEXT_MAX_LEN 24
 /** Maximum length of the forecast range string. */
 #define GUI_FORECAST_RANGE_TEXT_MAX_LEN 32
 /** Maximum length of the forecast summary string. */
@@ -134,6 +136,7 @@ typedef struct {
     char condition[GUI_FORECAST_CONDITION_MAX_LEN]; /*!< Current condition text. */
     gui_weather_icon_t current_icon; /*!< Icon matching the current weather condition. */
     char current_temperature[GUI_FORECAST_TEMP_TEXT_MAX_LEN]; /*!< Current temperature text. */
+    char feels_like_temperature[GUI_FORECAST_FEELS_LIKE_TEXT_MAX_LEN]; /*!< Apparent temperature text. */
     char range_text[GUI_FORECAST_RANGE_TEXT_MAX_LEN]; /*!< High/low summary text. */
     char summary[GUI_FORECAST_SUMMARY_TEXT_MAX_LEN]; /*!< One-line forecast summary. */
     gui_forecast_details_t details; /*!< Detail lines for the side card. */

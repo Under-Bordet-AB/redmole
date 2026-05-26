@@ -37,6 +37,8 @@ static void gui_state_init_forecast(gui_forecast_state_t *forecast)
     snprintf(forecast->condition, sizeof(forecast->condition), "%s", "Mostly cloudy");
     forecast->current_icon = GUI_WEATHER_ICON_CLOUDY;
     snprintf(forecast->current_temperature, sizeof(forecast->current_temperature), "%s", "18 C");
+    snprintf(forecast->feels_like_temperature, sizeof(forecast->feels_like_temperature), "%s",
+             "Feels like 18 C");
     snprintf(forecast->range_text, sizeof(forecast->range_text), "%s", "High 21 C  |  Low 13 C");
     snprintf(forecast->summary, sizeof(forecast->summary), "%s", "Stays mild later today.");
     snprintf(forecast->details.rain_chance, sizeof(forecast->details.rain_chance), "%s",

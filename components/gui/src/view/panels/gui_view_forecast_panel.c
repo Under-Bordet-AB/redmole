@@ -419,7 +419,7 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_border_width(today_text_column, 0, 0);
     lv_obj_set_style_shadow_width(today_text_column, 0, 0);
     lv_obj_set_style_pad_all(today_text_column, 0, 0);
-    lv_obj_set_style_pad_row(today_text_column, 8, 0);
+    lv_obj_set_style_pad_row(today_text_column, 6, 0);
     lv_obj_clear_flag(today_text_column, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_layout(today_text_column, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(today_text_column, LV_FLEX_FLOW_COLUMN);
@@ -442,7 +442,11 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
 
     label = lv_label_create(today_text_column);
-    lv_label_set_text(label, "Cool morning, brighter later, light winds.");
+    lv_label_set_text(label, "Feels like 18 C");
+    lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
+
+    label = lv_label_create(today_text_column);
+    lv_label_set_text(label, "Stays mild later today.");
     lv_obj_set_width(label, LV_PCT(100));
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
@@ -543,7 +547,9 @@ void gui_view_apply_forecast_panel(gui_view_t *view, const gui_view_model_t *mod
     gui_view_forecast_set_label_text(today_text_column, 1, model->forecast.condition);
     gui_view_forecast_set_label_text(today_text_column, 2,
                                      model->forecast.current_temperature);
-    gui_view_forecast_set_label_text(today_text_column, 3, model->forecast.summary);
+    gui_view_forecast_set_label_text(today_text_column, 3,
+                                     model->forecast.feels_like_temperature);
+    gui_view_forecast_set_label_text(today_text_column, 4, model->forecast.summary);
     gui_view_forecast_apply_icon(today_icon_slot,
 #if FORECAST_FORCE_TODAY_CLEAR_FOR_TEST
                                  GUI_WEATHER_ICON_CLEAR,

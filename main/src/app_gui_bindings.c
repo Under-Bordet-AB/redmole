@@ -791,6 +791,7 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     cJSON *hourly;
     cJSON *current_time;
     cJSON *current_temperature;
+    cJSON *current_apparent_temperature;
     cJSON *current_humidity;
     cJSON *current_weather_code;
     cJSON *hourly_time;
@@ -836,6 +837,8 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     hourly = cJSON_GetObjectItemCaseSensitive(root, "hourly");
     current_time = cJSON_GetObjectItemCaseSensitive(current, "time");
     current_temperature = cJSON_GetObjectItemCaseSensitive(current, "temperature_2m");
+    current_apparent_temperature = cJSON_GetObjectItemCaseSensitive(current,
+                                                                    "apparent_temperature");
     current_humidity = cJSON_GetObjectItemCaseSensitive(current, "relative_humidity_2m");
     current_weather_code = cJSON_GetObjectItemCaseSensitive(current, "weather_code");
     hourly_time = cJSON_GetObjectItemCaseSensitive(hourly, "time");
@@ -908,6 +911,13 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     forecast->current_icon = forecast_weather_code_to_icon(current_weather_code->valueint);
     snprintf(forecast->current_temperature, sizeof(forecast->current_temperature), "%.0f C",
              current_temperature->valuedouble);
+    if (cJSON_IsNumber(current_apparent_temperature)) {
+        snprintf(forecast->feels_like_temperature, sizeof(forecast->feels_like_temperature),
+                 "Feels like %.0f C", current_apparent_temperature->valuedouble);
+    } else {
+        snprintf(forecast->feels_like_temperature, sizeof(forecast->feels_like_temperature),
+                 "%s", "Feels like N/A");
+    }
     snprintf(forecast->range_text, sizeof(forecast->range_text),
              "High %.0f C  |  Low %.0f C",
              today_temp_max->valuedouble, today_temp_min->valuedouble);
@@ -1543,7 +1553,8 @@ task_status_t forecast_work(task_node_t *node) {
     snprintf(url, sizeof(url),
              "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f"
              "&timezone=auto"
-             "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m"
+             "&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
+             "weather_code,wind_speed_10m,wind_direction_10m"
              "&hourly=temperature_2m,weather_code"
              "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant"
              "&forecast_days=5",
