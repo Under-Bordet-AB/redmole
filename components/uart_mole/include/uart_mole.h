@@ -52,8 +52,10 @@
 #define SET_GUI_ONLINE              (1 << 3)
 #define SET_SDCARD_ONLINE           (1 << 4)
 
-/* Event group bits injected from main.
- * NAC sets/clears WIFI, sensor_data sets/clears SENSOR, http_client sets/clears SERVER. */
+/* USE THESE TO SET YOUR MODULES BIT:
+ * ie. xEventGroupSetBits(self->event_group, UART_MOLE_WIFI_CONNECTED_BIT); for setting
+ * and xEventGroupClearBits(self->event_group, UART_MOLE_WIFI_CONNECTED_BIT); for clearing.
+. */
 #define UART_MOLE_WIFI_CONNECTED_BIT    BIT0
 #define UART_MOLE_SENSOR_ONLINE_BIT     BIT1
 #define UART_MOLE_SERVER_ONLINE_BIT     BIT2
