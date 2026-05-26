@@ -75,7 +75,7 @@ static esp_err_t init_runtime_modules(void) {
     gui_init(&s_gui, &gui_init_config);
 
     // Initialize the GUI bindings
-    rv = app_gui_bindings_init(&s_gui);
+    rv = app_gui_bindings_init(&s_gui, &s_event_group);
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "app_gui_bindings_init failed: %s", esp_err_to_name(rv));
         return rv;

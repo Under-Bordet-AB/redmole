@@ -72,6 +72,14 @@ void gui_run(gui_ctx_t *self);
 void gui_deinit(gui_ctx_t *self);
 
 /**
+ * @brief Check whether the GUI runtime is initialized and actively processing.
+ *
+ * @param self GUI context to inspect.
+ * @return True when the GUI is ready and its refresh heartbeat is recent.
+ */
+bool gui_is_active(gui_ctx_t *self);
+
+/**
  * @brief Register or replace the application callbacks used by the GUI.
  *
  * @param self Initialized GUI context.

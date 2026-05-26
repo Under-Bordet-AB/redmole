@@ -14,14 +14,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cJSON.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "http_client.h"
 #include "nac.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
 #include "sdkconfig.h"
+#include "uart_mole.h"
 
 static const char *TAG = "APP_GUI_BINDINGS";
 
@@ -46,6 +50,7 @@ static const char *TAG = "APP_GUI_BINDINGS";
 
 typedef struct {
     gui_ctx_t *gui;
+    EventGroupHandle_t *event_group;
 
     bool wifi_connect_requested;
     bool wifi_scan_requested;
@@ -80,6 +85,7 @@ static gui_wifi_state_t map_wifi_state(nac_wifi_status_t status);
 static void set_wifi_status(gui_ctx_t *gui, const char *status_text, gui_wifi_state_t state);
 static void copy_scan_results(gui_wifi_settings_t *wifi);
 static gui_sd_card_state_t get_sd_card_state(void);
+static void sync_gui_online_bit(gui_ctx_t *gui);
 static int32_t clamp_saved_brightness(int32_t value);
 static bool parse_coordinate_in_range(const char *text, double min_value, double max_value);
 static const char *forecast_weather_code_to_condition(int weather_code);
@@ -133,7 +139,7 @@ static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const ch
 static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data);
 
 // Basics
-esp_err_t app_gui_bindings_init(gui_ctx_t *gui);
+esp_err_t app_gui_bindings_init(gui_ctx_t *gui, EventGroupHandle_t *event_group);
 void app_gui_bindings_sync(gui_ctx_t *gui);
 
 // Function definitions
@@ -213,21 +219,64 @@ static void copy_scan_results(gui_wifi_settings_t *wifi)
     wifi->network_count = count;
 }
 
+static void format_unknown_last_updated(char *text, size_t text_len)
+{
+    if ((text == NULL) || (text_len == 0U)) {
+        return;
+    }
+
+    snprintf(text, text_len, "%s", "Last updated: --:--:--");
+}
+
+static void format_last_updated_now(char *text, size_t text_len)
+{
+    time_t now;
+    struct tm time_info;
+
+    if ((text == NULL) || (text_len == 0U)) {
+        return;
+    }
+
+    now = time(NULL);
+    if ((now < 1700000000) || (localtime_r(&now, &time_info) == NULL) ||
+        (strftime(text, text_len, "Last updated: %H:%M:%S", &time_info) == 0U)) {
+        format_unknown_last_updated(text, text_len);
+    }
+}
+
 static void sync_sensor(gui_ctx_t *gui)
 {
     sensor_data_sample sample = { 0 };
     gui_sensor_state_t sensor = { 0 };
+    gui_sensor_state_t current_sensor = { 0 };
+    bool has_current_sensor;
+    uint32_t update_count;
 
     if (gui == NULL) {
         return;
     }
 
+    has_current_sensor = gui_get_sensor_state(gui, &current_sensor);
+    if (has_current_sensor) {
+        sensor = current_sensor;
+    }
+
+    if (sensor.last_updated[0] == '\0') {
+        format_unknown_last_updated(sensor.last_updated, sizeof(sensor.last_updated));
+    }
+
     if (sensor_data_get_latest_local(&sample) && sample.valid) {
+        update_count = sensor_data_get_local_update_count();
         sensor.temperature_deci_c = sample.temperature_deci_c;
         sensor.humidity_deci_pct = sample.humidity_deci_pct;
         sensor.pressure_deci_hpa = sample.pressure_deci_hpa;
         sensor.is_fresh = sensor_data_is_local_fresh(3000U);
-        sensor.update_count = sensor_data_get_local_update_count();
+        sensor.update_count = update_count;
+        if (!has_current_sensor || (current_sensor.update_count != update_count)) {
+            format_last_updated_now(sensor.last_updated, sizeof(sensor.last_updated));
+        }
+    } else {
+        sensor.is_fresh = false;
     }
 
     gui_set_sensor_state(gui, &sensor);
@@ -236,6 +285,19 @@ static void sync_sensor(gui_ctx_t *gui)
 static gui_sd_card_state_t get_sd_card_state(void)
 {
     return GUI_SD_CARD_STATE_IDLE;
+}
+
+static void sync_gui_online_bit(gui_ctx_t *gui)
+{
+    if ((s_bindings.event_group == NULL) || (*s_bindings.event_group == NULL)) {
+        return;
+    }
+
+    if (gui_is_active(gui)) {
+        xEventGroupSetBits(*s_bindings.event_group, UART_MOLE_GUI_ONLINE_BIT);
+    } else {
+        xEventGroupClearBits(*s_bindings.event_group, UART_MOLE_GUI_ONLINE_BIT);
+    }
 }
 
 static bool sync_wifi_state(gui_ctx_t *gui)
@@ -1587,6 +1649,7 @@ task_status_t forecast_work(task_node_t *node) {
         return TASK_RUN_AGAIN;
     }
 
+    format_last_updated_now(forecast.last_updated, sizeof(forecast.last_updated));
     gui_set_forecast_state(s_bindings.gui, &forecast);
     free(buf);
     return TASK_RUN_AGAIN;
@@ -1637,6 +1700,7 @@ task_status_t leop_work(task_node_t *node) {
         return TASK_RUN_AGAIN;
     }
 
+    format_last_updated_now(energy_plan.last_updated, sizeof(energy_plan.last_updated));
     gui_set_energy_plan_state(s_bindings.gui, &energy_plan);
     free(buf);
     return TASK_RUN_AGAIN;
@@ -1652,16 +1716,20 @@ task_status_t sensor_work(task_node_t *node) {
 // Basics
 //////////////////////////
 
-esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
+esp_err_t app_gui_bindings_init(gui_ctx_t *gui, EventGroupHandle_t *event_group)
 {
     gui_module_bindings_t bindings = { 0 };
 
-    if (gui == NULL) {
+    if ((gui == NULL) || (event_group == NULL) || (*event_group == NULL)) {
+        if ((event_group != NULL) && (*event_group != NULL)) {
+            xEventGroupClearBits(*event_group, UART_MOLE_GUI_ONLINE_BIT);
+        }
         return ESP_ERR_INVALID_ARG;
     }
 
     memset(&s_bindings, 0, sizeof(s_bindings));
     s_bindings.gui = gui;
+    s_bindings.event_group = event_group;
 
     bindings.user_data = &s_bindings;
     bindings.on_panel_changed = on_panel_changed;
@@ -1705,6 +1773,8 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
 
 void app_gui_bindings_sync(gui_ctx_t *gui)
 {
+    sync_gui_online_bit(gui);
+
     if (gui == NULL) {
         return;
     }

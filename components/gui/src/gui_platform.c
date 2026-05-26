@@ -3,6 +3,8 @@
 #include <stdbool.h>
 
 #include "esp_check.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "gt911.h"
 #include "io_extension.h"
 #include "lvgl_port.h"
@@ -26,6 +28,7 @@ static void gui_platform_refresh_timer_cb(lv_timer_t *timer)
     }
 
     runtime = (gui_runtime_t *)self->module_state;
+    runtime->last_heartbeat_tick = xTaskGetTickCount();
 
     gui_screen_update_sidebar_clock(&runtime->screen);
 

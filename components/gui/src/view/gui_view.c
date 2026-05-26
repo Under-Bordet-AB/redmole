@@ -10,6 +10,9 @@
 #include "panels/gui_view_forecast_panel.h"
 #include "panels/gui_view_settings_panel.h"
 
+#define GUI_VIEW_UPDATE_LABEL_X_OFFSET 6
+#define GUI_VIEW_UPDATE_LABEL_Y_OFFSET 10
+
 static gui_view_theme_t gui_view_effective_theme(gui_view_theme_t base_theme,
                                                  bool night_variant_enabled)
 {
@@ -103,6 +106,41 @@ static void gui_view_update_sidebar_clock_impl(gui_view_t *view)
     strftime(date_text, sizeof(date_text), "%a %d %b", &time_info);
     gui_view_set_label_text_if_changed(view->sidebar_clock_label, clock_text);
     gui_view_set_label_text_if_changed(view->sidebar_date_label, date_text);
+}
+
+static void gui_view_apply_update_label(gui_view_t *view, const gui_view_model_t *model)
+{
+    lv_obj_t *panel = NULL;
+    const char *text = NULL;
+
+    if ((view == NULL) || (model == NULL) || (view->update_label == NULL)) {
+        return;
+    }
+
+    if (model->active_panel == GUI_PANEL_BME280) {
+        panel = view->bme280_panel;
+        text = model->sensor.last_updated;
+    } else if (model->active_panel == GUI_PANEL_ENERGY_PLAN) {
+        panel = view->energy_plan_panel;
+        text = model->energy_plan.last_updated;
+    } else if (model->active_panel == GUI_PANEL_FORECAST) {
+        panel = view->forecast_panel;
+        text = model->forecast.last_updated;
+    } else {
+        lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    if (panel == NULL) {
+        lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    gui_view_set_label_text_if_changed(view->update_label, text);
+     lv_obj_align_to(view->update_label, panel, LV_ALIGN_OUT_BOTTOM_LEFT,
+                     GUI_VIEW_UPDATE_LABEL_X_OFFSET, GUI_VIEW_UPDATE_LABEL_Y_OFFSET);
+    lv_obj_clear_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(view->update_label);
 }
 
 static void gui_view_apply_header(gui_view_t *view, const gui_view_model_t *model)
@@ -279,6 +317,17 @@ static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
     }
 }
 
+static void gui_view_style_update_label(lv_obj_t *label, lv_color_t text_color,
+                                        const lv_font_t *font)
+{
+    if (label == NULL) {
+        return;
+    }
+
+    lv_obj_set_style_text_color(label, text_color, 0);
+    lv_obj_set_style_text_font(label, font, 0);
+}
+
 static void gui_view_style_energy_labels(lv_obj_t *parent, lv_color_t text_color,
                                          gui_view_theme_t theme)
 {
@@ -313,6 +362,23 @@ static void gui_view_style_energy_labels(lv_obj_t *parent, lv_color_t text_color
                     lv_obj_set_style_text_font(nested_child, body_font, 0);
                 }
             }
+        }
+    }
+}
+
+static void gui_view_style_energy_legend_labels(gui_view_t *view, lv_color_t text_color)
+{
+    uint32_t index;
+
+    if (view == NULL) {
+        return;
+    }
+
+    for (index = 0;
+         index < (sizeof(view->energy_legend_labels) / sizeof(view->energy_legend_labels[0]));
+         index++) {
+        if (view->energy_legend_labels[index] != NULL) {
+            lv_obj_set_style_text_color(view->energy_legend_labels[index], text_color, 0);
         }
     }
 }
@@ -792,10 +858,13 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     }
     lv_obj_set_style_text_font(view->energy_plan_panel, body_font, 0);
     gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, effective_theme);
+    //gui_view_style_energy_legend_labels(view, accent_soft_color);
+    gui_view_style_energy_legend_labels(view, subtitle_text);
 
     gui_view_style_forecast_panel(view, panel_bg, panel_border, panel_bg_opa, card_bg,
                                   card_border, title_text, subtitle_text, accent_color,
                                   effective_theme);
+    gui_view_style_update_label(view->update_label, muted_text, body_font);
 
     gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
                                  subtitle_text, effective_theme);
@@ -1283,6 +1352,13 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     gui_view_init_energy_panel(view, content);
     gui_view_init_forecast_panel(view, content);
 
+    view->update_label = lv_label_create(view->screen);
+    lv_label_set_text(view->update_label, "Last updated: --:--:--");
+    lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_IGNORE_LAYOUT | LV_OBJ_FLAG_FLOATING);
+    lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_text_color(view->update_label, lv_color_hex(0x607089), 0);
+    lv_obj_move_foreground(view->update_label);
+
     gui_view_apply(view, model);
     gui_view_update_sidebar_clock_impl(view);
 }
@@ -1339,4 +1415,6 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)
     } else {
         gui_view_apply_settings_panel(view, model);
     }
+
+    gui_view_apply_update_label(view, model);
 }
