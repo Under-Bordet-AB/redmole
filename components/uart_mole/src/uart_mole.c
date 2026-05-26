@@ -11,7 +11,6 @@
 #include "esp_timer.h"
 #include "freertos/idf_additions.h"
 #include "http_client.h"
-#include "nac.h"
 #include "sensor_data.h"
 #include "task_scheduler.h"
 #include <stdint.h>
@@ -115,7 +114,7 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
     }
 
     BaseType_t rc = xTaskCreate(uart_mole_listener_task, "uart_mole_listener",
-                                UART_MOLE_STACK_SIZE, NULL, 12, &s_uart_mole.rtos_task);
+                                UART_MOLE_STACK_SIZE, &s_uart_mole, 12, &s_uart_mole.rtos_task);
     if (rc != pdPASS)
     {
         ESP_LOGE(TAG, "xTaskCreate failed");
@@ -252,7 +251,7 @@ static task_status_t uart_mole_work(task_node_t *node)
  *      json_len = data_len - sizeof(timestamp_s) - sizeof(crc16) */
 static void uart_mole_listener_task(void *pvParameters)
 {
-    (void)pvParameters;
+    uart_ctx_t *self = (uart_ctx_t *)pvParameters;
     uart_event_t event;
     uint8_t cmd;
 
@@ -296,11 +295,28 @@ static void uart_mole_listener_task(void *pvParameters)
                  * The sensor status is also checked through the eventgroup and not a function call
                  * This decouples the modules much better.
                  */
+                EventBits_t event_bits = xEventGroupGetBits(*self->event_group);
                 uint8_t status = 0;
-                if (nac_get_wifi_status() == NAC_WIFI_CONNECTED)
+                if (event_bits & UART_MOLE_WIFI_CONNECTED_BIT)
+                {
                     status |= SET_WIFI_ONLINE;
-                if (sensor_data_is_local_fresh(5000))
+                }
+                if (event_bits & UART_MOLE_SENSOR_ONLINE_BIT)
+                {
                     status |= SET_BME280_SENSOR_ONLINE;
+                }
+                if (event_bits & UART_MOLE_SERVER_ONLINE_BIT)
+                {
+                    status |= SET_LEOP_SERVER_ONLINE;
+                }
+                if (event_bits & UART_MOLE_GUI_ONLINE_BIT)
+                {
+                    status |= SET_GUI_ONLINE;
+                }
+                if (event_bits & UART_MOLE_SDCARD_ONLINE_BIT)
+                {
+                    status |= SET_SDCARD_ONLINE;
+                }
 
                 pkg->tag_bit     = UART_STATUS_PKG;
                 pkg->data_len    = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);

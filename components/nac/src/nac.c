@@ -66,8 +66,8 @@
 
 typedef struct
 {
-    wifi_ctx_t      wifi;
-    bluetooth_ctx_t bluetooth;
+    wifi_ctx_t          wifi;
+    EventGroupHandle_t *event_group;
 } nac_ctx_t;
 
 static nac_ctx_t s_nac;
@@ -86,28 +86,20 @@ static void   wifi_scan_done(wifi_ctx_t *self);
 static int8_t wifi_init(wifi_ctx_t *self);
 static void   wifi_dispose(wifi_ctx_t *self);
 task_status_t wifi_connect(task_node_t *node);
-static int8_t bluetooth_init(bluetooth_ctx_t *self);
-static void   bluetooth_dispose(bluetooth_ctx_t *self);
 
 /*  Public API */
 
-esp_err_t nac_init(void)
+esp_err_t nac_init(EventGroupHandle_t *event_group)
 {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     memset(&s_nac, 0, sizeof(s_nac));
+    s_nac.event_group = event_group;
 
     if (wifi_init(&s_nac.wifi) != 0)
     {
         ESP_LOGE("NAC", "wifi_init failed");
-        return ESP_FAIL;
-    }
-
-    if (bluetooth_init(&s_nac.bluetooth) != 0)
-    {
-        ESP_LOGE("NAC", "bluetooth_init failed");
-        wifi_dispose(&s_nac.wifi);
         return ESP_FAIL;
     }
 
@@ -117,7 +109,6 @@ esp_err_t nac_init(void)
 void nac_dispose(void)
 {
     wifi_dispose(&s_nac.wifi);
-    bluetooth_dispose(&s_nac.bluetooth);
     memset(&s_nac, 0, sizeof(s_nac));
 }
 
@@ -529,6 +520,8 @@ static void wifi_disconnect(wifi_ctx_t *self)
     self->state = WIFI_STATE_IDLE;
     http_client_notify_network_down();
     ESP_LOGI(self->tag, "Notified http client of incoming disconnect");
+    xEventGroupClearBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
+    ESP_LOGI(self->tag, "Notified event group of disconnect");
 
     sntp_sync_stop();
     ESP_LOGI(self->tag, "Stopped SNTP client");
@@ -653,7 +646,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
         sntp_sync_start();
         ESP_LOGI(self->tag, "Started SNTP client");
-
+        xEventGroupSetBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
+        ESP_LOGI(self->tag, "Notified event group of connect");
         if (self->saved_to_nvs == 0 && s_wifi_ssid[0] != '\0')
         {
             rm_nvs_set_str("wifi_ssid", s_wifi_ssid);
@@ -661,39 +655,4 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             self->saved_to_nvs = 1;
         }
     }
-}
-
-/*  Bluetooth */
-
-static int8_t bluetooth_init(bluetooth_ctx_t *self)
-{
-    self->state                 = BLUETOOTH_STATE_IDLE;
-    self->bluetooth_event_group = xEventGroupCreate();
-
-    if (!self->bluetooth_event_group)
-    {
-        ESP_LOGE("BT", "Failed to create Bluetooth event group");
-        return -1;
-    }
-
-    return 0;
-}
-
-static void bluetooth_dispose(bluetooth_ctx_t *self)
-{
-    if (self->bluetooth_event_group)
-    {
-        vEventGroupDelete(self->bluetooth_event_group);
-        self->bluetooth_event_group = NULL;
-    }
-
-    /*
-     * TODO: when Bluetooth is wired up, add:
-     *   esp_bluedroid_disable();
-     *   esp_bluedroid_deinit();
-     *   esp_bt_controller_disable();
-     *   esp_bt_controller_deinit();
-     */
-
-    ESP_LOGI("BT", "Disposed");
 }
