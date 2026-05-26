@@ -440,8 +440,17 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
             }
             label = lv_obj_get_child(today_text_column, 3);
             if (label != NULL) {
-                lv_obj_set_style_text_color(label, subtitle_color, 0);
-                lv_obj_set_style_text_font(label, body_font, 0);
+                lv_obj_t *prefix_label = lv_obj_get_child(label, 0);
+                lv_obj_t *value_label = lv_obj_get_child(label, 1);
+
+                if (prefix_label != NULL) {
+                    lv_obj_set_style_text_color(prefix_label, subtitle_color, 0);
+                    lv_obj_set_style_text_font(prefix_label, body_font, 0);
+                }
+                if (value_label != NULL) {
+                    lv_obj_set_style_text_color(value_label, accent_color, 0);
+                    lv_obj_set_style_text_font(value_label, body_font, 0);
+                }
             }
             label = lv_obj_get_child(today_text_column, 4);
             if (label != NULL) {

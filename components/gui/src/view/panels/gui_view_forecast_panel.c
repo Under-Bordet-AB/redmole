@@ -16,6 +16,7 @@
 #define FORECAST_WEATHER_ICON_BASE_WIDTH 128
 #define FORECAST_WEATHER_ICON_BASE_HEIGHT 129
 #define FORECAST_DEFAULT_ACCENT_COLOR 0x1D4ED8
+#define FORECAST_FEELS_LIKE_PREFIX "Feels like "
 
 static void gui_view_forecast_set_label_text(lv_obj_t *parent, uint32_t child_index,
                                              const char *text)
@@ -44,6 +45,34 @@ static uint32_t gui_view_forecast_accent_hex(const gui_view_t *view)
 
     def = gui_theme_get(view->current_theme);
     return (def != NULL) ? def->accent_color : FORECAST_DEFAULT_ACCENT_COLOR;
+}
+
+static void gui_view_forecast_set_feels_like_row_text(lv_obj_t *row, const char *text)
+{
+    lv_obj_t *prefix_label;
+    lv_obj_t *value_label;
+    size_t prefix_len;
+
+    if ((row == NULL) || (text == NULL)) {
+        return;
+    }
+
+    prefix_label = lv_obj_get_child(row, 0);
+    value_label = lv_obj_get_child(row, 1);
+    if ((prefix_label == NULL) || (value_label == NULL)) {
+        return;
+    }
+
+    prefix_len = strlen(FORECAST_FEELS_LIKE_PREFIX);
+    if ((strncmp(text, FORECAST_FEELS_LIKE_PREFIX, prefix_len) == 0) &&
+        (text[prefix_len] != '\0')) {
+        lv_label_set_text(prefix_label, "Feels like");
+        lv_label_set_text(value_label, &text[prefix_len]);
+        return;
+    }
+
+    lv_label_set_text(prefix_label, text);
+    lv_label_set_text(value_label, "");
 }
 
 static void gui_view_forecast_set_detail_row_text(lv_obj_t *row, const char *text)
@@ -90,6 +119,38 @@ static void gui_view_forecast_set_detail_text(lv_obj_t *parent, uint32_t child_i
 
     gui_view_forecast_set_detail_row_text(lv_obj_get_child(parent, (int32_t)child_index),
                                           text);
+}
+
+static lv_obj_t *gui_view_forecast_create_feels_like_row(lv_obj_t *parent, const char *text)
+{
+    lv_obj_t *row;
+    lv_obj_t *label;
+
+    row = lv_obj_create(parent);
+    lv_obj_set_width(row, LV_SIZE_CONTENT);
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_shadow_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_style_pad_column(row, 5, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    label = lv_label_create(row);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
+
+    label = lv_label_create(row);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x1D4ED8), 0);
+
+    gui_view_forecast_set_feels_like_row_text(row, text);
+
+    return row;
 }
 
 static lv_obj_t *gui_view_forecast_create_detail_row(lv_obj_t *parent, const char *text)
@@ -441,9 +502,7 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_text_color(label, lv_color_hex(0x1D4ED8), 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
 
-    label = lv_label_create(today_text_column);
-    lv_label_set_text(label, "Feels like 18 C");
-    lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
+    (void)gui_view_forecast_create_feels_like_row(today_text_column, "Feels like 18 C");
 
     label = lv_label_create(today_text_column);
     lv_label_set_text(label, "Stays mild later today.");
@@ -547,8 +606,8 @@ void gui_view_apply_forecast_panel(gui_view_t *view, const gui_view_model_t *mod
     gui_view_forecast_set_label_text(today_text_column, 1, model->forecast.condition);
     gui_view_forecast_set_label_text(today_text_column, 2,
                                      model->forecast.current_temperature);
-    gui_view_forecast_set_label_text(today_text_column, 3,
-                                     model->forecast.feels_like_temperature);
+    gui_view_forecast_set_feels_like_row_text(lv_obj_get_child(today_text_column, 3),
+                                              model->forecast.feels_like_temperature);
     gui_view_forecast_set_label_text(today_text_column, 4, model->forecast.summary);
     gui_view_forecast_apply_icon(today_icon_slot,
 #if FORECAST_FORCE_TODAY_CLEAR_FOR_TEST
