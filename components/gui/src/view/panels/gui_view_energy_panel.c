@@ -85,7 +85,15 @@ static bool gui_view_energy_plan_changed(gui_view_t *view, const gui_energy_plan
     }
 
     return !view->has_last_energy_plan ||
-           (memcmp(&view->last_energy_plan, energy_plan, sizeof(*energy_plan)) != 0);
+           (memcmp(view->last_energy_plan.buy_electricity, energy_plan->buy_electricity,
+                   sizeof(energy_plan->buy_electricity)) != 0) ||
+           (memcmp(view->last_energy_plan.use_solar_directly,
+                   energy_plan->use_solar_directly,
+                   sizeof(energy_plan->use_solar_directly)) != 0) ||
+           (memcmp(view->last_energy_plan.charge_battery, energy_plan->charge_battery,
+                   sizeof(energy_plan->charge_battery)) != 0) ||
+           (memcmp(view->last_energy_plan.sell_excess, energy_plan->sell_excess,
+                   sizeof(energy_plan->sell_excess)) != 0);
 }
 
 void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)

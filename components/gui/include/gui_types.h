@@ -85,6 +85,8 @@ typedef enum {
 #define GUI_FORECAST_DAY_DATE_TEXT_MAX_LEN 16
 /** Maximum length of a daily forecast range string. */
 #define GUI_FORECAST_DAY_RANGE_TEXT_MAX_LEN 20
+/** Maximum length of a last-updated timestamp label. */
+#define GUI_LAST_UPDATED_TEXT_MAX_LEN 32
 
 /**
  * @brief Latest sensor readings displayed by the GUI.
@@ -95,6 +97,7 @@ typedef struct {
     int32_t pressure_deci_hpa; /*!< Pressure in deci-hectopascals. */
     bool is_fresh;             /*!< True when the readings reflect a recent sensor update. */
     uint32_t update_count;     /*!< Monotonic counter of applied sensor updates. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
 } gui_sensor_state_t;
 
 /**
@@ -105,6 +108,7 @@ typedef struct {
     uint16_t use_solar_directly[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Direct solar consumption per hour. */
     uint16_t charge_battery[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Battery charging values per hour. */
     uint16_t sell_excess[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Excess energy sold back per hour. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
 } gui_energy_plan_t;
 
 /**
@@ -141,6 +145,7 @@ typedef struct {
     char summary[GUI_FORECAST_SUMMARY_TEXT_MAX_LEN]; /*!< One-line forecast summary. */
     gui_forecast_details_t details; /*!< Detail lines for the side card. */
     gui_forecast_day_t days[GUI_FORECAST_DAY_COUNT]; /*!< Daily forecast entries shown below the summary cards. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
 } gui_forecast_state_t;
 
 /**

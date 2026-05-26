@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -218,21 +219,64 @@ static void copy_scan_results(gui_wifi_settings_t *wifi)
     wifi->network_count = count;
 }
 
+static void format_unknown_last_updated(char *text, size_t text_len)
+{
+    if ((text == NULL) || (text_len == 0U)) {
+        return;
+    }
+
+    snprintf(text, text_len, "%s", "Last updated: --:--:--");
+}
+
+static void format_last_updated_now(char *text, size_t text_len)
+{
+    time_t now;
+    struct tm time_info;
+
+    if ((text == NULL) || (text_len == 0U)) {
+        return;
+    }
+
+    now = time(NULL);
+    if ((now < 1700000000) || (localtime_r(&now, &time_info) == NULL) ||
+        (strftime(text, text_len, "Last updated: %H:%M:%S", &time_info) == 0U)) {
+        format_unknown_last_updated(text, text_len);
+    }
+}
+
 static void sync_sensor(gui_ctx_t *gui)
 {
     sensor_data_sample sample = { 0 };
     gui_sensor_state_t sensor = { 0 };
+    gui_sensor_state_t current_sensor = { 0 };
+    bool has_current_sensor;
+    uint32_t update_count;
 
     if (gui == NULL) {
         return;
     }
 
+    has_current_sensor = gui_get_sensor_state(gui, &current_sensor);
+    if (has_current_sensor) {
+        sensor = current_sensor;
+    }
+
+    if (sensor.last_updated[0] == '\0') {
+        format_unknown_last_updated(sensor.last_updated, sizeof(sensor.last_updated));
+    }
+
     if (sensor_data_get_latest_local(&sample) && sample.valid) {
+        update_count = sensor_data_get_local_update_count();
         sensor.temperature_deci_c = sample.temperature_deci_c;
         sensor.humidity_deci_pct = sample.humidity_deci_pct;
         sensor.pressure_deci_hpa = sample.pressure_deci_hpa;
         sensor.is_fresh = sensor_data_is_local_fresh(3000U);
-        sensor.update_count = sensor_data_get_local_update_count();
+        sensor.update_count = update_count;
+        if (!has_current_sensor || (current_sensor.update_count != update_count)) {
+            format_last_updated_now(sensor.last_updated, sizeof(sensor.last_updated));
+        }
+    } else {
+        sensor.is_fresh = false;
     }
 
     gui_set_sensor_state(gui, &sensor);
@@ -1605,6 +1649,7 @@ task_status_t forecast_work(task_node_t *node) {
         return TASK_RUN_AGAIN;
     }
 
+    format_last_updated_now(forecast.last_updated, sizeof(forecast.last_updated));
     gui_set_forecast_state(s_bindings.gui, &forecast);
     free(buf);
     return TASK_RUN_AGAIN;
@@ -1655,6 +1700,7 @@ task_status_t leop_work(task_node_t *node) {
         return TASK_RUN_AGAIN;
     }
 
+    format_last_updated_now(energy_plan.last_updated, sizeof(energy_plan.last_updated));
     gui_set_energy_plan_state(s_bindings.gui, &energy_plan);
     free(buf);
     return TASK_RUN_AGAIN;

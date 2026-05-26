@@ -14,6 +14,15 @@ static void gui_state_copy_status(gui_wifi_settings_t *wifi, const char *text)
     snprintf(wifi->status_text, sizeof(wifi->status_text), "%s", text);
 }
 
+static void gui_state_set_default_last_updated(char *text, size_t text_len)
+{
+    if ((text == NULL) || (text_len == 0U)) {
+        return;
+    }
+
+    snprintf(text, text_len, "%s", "Last updated: --:--:--");
+}
+
 static void gui_state_reset_wifi_scan(gui_state_t *state)
 {
     if (state == NULL) {
@@ -79,6 +88,8 @@ static void gui_state_init_forecast(gui_forecast_state_t *forecast)
     forecast->days[4].icon = GUI_WEATHER_ICON_PARTLY_CLOUDY;
     snprintf(forecast->days[4].range_text, sizeof(forecast->days[4].range_text), "%s",
              "21 / 13 C");
+    gui_state_set_default_last_updated(forecast->last_updated,
+                                       sizeof(forecast->last_updated));
 }
 
 static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
@@ -92,7 +103,8 @@ static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
            (left->humidity_deci_pct == right->humidity_deci_pct) &&
            (left->pressure_deci_hpa == right->pressure_deci_hpa) &&
            (left->is_fresh == right->is_fresh) &&
-           (left->update_count == right->update_count);
+           (left->update_count == right->update_count) &&
+           (strcmp(left->last_updated, right->last_updated) == 0);
 }
 
 static bool gui_state_energy_plan_equals(const gui_energy_plan_t *left,
@@ -195,6 +207,10 @@ void gui_state_init(gui_state_t *state)
     state->wifi_state = GUI_WIFI_STATE_IDLE;
     state->bluetooth_state = GUI_BLUETOOTH_STATE_IDLE;
     state->sd_card_state = GUI_SD_CARD_STATE_IDLE;
+    gui_state_set_default_last_updated(state->sensor.last_updated,
+                                       sizeof(state->sensor.last_updated));
+    gui_state_set_default_last_updated(state->energy_plan.last_updated,
+                                       sizeof(state->energy_plan.last_updated));
     gui_state_init_forecast(&state->forecast);
     gui_state_reset_wifi_scan(state);
     gui_state_copy_status(&state->wifi, "Press Scan to search for Wi-Fi networks.");
