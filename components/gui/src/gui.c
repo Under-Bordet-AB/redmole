@@ -5,11 +5,15 @@
 
 #include "esp_check.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "gui_internal.h"
 #include "gui_platform.h"
 #include "lvgl_port.h"
 #include "view/gui_view_common.h"
 #include "view/gui_theme_defs.h"
+
+#define GUI_ACTIVE_HEARTBEAT_TIMEOUT_MS 5000U
 
 static gui_runtime_t s_runtime;
 
@@ -518,6 +522,7 @@ void gui_init(gui_ctx_t *self, const gui_init_config_t *config)
     gui_state_init(&runtime->state);
     gui_apply_init_config(runtime, config);
     gui_state_build_screen_model(&runtime->state, &model);
+    runtime->last_heartbeat_tick = xTaskGetTickCount();
 
     if (lvgl_port_lock(-1)) {
         gui_screen_init(&runtime->screen, &model, gui_handle_nav_event, gui_handle_settings_event, runtime);
@@ -533,6 +538,22 @@ void gui_init(gui_ctx_t *self, const gui_init_config_t *config)
 void gui_run(gui_ctx_t *self)
 {
     (void)self;
+}
+
+bool gui_is_active(gui_ctx_t *self)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+    TickType_t now;
+    TickType_t age;
+
+    if ((self == NULL) || !self->is_ready || (runtime == NULL) ||
+        (runtime->refresh_timer == NULL)) {
+        return false;
+    }
+
+    now = xTaskGetTickCount();
+    age = now - runtime->last_heartbeat_tick;
+    return age <= pdMS_TO_TICKS(GUI_ACTIVE_HEARTBEAT_TIMEOUT_MS);
 }
 
 void gui_set_bindings(gui_ctx_t *self, const gui_module_bindings_t *bindings)

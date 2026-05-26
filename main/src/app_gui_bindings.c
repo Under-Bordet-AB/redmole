@@ -17,11 +17,14 @@
 
 #include "cJSON.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "http_client.h"
 #include "nac.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
 #include "sdkconfig.h"
+#include "uart_mole.h"
 
 static const char *TAG = "APP_GUI_BINDINGS";
 
@@ -46,6 +49,7 @@ static const char *TAG = "APP_GUI_BINDINGS";
 
 typedef struct {
     gui_ctx_t *gui;
+    EventGroupHandle_t *event_group;
 
     bool wifi_connect_requested;
     bool wifi_scan_requested;
@@ -80,6 +84,7 @@ static gui_wifi_state_t map_wifi_state(nac_wifi_status_t status);
 static void set_wifi_status(gui_ctx_t *gui, const char *status_text, gui_wifi_state_t state);
 static void copy_scan_results(gui_wifi_settings_t *wifi);
 static gui_sd_card_state_t get_sd_card_state(void);
+static void sync_gui_online_bit(gui_ctx_t *gui);
 static int32_t clamp_saved_brightness(int32_t value);
 static bool parse_coordinate_in_range(const char *text, double min_value, double max_value);
 static const char *forecast_weather_code_to_condition(int weather_code);
@@ -133,7 +138,7 @@ static bool on_wifi_connect_requested(gui_ctx_t *gui, const char *ssid, const ch
 static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data);
 
 // Basics
-esp_err_t app_gui_bindings_init(gui_ctx_t *gui);
+esp_err_t app_gui_bindings_init(gui_ctx_t *gui, EventGroupHandle_t *event_group);
 void app_gui_bindings_sync(gui_ctx_t *gui);
 
 // Function definitions
@@ -236,6 +241,19 @@ static void sync_sensor(gui_ctx_t *gui)
 static gui_sd_card_state_t get_sd_card_state(void)
 {
     return GUI_SD_CARD_STATE_IDLE;
+}
+
+static void sync_gui_online_bit(gui_ctx_t *gui)
+{
+    if ((s_bindings.event_group == NULL) || (*s_bindings.event_group == NULL)) {
+        return;
+    }
+
+    if (gui_is_active(gui)) {
+        xEventGroupSetBits(*s_bindings.event_group, UART_MOLE_GUI_ONLINE_BIT);
+    } else {
+        xEventGroupClearBits(*s_bindings.event_group, UART_MOLE_GUI_ONLINE_BIT);
+    }
 }
 
 static bool sync_wifi_state(gui_ctx_t *gui)
@@ -1652,16 +1670,20 @@ task_status_t sensor_work(task_node_t *node) {
 // Basics
 //////////////////////////
 
-esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
+esp_err_t app_gui_bindings_init(gui_ctx_t *gui, EventGroupHandle_t *event_group)
 {
     gui_module_bindings_t bindings = { 0 };
 
-    if (gui == NULL) {
+    if ((gui == NULL) || (event_group == NULL) || (*event_group == NULL)) {
+        if ((event_group != NULL) && (*event_group != NULL)) {
+            xEventGroupClearBits(*event_group, UART_MOLE_GUI_ONLINE_BIT);
+        }
         return ESP_ERR_INVALID_ARG;
     }
 
     memset(&s_bindings, 0, sizeof(s_bindings));
     s_bindings.gui = gui;
+    s_bindings.event_group = event_group;
 
     bindings.user_data = &s_bindings;
     bindings.on_panel_changed = on_panel_changed;
@@ -1705,6 +1727,8 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
 
 void app_gui_bindings_sync(gui_ctx_t *gui)
 {
+    sync_gui_online_bit(gui);
+
     if (gui == NULL) {
         return;
     }
