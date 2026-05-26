@@ -928,9 +928,8 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     }
 
     if (cJSON_IsNumber(today_wind_speed_max) && cJSON_IsNumber(today_wind_direction_dominant)) {
-        snprintf(forecast->details.wind, sizeof(forecast->details.wind), "Wind: %.0f m/s %s",
-                 today_wind_speed_max->valuedouble,
-                 forecast_wind_direction_to_compass(today_wind_direction_dominant->valuedouble));
+        snprintf(forecast->details.wind, sizeof(forecast->details.wind), "Wind: %.0f m/s",
+                 today_wind_speed_max->valuedouble);
     } else {
         snprintf(forecast->details.wind, sizeof(forecast->details.wind), "%s", "Wind: N/A");
     }
@@ -969,8 +968,8 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
         forecast->days[day_index].icon =
             forecast_weather_code_to_icon(weather_code_item->valueint);
         snprintf(forecast->days[day_index].range_text,
-                 sizeof(forecast->days[day_index].range_text), "%.0f | %.0f C",
-                 temp_max_item->valuedouble, temp_min_item->valuedouble);
+                 sizeof(forecast->days[day_index].range_text), "%.0f/%.0f C",
+                 temp_min_item->valuedouble, temp_max_item->valuedouble);
     }
 
     cJSON_Delete(root);

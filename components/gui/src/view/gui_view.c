@@ -463,10 +463,18 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
         }
 
         for (uint32_t index = 1; index < lv_obj_get_child_cnt(details_card); index++) {
-            label = lv_obj_get_child(details_card, (int32_t)index);
-            if (label != NULL) {
-                lv_obj_set_style_text_color(label, title_color, 0);
-                lv_obj_set_style_text_font(label, body_font, 0);
+            lv_obj_t *row = lv_obj_get_child(details_card, (int32_t)index);
+            lv_obj_t *name_label = (row != NULL) ? lv_obj_get_child(row, 0) : NULL;
+            lv_obj_t *value_label = (row != NULL) ? lv_obj_get_child(row, 1) : NULL;
+
+            if (name_label != NULL) {
+                lv_obj_set_style_text_color(name_label, title_color, 0);
+                lv_obj_set_style_text_font(name_label, body_font, 0);
+            }
+            if (value_label != NULL) {
+                lv_obj_set_style_text_color(value_label, accent_color, 0);
+                lv_obj_set_style_text_font(value_label, body_font, 0);
+                lv_obj_set_style_text_align(value_label, LV_TEXT_ALIGN_RIGHT, 0);
             }
         }
     }

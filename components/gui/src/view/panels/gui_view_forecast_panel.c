@@ -1,18 +1,20 @@
 #include "gui_view_forecast_panel.h"
 
 #include <stdint.h>
+#include <string.h>
 
 #include "../assets/weather_icons/gui_weather_icons.h"
 #include "../gui_theme_defs.h"
 #include "../gui_view_common.h"
 
-#define FORECAST_TODAY_ICON_SIZE 128
-#define FORECAST_DAY_ICON_SIZE   64
+#define FORECAST_TODAY_ICON_SIZE 142
+#define FORECAST_DAY_ICON_SIZE   76
 #define FORECAST_ENABLE_TODAY_ICON 1
 #define FORECAST_ENABLE_DAY_ICONS  1
 #define FORECAST_FORCE_TODAY_CLEAR_FOR_TEST 0
 #define FORECAST_WEATHER_ICON_BASE_WIDTH 128
 #define FORECAST_WEATHER_ICON_BASE_HEIGHT 129
+#define FORECAST_DEFAULT_ACCENT_COLOR 0x1D4ED8
 
 static void gui_view_forecast_set_label_text(lv_obj_t *parent, uint32_t child_index,
                                              const char *text)
@@ -31,6 +33,99 @@ static void gui_view_forecast_set_label_text(lv_obj_t *parent, uint32_t child_in
     lv_label_set_text(label, text);
 }
 
+static uint32_t gui_view_forecast_accent_hex(const gui_view_t *view)
+{
+    const gui_theme_def_t *def;
+
+    if (view == NULL) {
+        return FORECAST_DEFAULT_ACCENT_COLOR;
+    }
+
+    def = gui_theme_get(view->current_theme);
+    return (def != NULL) ? def->accent_color : FORECAST_DEFAULT_ACCENT_COLOR;
+}
+
+static void gui_view_forecast_set_detail_row_text(lv_obj_t *row, const char *text)
+{
+    lv_obj_t *name_label;
+    lv_obj_t *value_label;
+    const char *colon;
+    const char *value_start;
+    size_t name_len;
+
+    if ((row == NULL) || (text == NULL)) {
+        return;
+    }
+
+    name_label = lv_obj_get_child(row, 0);
+    value_label = lv_obj_get_child(row, 1);
+    if ((name_label == NULL) || (value_label == NULL)) {
+        return;
+    }
+
+    colon = strchr(text, ':');
+    if (colon == NULL) {
+        lv_label_set_text(name_label, text);
+        lv_label_set_text(value_label, "");
+        return;
+    }
+
+    name_len = (size_t)(colon - text) + 1;
+    value_start = colon + 1;
+    while (*value_start == ' ') {
+        value_start++;
+    }
+
+    lv_label_set_text_fmt(name_label, "%.*s", (int)name_len, text);
+    lv_label_set_text(value_label, value_start);
+}
+
+static void gui_view_forecast_set_detail_text(lv_obj_t *parent, uint32_t child_index,
+                                              const char *text)
+{
+    if ((parent == NULL) || (text == NULL)) {
+        return;
+    }
+
+    gui_view_forecast_set_detail_row_text(lv_obj_get_child(parent, (int32_t)child_index),
+                                          text);
+}
+
+static lv_obj_t *gui_view_forecast_create_detail_row(lv_obj_t *parent, const char *text)
+{
+    lv_obj_t *row;
+    lv_obj_t *label;
+
+    row = lv_obj_create(parent);
+    lv_obj_set_width(row, LV_PCT(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_shadow_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_style_pad_column(row, 8, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    label = lv_label_create(row);
+    lv_obj_set_width(label, 0);
+    lv_obj_set_flex_grow(label, 1);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x10213D), 0);
+
+    label = lv_label_create(row);
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x1D4ED8), 0);
+
+    gui_view_forecast_set_detail_row_text(row, text);
+
+    return row;
+}
+
 static void gui_view_forecast_prepare_icon_slot(lv_obj_t *slot, lv_coord_t size)
 {
     lv_obj_set_size(slot, size, size);
@@ -44,14 +139,7 @@ static void gui_view_forecast_prepare_icon_slot(lv_obj_t *slot, lv_coord_t size)
 
 static lv_color_t gui_view_forecast_icon_color(const gui_view_t *view)
 {
-    const gui_theme_def_t *def;
-
-    if (view == NULL) {
-        return lv_color_hex(0x1D4ED8);
-    }
-
-    def = gui_theme_get(view->current_theme);
-    return (def != NULL) ? lv_color_hex(def->accent_color) : lv_color_hex(0x1D4ED8);
+    return lv_color_hex(gui_view_forecast_accent_hex(view));
 }
 
 static void gui_view_forecast_tint_icon_slot(lv_obj_t *slot, lv_color_t icon_color)
@@ -381,24 +469,13 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_flex_grow(details_card, 1);
 
     label = lv_label_create(details_card);
-    lv_label_set_text(label, "Forecast details");
+    lv_label_set_text(label, "Details");
     lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
 
-    label = lv_label_create(details_card);
-    lv_label_set_text(label, "Rain chance: 20%");
-    lv_obj_set_style_text_color(label, lv_color_hex(0x10213D), 0);
-
-    label = lv_label_create(details_card);
-    lv_label_set_text(label, "Wind: 4 m/s NW");
-    lv_obj_set_style_text_color(label, lv_color_hex(0x10213D), 0);
-
-    label = lv_label_create(details_card);
-    lv_label_set_text(label, "Humidity: 61%");
-    lv_obj_set_style_text_color(label, lv_color_hex(0x10213D), 0);
-
-    label = lv_label_create(details_card);
-    lv_label_set_text(label, "UV index: 3");
-    lv_obj_set_style_text_color(label, lv_color_hex(0x10213D), 0);
+    (void)gui_view_forecast_create_detail_row(details_card, "Rain chance: 20%");
+    (void)gui_view_forecast_create_detail_row(details_card, "Wind: 4 m/s NW");
+    (void)gui_view_forecast_create_detail_row(details_card, "Humidity: 61%");
+    (void)gui_view_forecast_create_detail_row(details_card, "UV index: 3");
 
     days_row = lv_obj_create(view->forecast_panel);
     lv_obj_set_size(days_row, LV_PCT(100), 0);
@@ -474,11 +551,11 @@ void gui_view_apply_forecast_panel(gui_view_t *view, const gui_view_model_t *mod
 #endif
                                  FORECAST_TODAY_ICON_SIZE, icon_color);
 
-    gui_view_forecast_set_label_text(details_card, 0, "Forecast details");
-    gui_view_forecast_set_label_text(details_card, 1, model->forecast.details.rain_chance);
-    gui_view_forecast_set_label_text(details_card, 2, model->forecast.details.wind);
-    gui_view_forecast_set_label_text(details_card, 3, model->forecast.details.humidity);
-    gui_view_forecast_set_label_text(details_card, 4, model->forecast.details.uv_index);
+    gui_view_forecast_set_label_text(details_card, 0, "Details");
+    gui_view_forecast_set_detail_text(details_card, 1, model->forecast.details.rain_chance);
+    gui_view_forecast_set_detail_text(details_card, 2, model->forecast.details.wind);
+    gui_view_forecast_set_detail_text(details_card, 3, model->forecast.details.humidity);
+    gui_view_forecast_set_detail_text(details_card, 4, model->forecast.details.uv_index);
 
     for (day_index = 0; day_index < GUI_FORECAST_DAY_COUNT; day_index++) {
         gui_view_forecast_apply_day_card(lv_obj_get_child(days_row, (int32_t)day_index),
