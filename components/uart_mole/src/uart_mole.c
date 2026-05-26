@@ -8,6 +8,7 @@
 #include "esp_err.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/idf_additions.h"
 #include "http_client.h"
@@ -182,14 +183,19 @@ static task_status_t uart_mole_work(task_node_t *node)
             break;
         }
 
-        case UART_CONFIG_PKG:
+        case UART_RESTART_PKG:
         {
-            uart_config_pkg_t *pkg  = &self->pkg_buf.config;
+            uart_restart_pkg_t *pkg = &self->pkg_buf.restart;
             size_t hdr_len          = sizeof(pkg->tag_bit) + sizeof(pkg->data_len);
             const uint8_t *payload  = (const uint8_t *)pkg + hdr_len;
             uart_mole_uart_write_wrapper(port, pkg, hdr_len);
             uart_mole_uart_write_wrapper(port, payload, pkg->data_len);
             memset(pkg, 0, sizeof(*pkg));
+            /* Wait for the TX FIFO to clock out completely before resetting.
+             * Without this the client receives a truncated packet. */
+            uart_wait_tx_done(port, pdMS_TO_TICKS(200));
+            ESP_LOGI(TAG, "restarting now");
+            esp_restart();
             break;
         }
 
@@ -233,7 +239,7 @@ static task_status_t uart_mole_work(task_node_t *node)
  *         and queues it for transmission via the task scheduler.
  *
  *  The command byte maps directly to uart_pkg_tag_t.  For fixed-layout packages
- *  (STATUS / SENSOR / CONFIG / DIAG), data_len is the number of bytes the receiver
+ *  (STATUS / SENSOR / RESTART / DIAG), data_len is the number of bytes the receiver
  *  must read after data_len itself:
  *
  *      data_len = sizeof(pkg) - sizeof(tag_bit) - sizeof(data_len)
@@ -361,21 +367,22 @@ static void uart_mole_listener_task(void *pvParameters)
                 break;
             }
 
-            case UART_CONFIG_PKG:
+            case UART_RESTART_PKG:
             {
                 /* payload (data_len bytes): rslt_bit + timestamp_s + crc16
-                 * crc16 covers:             rslt_bit + timestamp_s            */
-                uart_config_pkg_t *pkg = &s_uart_mole.pkg_buf.config;
+                 * crc16 covers:             rslt_bit + timestamp_s
+                 * uart_mole_work sends the ACK, drains the FIFO, then calls esp_restart(). */
+                uart_restart_pkg_t *pkg = &s_uart_mole.pkg_buf.restart;
 
-                pkg->tag_bit     = UART_CONFIG_PKG;
+                pkg->tag_bit     = UART_RESTART_PKG;
                 pkg->data_len    = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);
-                pkg->rslt_bit    = SET_CONFIG_OK;
+                pkg->rslt_bit    = SET_RESTART_OK;
                 pkg->timestamp_s = (uint32_t)time(NULL);
                 pkg->crc16       = esp_crc16_le(0, &pkg->rslt_bit,
                                                 (uint32_t)(pkg->data_len - sizeof(pkg->crc16)));
 
-                s_uart_mole.pkg_tag = UART_CONFIG_PKG;
-                s_uart_mole.stats.uart_mole_config_pkg++;
+                s_uart_mole.pkg_tag = UART_RESTART_PKG;
+                s_uart_mole.stats.uart_mole_restart_pkg++;
                 task_scheduler_add(&s_uart_mole.task_node, 0);
                 break;
             }

@@ -43,7 +43,7 @@
 #define UART_TAG_STATUS             (1 << 0)
 #define UART_TAG_SERVER             (1 << 1)
 #define UART_TAG_SENSOR             (1 << 2)
-#define UART_TAG_CONFIG             (1 << 3)
+#define UART_TAG_RESTART            (1 << 3)
 
 /* Status bits for UART status packages */
 #define SET_WIFI_ONLINE             (1 << 0)
@@ -63,9 +63,9 @@
 #define UART_MOLE_SDCARD_ONLINE_BIT     BIT4
 
 
-/* Result bits for UART config packages */
-#define SET_CONFIG_OK               (1 << 0)
-#define SET_CONFIG_FAILED           (1 << 1)
+/* Result bits for UART restart packages */
+#define SET_RESTART_OK              (1 << 0)
+#define SET_RESTART_FAILED          (1 << 1)
 
 /* UART packet tags */
 typedef enum
@@ -73,7 +73,7 @@ typedef enum
     UART_STATUS_PKG = 0,
     UART_SERVER_PKG = 1,
     UART_SENSOR_PKG = 2,
-    UART_CONFIG_PKG = 3,
+    UART_RESTART_PKG = 3,
     UART_DIAG_PKG   = 4,
     UART_TEST_PKG   = 5,
 } uart_pkg_tag_t;
@@ -118,16 +118,15 @@ typedef struct __attribute__ ((packed))
     uint16_t crc16;
 } uart_sensor_pkg_t;
 
-/* Sent to client when command: CONFIG is received */
+/* Sent to client when command: RESTART is received — ACK before chip resets */
 typedef struct __attribute__ ((packed))
 {
-
     uint8_t  tag_bit;
     uint16_t data_len;
     uint8_t  rslt_bit;
     uint32_t timestamp_s;
     uint16_t crc16;
-} uart_config_pkg_t;
+} uart_restart_pkg_t;
 
 /* Sent to client when command: DIAGNOSTICS is received */
 typedef struct __attribute__ ((packed))
@@ -146,7 +145,7 @@ typedef struct uart_mole_stats
     uint32_t uart_mole_status_pkg;
     uint32_t uart_mole_server_pkg;
     uint32_t uart_mole_sensor_pkg;
-    uint32_t uart_mole_config_pkg;
+    uint32_t uart_mole_restart_pkg;
 } uart_mole_stats_t;
 
 typedef struct uart_ctx
@@ -172,7 +171,7 @@ typedef struct uart_ctx
         uart_status_pkg_t  status;
         uart_server_pkg_t  server;
         uart_sensor_pkg_t  sensor;
-        uart_config_pkg_t  config;
+        uart_restart_pkg_t restart;
         uart_diag_pkg_t    diag;
     } pkg_buf;
 } uart_ctx_t;
