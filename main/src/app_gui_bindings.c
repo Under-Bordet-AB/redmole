@@ -101,7 +101,6 @@ static void forecast_format_later_today_summary(const cJSON *hourly_time,
                                                 int current_weather_code,
                                                 char *summary,
                                                 size_t summary_len);
-static const char *forecast_wind_direction_to_compass(double direction_degrees);
 static bool forecast_parse_date_parts(const char *date_text, int *year, int *month, int *day);
 static void forecast_format_day_label(const char *date_text, char *label, size_t label_len);
 static void forecast_format_day_date(const char *date_text, char *label, size_t label_len);
@@ -650,7 +649,7 @@ static void forecast_format_later_today_summary(const cJSON *hourly_time,
         return;
     }
 
-    snprintf(summary, summary_len, "%s", "Forecast continues through the day.");
+    snprintf(summary, summary_len, "%s", "Continues all day.");
 
     if (!cJSON_IsArray(hourly_time) || !cJSON_IsArray(hourly_temperature) ||
         !cJSON_IsArray(hourly_weather_code) || (today_date == NULL) ||
@@ -706,25 +705,6 @@ static void forecast_format_later_today_summary(const cJSON *hourly_time,
     } else {
         snprintf(summary, summary_len, "%s", "Stays mild later today.");
     }
-}
-
-static const char *forecast_wind_direction_to_compass(double direction_degrees)
-{
-    static const char *labels[] = {
-        "N", "NE", "E", "SE", "S", "SW", "W", "NW"
-    };
-    int index;
-
-    while (direction_degrees < 0.0) {
-        direction_degrees += 360.0;
-    }
-
-    while (direction_degrees >= 360.0) {
-        direction_degrees -= 360.0;
-    }
-
-    index = (int)((direction_degrees + 22.5) / 45.0) % 8;
-    return labels[index];
 }
 
 static bool forecast_parse_date_parts(const char *date_text, int *year, int *month, int *day)

@@ -10,8 +10,8 @@
 #include "panels/gui_view_forecast_panel.h"
 #include "panels/gui_view_settings_panel.h"
 
-#define GUI_VIEW_UPDATE_LABEL_X_OFFSET 6
-#define GUI_VIEW_UPDATE_LABEL_Y_OFFSET 10
+#define GUI_VIEW_UPDATE_LABEL_X_OFFSET 24
+#define GUI_VIEW_UPDATE_LABEL_Y_OFFSET 9
 
 static gui_view_theme_t gui_view_effective_theme(gui_view_theme_t base_theme,
                                                  bool night_variant_enabled)
@@ -713,7 +713,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         sidebar_grad   = lv_color_hex(def->sidebar_grad);
         sidebar_shadow = lv_color_hex(def->sidebar_shadow);
         sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        brand_text     = lv_color_hex(def->brand_text);
+        //brand_text     = lv_color_hex(def->brand_text);
+        brand_text     = lv_color_hex(def->accent_color);
 
         content_bg     = lv_color_hex(def->content_bg);
         content_shadow = lv_color_hex(def->content_shadow);
@@ -793,8 +794,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_shadow_color(view->sidebar, sidebar_shadow, 0);
     brand = lv_obj_get_child(view->sidebar, 0);
     if (brand != NULL) {
-        //lv_obj_set_style_text_color(brand, brand_text, 0);
-        lv_obj_set_style_text_color(brand, accent_color, 0);
+        lv_obj_set_style_text_color(brand, brand_text, 0);
         lv_obj_set_style_text_font(brand, emphasis_font, 0);
     }
 
