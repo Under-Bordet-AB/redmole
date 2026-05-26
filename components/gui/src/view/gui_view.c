@@ -325,6 +325,8 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
 {
     lv_obj_t *day_label;
     lv_obj_t *condition_label;
+    lv_obj_t *icon_area;
+    lv_obj_t *icon_slot;
     lv_obj_t *temp_label;
     const lv_font_t *body_font;
     const lv_font_t *emphasis_font;
@@ -343,6 +345,8 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
 
     day_label = lv_obj_get_child(card, 0);
     condition_label = lv_obj_get_child(card, 1);
+    icon_area = lv_obj_get_child(card, 2);
+    icon_slot = (icon_area != NULL) ? lv_obj_get_child(icon_area, 0) : NULL;
     temp_label = lv_obj_get_child(card, 3);
 
     if (day_label != NULL) {
@@ -356,6 +360,10 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
     if (temp_label != NULL) {
         lv_obj_set_style_text_color(temp_label, accent_color, 0);
         lv_obj_set_style_text_font(temp_label, emphasis_font, 0);
+    }
+    if ((icon_slot != NULL) && (lv_obj_get_child(icon_slot, 0) != NULL)) {
+        lv_obj_t *icon = lv_obj_get_child(icon_slot, 0);
+        lv_obj_set_style_text_color(icon, accent_color, 0);
     }
 }
 
@@ -411,30 +419,48 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
     gui_view_style_forecast_card(details_card, card_bg, card_border, theme);
 
     if (today_card != NULL) {
-        label = lv_obj_get_child(today_card, 0);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, subtitle_color, 0);
-            lv_obj_set_style_text_font(label, body_font, 0);
+        lv_obj_t *today_text_column = lv_obj_get_child(today_card, 0);
+        lv_obj_t *today_icon_slot = lv_obj_get_child(today_card, 1);
+
+        if (today_text_column != NULL) {
+            label = lv_obj_get_child(today_text_column, 0);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, subtitle_color, 0);
+                lv_obj_set_style_text_font(label, body_font, 0);
+            }
+            label = lv_obj_get_child(today_text_column, 1);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, title_color, 0);
+                lv_obj_set_style_text_font(label, emphasis_font, 0);
+            }
+            label = lv_obj_get_child(today_text_column, 2);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, accent_color, 0);
+                lv_obj_set_style_text_font(label, emphasis_font, 0);
+            }
+            label = lv_obj_get_child(today_text_column, 3);
+            if (label != NULL) {
+                lv_obj_t *prefix_label = lv_obj_get_child(label, 0);
+                lv_obj_t *value_label = lv_obj_get_child(label, 1);
+
+                if (prefix_label != NULL) {
+                    lv_obj_set_style_text_color(prefix_label, subtitle_color, 0);
+                    lv_obj_set_style_text_font(prefix_label, body_font, 0);
+                }
+                if (value_label != NULL) {
+                    lv_obj_set_style_text_color(value_label, accent_color, 0);
+                    lv_obj_set_style_text_font(value_label, body_font, 0);
+                }
+            }
+            label = lv_obj_get_child(today_text_column, 4);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, subtitle_color, 0);
+                lv_obj_set_style_text_font(label, body_font, 0);
+            }
         }
-        label = lv_obj_get_child(today_card, 1);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, title_color, 0);
-            lv_obj_set_style_text_font(label, emphasis_font, 0);
-        }
-        label = lv_obj_get_child(today_card, 2);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, accent_color, 0);
-            lv_obj_set_style_text_font(label, emphasis_font, 0);
-        }
-        label = lv_obj_get_child(today_card, 3);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, subtitle_color, 0);
-            lv_obj_set_style_text_font(label, body_font, 0);
-        }
-        label = lv_obj_get_child(today_card, 4);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, subtitle_color, 0);
-            lv_obj_set_style_text_font(label, body_font, 0);
+        if ((today_icon_slot != NULL) && (lv_obj_get_child(today_icon_slot, 0) != NULL)) {
+            lv_obj_t *icon = lv_obj_get_child(today_icon_slot, 0);
+            lv_obj_set_style_text_color(icon, accent_color, 0);
         }
     }
 
@@ -446,10 +472,18 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
         }
 
         for (uint32_t index = 1; index < lv_obj_get_child_cnt(details_card); index++) {
-            label = lv_obj_get_child(details_card, (int32_t)index);
-            if (label != NULL) {
-                lv_obj_set_style_text_color(label, title_color, 0);
-                lv_obj_set_style_text_font(label, body_font, 0);
+            lv_obj_t *row = lv_obj_get_child(details_card, (int32_t)index);
+            lv_obj_t *name_label = (row != NULL) ? lv_obj_get_child(row, 0) : NULL;
+            lv_obj_t *value_label = (row != NULL) ? lv_obj_get_child(row, 1) : NULL;
+
+            if (name_label != NULL) {
+                lv_obj_set_style_text_color(name_label, title_color, 0);
+                lv_obj_set_style_text_font(name_label, body_font, 0);
+            }
+            if (value_label != NULL) {
+                lv_obj_set_style_text_color(value_label, accent_color, 0);
+                lv_obj_set_style_text_font(value_label, body_font, 0);
+                lv_obj_set_style_text_align(value_label, LV_TEXT_ALIGN_RIGHT, 0);
             }
         }
     }
@@ -693,8 +727,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_shadow_color(view->sidebar, sidebar_shadow, 0);
     brand = lv_obj_get_child(view->sidebar, 0);
     if (brand != NULL) {
-        lv_obj_set_style_text_color(brand, brand_text, 0);
-        lv_obj_set_style_text_font(brand, body_font, 0);
+        //lv_obj_set_style_text_color(brand, brand_text, 0);
+        lv_obj_set_style_text_color(brand, accent_color, 0);
+        lv_obj_set_style_text_font(brand, emphasis_font, 0);
     }
 
     lv_obj_set_style_bg_color(view->content, content_bg, 0);
@@ -1163,7 +1198,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 
     brand = lv_label_create(sidebar);
     lv_label_set_text(brand, "Redmole");
-    lv_obj_set_style_text_font(brand, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(brand, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(brand, lv_color_hex(0xF8FAFC), 0);
     lv_obj_align(brand, LV_ALIGN_TOP_MID, 0, 28);
 
@@ -1177,7 +1212,8 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_label_set_text(view->sidebar_date_label, "--- -- ---");
     lv_obj_set_style_text_font(view->sidebar_date_label, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(view->sidebar_date_label, lv_color_hex(0x94A3B8), 0);
-    lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 84);
+    //lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 88);
 
     view->bme280_button = gui_view_create_nav_button(sidebar, 140, "BME280", nav_event_cb,
                                                        event_user_data);

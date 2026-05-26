@@ -6,6 +6,8 @@ set(gui_srcs
     "src/view/gui_view.c"
     "src/view/gui_view_common.c"
     "src/view/gui_theme_defs.c"
+    "src/view/assets/weather_icons/gui_weather_icons.c"
+    "src/view/assets/weather_icons/weather_icons_128.c"
     "src/view/panels/gui_view_bme280_panel.c"
     "src/view/panels/gui_view_energy_panel.c"
     "src/view/panels/gui_view_forecast_panel.c"

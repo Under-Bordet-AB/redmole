@@ -83,6 +83,7 @@ static gui_sd_card_state_t get_sd_card_state(void);
 static int32_t clamp_saved_brightness(int32_t value);
 static bool parse_coordinate_in_range(const char *text, double min_value, double max_value);
 static const char *forecast_weather_code_to_condition(int weather_code);
+static gui_weather_icon_t forecast_weather_code_to_icon(int weather_code);
 static int forecast_weather_code_to_sky_rank(int weather_code);
 static bool forecast_parse_hour(const char *time_text, char *date, size_t date_len, int *hour);
 static void forecast_format_later_today_summary(const cJSON *hourly_time,
@@ -95,7 +96,9 @@ static void forecast_format_later_today_summary(const cJSON *hourly_time,
                                                 char *summary,
                                                 size_t summary_len);
 static const char *forecast_wind_direction_to_compass(double direction_degrees);
+static bool forecast_parse_date_parts(const char *date_text, int *year, int *month, int *day);
 static void forecast_format_day_label(const char *date_text, char *label, size_t label_len);
+static void forecast_format_day_date(const char *date_text, char *label, size_t label_len);
 static bool forecast_load_location(double *latitude, double *longitude);
 static bool forecast_parse_response(const char *response, gui_forecast_state_t *forecast);
 static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_plan);
@@ -451,6 +454,50 @@ static const char *forecast_weather_code_to_condition(int weather_code)
     }
 }
 
+static gui_weather_icon_t forecast_weather_code_to_icon(int weather_code)
+{
+    switch (weather_code) {
+        case 0:
+        case 1:
+            return GUI_WEATHER_ICON_CLEAR;
+        case 2:
+            return GUI_WEATHER_ICON_PARTLY_CLOUDY;
+        case 3:
+            return GUI_WEATHER_ICON_CLOUDY;
+        case 45:
+        case 48:
+            return GUI_WEATHER_ICON_FOG;
+        case 51:
+        case 53:
+        case 55:
+        case 56:
+        case 57:
+            return GUI_WEATHER_ICON_DRIZZLE;
+        case 61:
+        case 63:
+        case 65:
+        case 66:
+        case 67:
+        case 80:
+        case 81:
+        case 82:
+            return GUI_WEATHER_ICON_RAIN;
+        case 71:
+        case 73:
+        case 75:
+        case 77:
+        case 85:
+        case 86:
+            return GUI_WEATHER_ICON_SNOW;
+        case 95:
+        case 96:
+        case 99:
+            return GUI_WEATHER_ICON_THUNDERSTORM;
+        default:
+            return GUI_WEATHER_ICON_CLOUDY;
+    }
+}
+
 static int forecast_weather_code_to_sky_rank(int weather_code)
 {
     switch (weather_code) {
@@ -618,6 +665,43 @@ static const char *forecast_wind_direction_to_compass(double direction_degrees)
     return labels[index];
 }
 
+static bool forecast_parse_date_parts(const char *date_text, int *year, int *month, int *day)
+{
+    static const int days_in_month[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    int parsed_year;
+    int parsed_month;
+    int parsed_day;
+    int chars_read = 0;
+    int max_day;
+
+    if ((date_text == NULL) || (month == NULL) || (day == NULL) ||
+        (strlen(date_text) != 10U) || (date_text[4] != '-') || (date_text[7] != '-') ||
+        (sscanf(date_text, "%4d-%2d-%2d%n", &parsed_year, &parsed_month, &parsed_day,
+                &chars_read) != 3) ||
+        (chars_read != 10) || (parsed_year < 1) || (parsed_month < 1) ||
+        (parsed_month > 12)) {
+        return false;
+    }
+
+    max_day = days_in_month[parsed_month - 1];
+    if ((parsed_month == 2) &&
+        (((parsed_year % 4) == 0) &&
+         (((parsed_year % 100) != 0) || ((parsed_year % 400) == 0)))) {
+        max_day = 29;
+    }
+
+    if ((parsed_day < 1) || (parsed_day > max_day)) {
+        return false;
+    }
+
+    if (year != NULL) {
+        *year = parsed_year;
+    }
+    *month = parsed_month;
+    *day = parsed_day;
+    return true;
+}
+
 static void forecast_format_day_label(const char *date_text, char *label, size_t label_len)
 {
     static const char *weekday_labels[] = {
@@ -633,9 +717,7 @@ static void forecast_format_day_label(const char *date_text, char *label, size_t
         return;
     }
 
-    if ((date_text == NULL) ||
-        (sscanf(date_text, "%4d-%2d-%2d", &year, &month, &day) != 3) ||
-        (month < 1) || (month > 12) || (day < 1) || (day > 31)) {
+    if (!forecast_parse_date_parts(date_text, &year, &month, &day)) {
         snprintf(label, label_len, "%s", "--");
         return;
     }
@@ -647,6 +729,27 @@ static void forecast_format_day_label(const char *date_text, char *label, size_t
     weekday = (year + (year / 4) - (year / 100) + (year / 400) +
                month_offsets[month - 1] + day) % 7;
     snprintf(label, label_len, "%s", weekday_labels[weekday]);
+}
+
+static void forecast_format_day_date(const char *date_text, char *label, size_t label_len)
+{
+    static const char *month_labels[] = {
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    };
+    int month;
+    int day;
+
+    if ((label == NULL) || (label_len == 0U)) {
+        return;
+    }
+
+    if (!forecast_parse_date_parts(date_text, NULL, &month, &day)) {
+        snprintf(label, label_len, "%s", "--");
+        return;
+    }
+
+    snprintf(label, label_len, "%s %d", month_labels[month - 1], day);
 }
 
 static bool forecast_load_location(double *latitude, double *longitude)
@@ -688,6 +791,7 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     cJSON *hourly;
     cJSON *current_time;
     cJSON *current_temperature;
+    cJSON *current_apparent_temperature;
     cJSON *current_humidity;
     cJSON *current_weather_code;
     cJSON *hourly_time;
@@ -733,6 +837,8 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     hourly = cJSON_GetObjectItemCaseSensitive(root, "hourly");
     current_time = cJSON_GetObjectItemCaseSensitive(current, "time");
     current_temperature = cJSON_GetObjectItemCaseSensitive(current, "temperature_2m");
+    current_apparent_temperature = cJSON_GetObjectItemCaseSensitive(current,
+                                                                    "apparent_temperature");
     current_humidity = cJSON_GetObjectItemCaseSensitive(current, "relative_humidity_2m");
     current_weather_code = cJSON_GetObjectItemCaseSensitive(current, "weather_code");
     hourly_time = cJSON_GetObjectItemCaseSensitive(hourly, "time");
@@ -799,11 +905,19 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     }
 
     forecast->has_data = true;
-    snprintf(forecast->title, sizeof(forecast->title), "%s", "Today");
+    snprintf(forecast->title, sizeof(forecast->title), "%s", "Right now");
     snprintf(forecast->condition, sizeof(forecast->condition), "%s",
              forecast_weather_code_to_condition(current_weather_code->valueint));
+    forecast->current_icon = forecast_weather_code_to_icon(current_weather_code->valueint);
     snprintf(forecast->current_temperature, sizeof(forecast->current_temperature), "%.0f C",
              current_temperature->valuedouble);
+    if (cJSON_IsNumber(current_apparent_temperature)) {
+        snprintf(forecast->feels_like_temperature, sizeof(forecast->feels_like_temperature),
+                 "Feels like %.0f C", current_apparent_temperature->valuedouble);
+    } else {
+        snprintf(forecast->feels_like_temperature, sizeof(forecast->feels_like_temperature),
+                 "%s", "Feels like N/A");
+    }
     snprintf(forecast->range_text, sizeof(forecast->range_text),
              "High %.0f C  |  Low %.0f C",
              today_temp_max->valuedouble, today_temp_min->valuedouble);
@@ -824,9 +938,8 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
     }
 
     if (cJSON_IsNumber(today_wind_speed_max) && cJSON_IsNumber(today_wind_direction_dominant)) {
-        snprintf(forecast->details.wind, sizeof(forecast->details.wind), "Wind: %.0f m/s %s",
-                 today_wind_speed_max->valuedouble,
-                 forecast_wind_direction_to_compass(today_wind_direction_dominant->valuedouble));
+        snprintf(forecast->details.wind, sizeof(forecast->details.wind), "Wind: %.0f m/s",
+                 today_wind_speed_max->valuedouble);
     } else {
         snprintf(forecast->details.wind, sizeof(forecast->details.wind), "%s", "Wind: N/A");
     }
@@ -860,12 +973,13 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
 
         forecast_format_day_label(time_item->valuestring, forecast->days[day_index].label,
                                   sizeof(forecast->days[day_index].label));
-        snprintf(forecast->days[day_index].condition,
-                 sizeof(forecast->days[day_index].condition), "%s",
-                 forecast_weather_code_to_condition(weather_code_item->valueint));
+        forecast_format_day_date(time_item->valuestring, forecast->days[day_index].date_text,
+                                 sizeof(forecast->days[day_index].date_text));
+        forecast->days[day_index].icon =
+            forecast_weather_code_to_icon(weather_code_item->valueint);
         snprintf(forecast->days[day_index].range_text,
-                 sizeof(forecast->days[day_index].range_text), "%.0f / %.0f C",
-                 temp_max_item->valuedouble, temp_min_item->valuedouble);
+                 sizeof(forecast->days[day_index].range_text), "%.0f/%.0f C",
+                 temp_min_item->valuedouble, temp_max_item->valuedouble);
     }
 
     cJSON_Delete(root);
@@ -1439,7 +1553,8 @@ task_status_t forecast_work(task_node_t *node) {
     snprintf(url, sizeof(url),
              "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f"
              "&timezone=auto"
-             "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m"
+             "&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
+             "weather_code,wind_speed_10m,wind_direction_10m"
              "&hourly=temperature_2m,weather_code"
              "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant"
              "&forecast_days=5",
@@ -1574,13 +1689,13 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui)
     }
 
     leop_task.work = leop_work;
-    rc = task_scheduler_add(&leop_task, 5000U);
+    rc = task_scheduler_add(&leop_task, 10000U);
     if (rc < 0) {
         ESP_LOGE(TAG, "Failed to add LEOP fetching task to scheduler.");
     }
 
     sensor_task.work = sensor_work;
-    rc = task_scheduler_add(&sensor_task, 5000U);
+    rc = task_scheduler_add(&sensor_task, 2500U);
     if (rc < 0) {
         ESP_LOGE(TAG, "Failed to add sensor fetching task to scheduler.");
     }
