@@ -6,6 +6,8 @@
 
 #define GUI_VIEW_ENERGY_PANEL_MARGIN 24
 #define GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH 300
+#define GUI_VIEW_ENERGY_LEGEND_COLUMN_GAP 20
+#define GUI_VIEW_ENERGY_LEGEND_LABEL_X_OFFSET 18
 #define GUI_VIEW_ENERGY_LEGEND_ROW_GAP 8
 #define GUI_VIEW_ENERGY_CHART_HORIZONTAL_INSET 36
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_DRAW_SIZE 52
@@ -13,6 +15,8 @@
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_MAX 1000
 #define GUI_VIEW_ENERGY_CHART_VALUE_SCALE 1000
 #define GUI_VIEW_ENERGY_TIME_LABEL_STEP_HOURS 6
+#define GUI_VIEW_ENERGY_TIME_LABEL_SLOT_WIDTH 72
+#define GUI_VIEW_ENERGY_TIME_LABEL_X_OFFSET 6
 
 static void gui_view_energy_format_time_label(char *label,
                                               size_t label_len,
@@ -81,10 +85,112 @@ static void gui_view_energy_chart_draw_event_cb(lv_event_t *event)
                       (GUI_VIEW_ENERGY_CHART_VALUE_SCALE / 10)));
 }
 
+static lv_coord_t gui_view_energy_chart_x_tick_offset(lv_obj_t *chart,
+                                                      lv_coord_t chart_width,
+                                                      uint8_t label_index)
+{
+    lv_coord_t border_width;
+    lv_coord_t pad_left;
+    lv_coord_t pad_right;
+    lv_coord_t plot_width;
+    uint8_t last_label_index;
+
+    if ((chart == NULL) || (chart_width <= 0)) {
+        return 0;
+    }
+
+    last_label_index = (uint8_t)(GUI_ENERGY_PLAN_TIME_LABEL_COUNT - 1U);
+    if (last_label_index == 0U) {
+        return 0;
+    }
+
+    border_width = lv_obj_get_style_border_width(chart, LV_PART_MAIN);
+    pad_left = lv_obj_get_style_pad_left(chart, LV_PART_MAIN);
+    pad_right = lv_obj_get_style_pad_right(chart, LV_PART_MAIN);
+    plot_width = chart_width - pad_left - pad_right - (border_width * 2);
+    if (plot_width < 0) {
+        plot_width = 0;
+    }
+
+    return pad_left + border_width + GUI_VIEW_ENERGY_TIME_LABEL_X_OFFSET +
+           (plot_width * label_index) / last_label_index;
+}
+
+static void gui_view_layout_energy_legend_items(gui_view_t *view, lv_coord_t chart_width)
+{
+    lv_coord_t item_width;
+    uint8_t item_index;
+
+    if ((view == NULL) || (chart_width <= GUI_VIEW_ENERGY_LEGEND_COLUMN_GAP)) {
+        return;
+    }
+
+    item_width = (chart_width - GUI_VIEW_ENERGY_LEGEND_COLUMN_GAP) / 2;
+    if (item_width > GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH) {
+        item_width = GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH;
+    }
+    if (item_width <= GUI_VIEW_ENERGY_LEGEND_LABEL_X_OFFSET) {
+        return;
+    }
+
+    for (item_index = 0;
+         item_index < (sizeof(view->energy_legend_dots) / sizeof(view->energy_legend_dots[0]));
+         item_index++) {
+        lv_obj_t *item;
+
+        if (view->energy_legend_dots[item_index] == NULL) {
+            continue;
+        }
+
+        item = lv_obj_get_parent(view->energy_legend_dots[item_index]);
+        if (item != NULL) {
+            lv_obj_set_width(item, item_width);
+        }
+        if (view->energy_legend_labels[item_index] != NULL) {
+            lv_obj_set_width(view->energy_legend_labels[item_index],
+                             item_width - GUI_VIEW_ENERGY_LEGEND_LABEL_X_OFFSET);
+        }
+    }
+}
+
+static void gui_view_layout_energy_time_labels(gui_view_t *view,
+                                               lv_obj_t *time_row,
+                                               lv_coord_t panel_content_width,
+                                               lv_coord_t chart_width)
+{
+    lv_coord_t chart_left;
+    uint8_t label_index;
+
+    if ((view == NULL) || (time_row == NULL) || (panel_content_width <= 0) ||
+        (chart_width <= 0)) {
+        return;
+    }
+
+    chart_left = (panel_content_width - chart_width) / 2;
+
+    for (label_index = 0; label_index < GUI_ENERGY_PLAN_TIME_LABEL_COUNT; label_index++) {
+        lv_obj_t *time_label = view->energy_time_labels[label_index];
+        lv_coord_t tick_x;
+        lv_coord_t label_x;
+
+        if (time_label == NULL) {
+            continue;
+        }
+
+        tick_x = chart_left + gui_view_energy_chart_x_tick_offset(
+                                  view->energy_plan_chart, chart_width, label_index);
+        label_x = tick_x - (GUI_VIEW_ENERGY_TIME_LABEL_SLOT_WIDTH / 2);
+
+        lv_obj_set_width(time_label, GUI_VIEW_ENERGY_TIME_LABEL_SLOT_WIDTH);
+        lv_obj_align(time_label, LV_ALIGN_LEFT_MID, label_x, 0);
+    }
+}
+
 static void gui_view_layout_energy_panel(gui_view_t *view)
 {
     lv_obj_t *legend_container;
     lv_obj_t *time_row;
+    lv_coord_t panel_content_width;
     lv_coord_t panel_width;
     lv_coord_t panel_height;
     lv_coord_t chart_width;
@@ -107,21 +213,25 @@ static void gui_view_layout_energy_panel(gui_view_t *view)
     legend_container = lv_obj_get_child(view->energy_plan_panel, 0);
     time_row = lv_obj_get_child(view->energy_plan_panel, 2);
 
-    if (legend_container != NULL) {
-        lv_obj_set_width(legend_container, LV_PCT(100));
+    panel_content_width = lv_obj_get_content_width(view->energy_plan_panel);
+    chart_width = panel_content_width - (GUI_VIEW_ENERGY_CHART_HORIZONTAL_INSET * 2);
+    if (chart_width <= 0) {
+        return;
     }
 
+    if (legend_container != NULL) {
+        lv_obj_set_width(legend_container, chart_width);
+        gui_view_layout_energy_legend_items(view, chart_width);
+    }
     if (view->energy_plan_chart != NULL) {
-        chart_width = lv_obj_get_content_width(view->energy_plan_panel) -
-                      (GUI_VIEW_ENERGY_CHART_HORIZONTAL_INSET * 2);
-        if (chart_width > 0) {
-            lv_obj_set_width(view->energy_plan_chart, chart_width);
-            lv_obj_align(view->energy_plan_chart, LV_ALIGN_CENTER, 0, 0);
-        }
+        lv_obj_set_width(view->energy_plan_chart, chart_width);
+        lv_obj_align(view->energy_plan_chart, LV_ALIGN_CENTER, 0, 0);
     }
 
     if (time_row != NULL) {
-        lv_obj_set_width(time_row, LV_PCT(100));
+        lv_obj_set_width(time_row, panel_content_width);
+        gui_view_layout_energy_time_labels(view, time_row, panel_content_width,
+                                           chart_width);
     }
 }
 
@@ -177,7 +287,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_border_width(legend_container, 0, 0);
     lv_obj_set_style_shadow_width(legend_container, 0, 0);
     lv_obj_set_style_pad_all(legend_container, 0, 0);
-    lv_obj_set_style_pad_column(legend_container, 20, 0);
+    lv_obj_set_style_pad_column(legend_container, GUI_VIEW_ENERGY_LEGEND_COLUMN_GAP, 0);
     lv_obj_set_style_pad_row(legend_container, GUI_VIEW_ENERGY_LEGEND_ROW_GAP, 0);
     lv_obj_clear_flag(legend_container, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_layout(legend_container, LV_LAYOUT_FLEX);
@@ -236,15 +346,14 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_shadow_width(time_row, 0, 0);
     lv_obj_set_style_pad_all(time_row, 0, 0);
     lv_obj_clear_flag(time_row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_layout(time_row, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(time_row, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(time_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER);
 
     for (label_index = 0; label_index < GUI_ENERGY_PLAN_TIME_LABEL_COUNT; label_index++) {
         time_label = lv_label_create(time_row);
         view->energy_time_labels[label_index] = time_label;
+        lv_label_set_long_mode(time_label, LV_LABEL_LONG_CLIP);
+        lv_obj_set_width(time_label, GUI_VIEW_ENERGY_TIME_LABEL_SLOT_WIDTH);
         lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
+        lv_obj_set_style_text_align(time_label, LV_TEXT_ALIGN_CENTER, 0);
     }
     gui_view_update_energy_time_labels(view, 0U);
 
