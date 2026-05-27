@@ -278,16 +278,18 @@ static void gui_view_style_wifi_card(gui_view_t *view, lv_color_t bg_color,
 
 static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
                                         lv_color_t card_border, lv_color_t label_color,
-                                        lv_color_t value_color, gui_view_theme_t theme)
+                                        lv_color_t accent_color, gui_view_theme_t theme)
 {
     uint32_t child_count;
     const lv_font_t *body_font;
+    const lv_font_t *emphasis_font;
 
     if ((view == NULL) || (view->bme280_panel == NULL)) {
         return;
     }
 
-    body_font = gui_theme_get(theme)->body_font;
+    body_font     = gui_theme_get(theme)->body_font;
+    emphasis_font = gui_theme_get(theme)->emphasis_font;
 
     child_count = lv_obj_get_child_cnt(view->bme280_panel);
     for (uint32_t index = 0; index < child_count; index++) {
@@ -311,8 +313,9 @@ static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
             lv_obj_set_style_text_font(label, body_font, 0);
         }
         if (value_label != NULL) {
-            lv_obj_set_style_text_color(value_label, value_color, 0);
-            lv_obj_set_style_text_font(value_label, body_font, 0);
+            lv_obj_set_style_text_color(value_label, accent_color, 0);
+            lv_obj_set_style_text_font(value_label, emphasis_font, 0);
+            lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 0);
         }
     }
 }
@@ -654,7 +657,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_color_t item_bg;
     lv_color_t item_border;
     lv_color_t muted_text;
-    lv_color_t value_text;
     lv_color_t keyboard_bg;
     lv_color_t keyboard_border;
     lv_color_t keyboard_key_bg;
@@ -730,7 +732,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         item_bg       = lv_color_hex(def->item_bg);
         item_border   = lv_color_hex(def->item_border);
         muted_text    = lv_color_hex(def->muted_text);
-        value_text    = lv_color_hex(def->value_text);
 
         keyboard_bg             = lv_color_hex(def->keyboard_bg);
         keyboard_border         = lv_color_hex(def->keyboard_border);
@@ -815,7 +816,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_bg_opa(view->bme280_panel, panel_bg_opa, 0);
     lv_obj_set_style_border_color(view->bme280_panel, panel_border, 0);
     lv_obj_set_style_text_font(view->bme280_panel, body_font, 0);
-    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, value_text,
+    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, accent_color,
                                 effective_theme);
 
     lv_obj_set_style_bg_color(view->energy_plan_panel, panel_bg, 0);
