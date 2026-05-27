@@ -1356,6 +1356,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_label_set_text(view->update_label, "Last updated: --:--:--");
     lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_IGNORE_LAYOUT | LV_OBJ_FLAG_FLOATING);
     lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_text_opa(view->update_label, LV_OPA_70, 0);
     lv_obj_set_style_text_color(view->update_label, lv_color_hex(0x607089), 0);
     lv_obj_move_foreground(view->update_label);
 
