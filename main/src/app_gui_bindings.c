@@ -108,6 +108,7 @@ static bool forecast_load_location(double *latitude, double *longitude);
 static bool forecast_parse_response(const char *response, gui_forecast_state_t *forecast);
 static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_plan);
 static bool leop_parse_series(const cJSON *series_array, uint16_t *values, const char *series_name);
+static bool leop_parse_timestamp_hour(const cJSON *timestamp_item, uint8_t *hour);
 static uint16_t leop_scale_hourly_average(double hourly_average);
 
 // UI sync
@@ -1094,6 +1095,51 @@ static bool leop_parse_series(const cJSON *series_array, uint16_t *values, const
     return true;
 }
 
+static bool leop_parse_timestamp_hour(const cJSON *timestamp_item, uint8_t *hour)
+{
+    int parsed_hour;
+    struct tm time_info;
+    time_t timestamp_s;
+    const char *time_text;
+
+    if ((timestamp_item == NULL) || (hour == NULL)) {
+        return false;
+    }
+
+    if (cJSON_IsNumber(timestamp_item)) {
+        if (timestamp_item->valuedouble < 0.0) {
+            return false;
+        }
+
+        timestamp_s = (time_t)timestamp_item->valuedouble;
+        if (localtime_r(&timestamp_s, &time_info) == NULL) {
+            return false;
+        }
+
+        *hour = (uint8_t)time_info.tm_hour;
+        return true;
+    }
+
+    if (!cJSON_IsString(timestamp_item)) {
+        return false;
+    }
+
+    time_text = timestamp_item->valuestring;
+    if ((strlen(time_text) < 13U) || ((time_text[10] != 'T') && (time_text[10] != ' ')) ||
+        (time_text[11] < '0') || (time_text[11] > '9') || (time_text[12] < '0') ||
+        (time_text[12] > '9')) {
+        return false;
+    }
+
+    parsed_hour = ((time_text[11] - '0') * 10) + (time_text[12] - '0');
+    if (parsed_hour > 23) {
+        return false;
+    }
+
+    *hour = (uint8_t)parsed_hour;
+    return true;
+}
+
 static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_plan)
 {
     cJSON *root;
@@ -1103,6 +1149,8 @@ static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_
     cJSON *charge_battery;
     cJSON *sell_excess;
     cJSON *timestamp;
+    cJSON *first_timestamp;
+    uint8_t start_hour;
 
 #define LEOP_PARSE_FAIL(fmt, ...)                                  \
     do {                                                           \
@@ -1136,7 +1184,13 @@ static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_
         LEOP_PARSE_FAIL("timestamp array shorter than %d points", LEOP_RAW_POINT_COUNT);
     }
 
+    first_timestamp = cJSON_GetArrayItem(timestamp, 0);
+    if (!leop_parse_timestamp_hour(first_timestamp, &start_hour)) {
+        LEOP_PARSE_FAIL("timestamp[0] does not contain a valid hour");
+    }
+
     memset(energy_plan, 0, sizeof(*energy_plan));
+    energy_plan->start_hour = start_hour;
 
     if (!leop_parse_series(buy_electricity, energy_plan->buy_electricity, "buy_electricity") ||
         !leop_parse_series(direct_use, energy_plan->use_solar_directly, "direct_use") ||

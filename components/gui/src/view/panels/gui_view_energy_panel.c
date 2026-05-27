@@ -12,6 +12,53 @@
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_MIN 0
 #define GUI_VIEW_ENERGY_CHART_Y_AXIS_MAX 1000
 #define GUI_VIEW_ENERGY_CHART_VALUE_SCALE 1000
+#define GUI_VIEW_ENERGY_TIME_LABEL_STEP_HOURS 6
+
+static void gui_view_energy_format_time_label(char *label,
+                                              size_t label_len,
+                                              uint8_t start_hour,
+                                              uint8_t offset_hours)
+{
+    uint8_t normalized_start_hour;
+    uint8_t display_hour;
+
+    if ((label == NULL) || (label_len == 0U)) {
+        return;
+    }
+
+    normalized_start_hour = (uint8_t)(start_hour % GUI_ENERGY_PLAN_POINT_COUNT);
+    if ((normalized_start_hour == 0U) && (offset_hours == GUI_ENERGY_PLAN_POINT_COUNT)) {
+        lv_snprintf(label, label_len, "24 h");
+        return;
+    }
+
+    display_hour =
+        (uint8_t)((normalized_start_hour + offset_hours) % GUI_ENERGY_PLAN_POINT_COUNT);
+    lv_snprintf(label, label_len, "%02u h", (unsigned int)display_hour);
+}
+
+static void gui_view_update_energy_time_labels(gui_view_t *view, uint8_t start_hour)
+{
+    uint8_t label_index;
+
+    if (view == NULL) {
+        return;
+    }
+
+    for (label_index = 0; label_index < GUI_ENERGY_PLAN_TIME_LABEL_COUNT; label_index++) {
+        char label_text[8];
+        uint8_t offset_hours =
+            (uint8_t)(label_index * GUI_VIEW_ENERGY_TIME_LABEL_STEP_HOURS);
+
+        if (view->energy_time_labels[label_index] == NULL) {
+            continue;
+        }
+
+        gui_view_energy_format_time_label(label_text, sizeof(label_text), start_hour,
+                                          offset_hours);
+        lv_label_set_text(view->energy_time_labels[label_index], label_text);
+    }
+}
 
 static void gui_view_energy_chart_draw_event_cb(lv_event_t *event)
 {
@@ -93,7 +140,8 @@ static bool gui_view_energy_plan_changed(gui_view_t *view, const gui_energy_plan
            (memcmp(view->last_energy_plan.charge_battery, energy_plan->charge_battery,
                    sizeof(energy_plan->charge_battery)) != 0) ||
            (memcmp(view->last_energy_plan.sell_excess, energy_plan->sell_excess,
-                   sizeof(energy_plan->sell_excess)) != 0);
+                   sizeof(energy_plan->sell_excess)) != 0) ||
+           (view->last_energy_plan.start_hour != energy_plan->start_hour);
 }
 
 void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
@@ -101,6 +149,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_t *legend_container;
     lv_obj_t *time_row;
     lv_obj_t *time_label;
+    uint8_t label_index;
 
     if ((view == NULL) || (content == NULL)) {
         return;
@@ -192,25 +241,12 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_flex_align(time_row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER);
 
-    time_label = lv_label_create(time_row);
-    lv_label_set_text(time_label, "00 h");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-
-    time_label = lv_label_create(time_row);
-    lv_label_set_text(time_label, "06 h");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-
-    time_label = lv_label_create(time_row);
-    lv_label_set_text(time_label, "12 h");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-
-    time_label = lv_label_create(time_row);
-    lv_label_set_text(time_label, "18 h");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
-
-    time_label = lv_label_create(time_row);
-    lv_label_set_text(time_label, "24 h");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
+    for (label_index = 0; label_index < GUI_ENERGY_PLAN_TIME_LABEL_COUNT; label_index++) {
+        time_label = lv_label_create(time_row);
+        view->energy_time_labels[label_index] = time_label;
+        lv_obj_set_style_text_color(time_label, lv_color_hex(0x607089), 0);
+    }
+    gui_view_update_energy_time_labels(view, 0U);
 
     gui_view_layout_energy_panel(view);
 }
@@ -226,6 +262,8 @@ void gui_view_apply_energy_panel(gui_view_t *view, const gui_view_model_t *model
     if (!gui_view_energy_plan_changed(view, &model->energy_plan)) {
         return;
     }
+
+    gui_view_update_energy_time_labels(view, model->energy_plan.start_hour);
 
     gui_view_apply_energy_series(view->energy_plan_chart, view->buy_series,
                                  model->energy_plan.buy_electricity);
