@@ -21,7 +21,7 @@
 #define GUI_VIEW_ENERGY_CHART_VALUE_SCALE 1000
 #define GUI_VIEW_ENERGY_TIME_LABEL_STEP_HOURS 6
 #define GUI_VIEW_ENERGY_TIME_LABEL_SLOT_WIDTH 72
-#define GUI_VIEW_ENERGY_TIME_LABEL_X_OFFSET 6
+#define GUI_VIEW_ENERGY_TIME_LABEL_X_OFFSET 1
 #define GUI_VIEW_ENERGY_CHART_LINE_WIDTH 3
 
 typedef enum {
@@ -46,13 +46,13 @@ static void gui_view_energy_format_time_label(char *label,
 
     normalized_start_hour = (uint8_t)(start_hour % GUI_ENERGY_PLAN_POINT_COUNT);
     if ((normalized_start_hour == 0U) && (offset_hours == GUI_ENERGY_PLAN_POINT_COUNT)) {
-        lv_snprintf(label, label_len, "24 h");
+        lv_snprintf(label, label_len, "24");
         return;
     }
 
     display_hour =
         (uint8_t)((normalized_start_hour + offset_hours) % GUI_ENERGY_PLAN_POINT_COUNT);
-    lv_snprintf(label, label_len, "%02u h", (unsigned int)display_hour);
+    lv_snprintf(label, label_len, "%02u", (unsigned int)display_hour);
 }
 
 static void gui_view_update_energy_time_labels(gui_view_t *view, uint8_t start_hour)
