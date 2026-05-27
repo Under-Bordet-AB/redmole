@@ -386,6 +386,70 @@ static void gui_view_style_energy_legend_labels(gui_view_t *view, lv_color_t tex
     }
 }
 
+static void gui_view_style_energy_action_widgets(gui_view_t *view, lv_color_t card_bg,
+                                                 lv_color_t card_border,
+                                                 lv_color_t title_color,
+                                                 lv_color_t subtitle_color,
+                                                 lv_color_t accent_color,
+                                                 lv_color_t idle_color,
+                                                 gui_view_theme_t theme)
+{
+    const gui_theme_def_t *def;
+    const lv_font_t *body_font;
+    const lv_font_t *emphasis_font;
+
+    if (view == NULL) {
+        return;
+    }
+
+    def = gui_theme_get(theme);
+    if (def == NULL) {
+        return;
+    }
+
+    body_font = def->body_font;
+    emphasis_font = def->emphasis_font;
+
+    if (view->energy_action_card != NULL) {
+        lv_obj_set_style_bg_color(view->energy_action_card, card_bg, 0);
+        lv_obj_set_style_bg_opa(view->energy_action_card, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(view->energy_action_card, card_border, 0);
+        lv_obj_set_style_text_font(view->energy_action_card, body_font, 0);
+    }
+    if (view->energy_action_icon != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_icon, accent_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_24, 0);
+    }
+    if (view->energy_action_eyebrow != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_eyebrow, subtitle_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_eyebrow, body_font, 0);
+    }
+    if (view->energy_action_title != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_title, title_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_title, emphasis_font, 0);
+        lv_obj_set_style_pad_bottom(view->energy_action_title, 6, 0);
+    }
+    if (view->energy_action_value != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_value, accent_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_value, body_font, 0);
+    }
+
+    for (uint32_t index = 0; index < GUI_ENERGY_PLAN_POINT_COUNT; index++) {
+        lv_obj_t *segment = view->energy_action_segments[index];
+
+        if (segment == NULL) {
+            continue;
+        }
+
+        lv_obj_set_style_radius(segment, 7, 0);
+        lv_obj_set_style_bg_color(segment, idle_color, 0);
+        lv_obj_set_style_bg_opa(segment, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(segment, 2, 0);
+        lv_obj_set_style_border_color(segment, title_color, 0);
+        lv_obj_set_style_border_opa(segment, LV_OPA_TRANSP, 0);
+    }
+}
+
 static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
                                              lv_color_t card_border, lv_color_t title_color,
                                              lv_color_t subtitle_color,
@@ -861,6 +925,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, effective_theme);
     //gui_view_style_energy_legend_labels(view, accent_soft_color);
     gui_view_style_energy_legend_labels(view, subtitle_text);
+    gui_view_style_energy_action_widgets(view, card_bg, card_border, title_text,
+                                         subtitle_text, accent_color, panel_border,
+                                         effective_theme);
 
     gui_view_style_forecast_panel(view, panel_bg, panel_border, panel_bg_opa, card_bg,
                                   card_border, title_text, subtitle_text, accent_color,
