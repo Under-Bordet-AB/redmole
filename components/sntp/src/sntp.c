@@ -18,6 +18,10 @@ static void on_time_synced(struct timeval *tv)
 void sntp_sync_start(void)
 {
     ESP_LOGI(TAG, "Starting SNTP");
+
+    setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+    tzset();
+
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "pool.ntp.org");
     esp_sntp_set_time_sync_notification_cb(on_time_synced);
