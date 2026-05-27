@@ -148,7 +148,7 @@ static const char *gui_view_energy_action_title(gui_view_energy_action_t action)
         case GUI_VIEW_ENERGY_ACTION_BUY:
             return "Buy electricity";
         case GUI_VIEW_ENERGY_ACTION_SOLAR:
-            return "Use solar directly";
+            return "Use solar";
         case GUI_VIEW_ENERGY_ACTION_CHARGE:
             return "Charge battery";
         case GUI_VIEW_ENERGY_ACTION_SELL:
@@ -592,7 +592,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
         "Buy electricity", &view->energy_legend_labels[0]);
     view->energy_legend_dots[1] = gui_view_create_legend_item(
         legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0xF59E0B),
-        "Use solar directly", &view->energy_legend_labels[1]);
+        "Use solar", &view->energy_legend_labels[1]);
     view->energy_legend_dots[2] = gui_view_create_legend_item(
         legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x10B981),
         "Charge battery", &view->energy_legend_labels[2]);
@@ -614,6 +614,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
                           LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_bottom(action_strip_row, -8, 0);
     lv_obj_add_flag(action_strip_row, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_add_flag(action_strip_row, LV_OBJ_FLAG_HIDDEN);
 
     for (label_index = 0; label_index < GUI_ENERGY_PLAN_POINT_COUNT; label_index++) {
         lv_obj_t *segment = lv_obj_create(action_strip_row);
