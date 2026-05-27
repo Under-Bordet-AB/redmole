@@ -1287,7 +1287,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 
     view->bme280_button = gui_view_create_nav_button(sidebar, 140, "BME280", nav_event_cb,
                                                        event_user_data);
-    view->energy_plan_button = gui_view_create_nav_button(sidebar, 212, "Energy plan",
+    view->energy_plan_button = gui_view_create_nav_button(sidebar, 212, "LEOP",
                                                           nav_event_cb, event_user_data);
     view->forecast_button = gui_view_create_nav_button(sidebar, 284, "Forecast", nav_event_cb,
                                                        event_user_data);
