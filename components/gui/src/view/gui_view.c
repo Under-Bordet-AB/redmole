@@ -414,11 +414,12 @@ static void gui_view_style_energy_action_widgets(gui_view_t *view, lv_color_t ca
         lv_obj_set_style_bg_color(view->energy_action_card, card_bg, 0);
         lv_obj_set_style_bg_opa(view->energy_action_card, LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(view->energy_action_card, card_border, 0);
+        //lv_obj_set_style_border_opa(view->energy_action_card, LV_OPA_TRANSP, 0);
         lv_obj_set_style_text_font(view->energy_action_card, body_font, 0);
     }
     if (view->energy_action_icon != NULL) {
         lv_obj_set_style_text_color(view->energy_action_icon, accent_color, 0);
-        lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_24, 0);
+        lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_32, 0);
     }
     if (view->energy_action_eyebrow != NULL) {
         lv_obj_set_style_text_color(view->energy_action_eyebrow, subtitle_color, 0);

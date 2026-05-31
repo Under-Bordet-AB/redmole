@@ -530,15 +530,16 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_flex_flow(view->energy_action_card, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(view->energy_action_card, LV_FLEX_ALIGN_START,
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_flex_grow(view->energy_action_card, 1);
+    lv_obj_set_flex_grow(view->energy_action_card, 3);
 
     view->energy_action_icon = lv_label_create(view->energy_action_card);
     lv_label_set_text(view->energy_action_icon, LV_SYMBOL_POWER);
     lv_label_set_long_mode(view->energy_action_icon, LV_LABEL_LONG_CLIP);
-    lv_obj_set_width(view->energy_action_icon, 42);
+    lv_obj_set_width(view->energy_action_icon, 44);
     lv_obj_set_style_text_align(view->energy_action_icon, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(view->energy_action_icon, lv_color_hex(0x1D4ED8), 0);
-    lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_32, 0);
+    lv_obj_add_flag(view->energy_action_icon, LV_OBJ_FLAG_HIDDEN);
 
     action_text_column = lv_obj_create(view->energy_action_card);
     lv_obj_set_size(action_text_column, 0, LV_PCT(100));
@@ -586,6 +587,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_flex_flow(legend_container, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(legend_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START,
                           LV_FLEX_ALIGN_START);
+    lv_obj_set_flex_grow(legend_container, 2);
 
     view->energy_legend_dots[0] = gui_view_create_legend_item(
         legend_container, 0, 0, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH, lv_color_hex(0x1D4ED8),
