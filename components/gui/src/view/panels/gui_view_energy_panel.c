@@ -538,7 +538,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_width(view->energy_action_icon, 44);
     lv_obj_set_style_text_align(view->energy_action_icon, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(view->energy_action_icon, lv_color_hex(0x1D4ED8), 0);
-    lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_24, 0);
     lv_obj_add_flag(view->energy_action_icon, LV_OBJ_FLAG_HIDDEN);
 
     action_text_column = lv_obj_create(view->energy_action_card);
