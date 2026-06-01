@@ -5,15 +5,27 @@
 #include "esp_log.h"
 #include "task_scheduler.h"
 
-/*
- * Module-level state.
- * task_node is embedded directly so the scheduler does not allocate it.
- * network_up is set by the NAC callbacks and gates all outgoing requests.
+/**
+ * @file
+ * @brief HTTP client module state and lifecycle management.
+ *
+ * Owns the module-level context, SPIRAM response buffer, and the scheduler
+ * task node used for periodic polling. Network lifecycle is driven by the
+ * NAC via http_client_notify_network_up() and
+ * http_client_notify_network_down().
+ */
+
+/**
+ * @brief Module-level state for the HTTP client.
+ *
+ * @p task_node is embedded directly so the scheduler does not need to
+ * allocate it. @p network_up is set by the NAC callbacks and gates all
+ * outgoing requests.
  */
 typedef struct
 {
-    task_node_t task_node;
-    bool network_up;
+    task_node_t task_node; /*!< Scheduler node; embedded to avoid heap allocation. */
+    bool network_up;       /*!< True when the network is available for requests. */
 } http_client_ctx_t;
 
 static http_client_ctx_t s_client = {0};
@@ -28,10 +40,6 @@ void      http_tls_deinit(void);
 esp_err_t http_request_get(const char *url, char *buf, size_t buf_len);
 // esp_err_t http_request_post(const char *url, const char *body, const char *content_type);
 
-/*
- * Called by NAC when WiFi connects.
- * Enables outgoing requests and adds the poll node to the scheduler.
- */
 void http_client_notify_network_up(void)
 {
     ESP_LOGD(TAG, "Network up");
@@ -39,10 +47,6 @@ void http_client_notify_network_up(void)
     task_scheduler_add(&s_client.task_node, 0);
 }
 
-/*
- * Called by NAC when WiFi disconnects.
- * Disables outgoing requests and removes the poll node from the scheduler.
- */
 void http_client_notify_network_down(void)
 {
     ESP_LOGD(TAG, "Network down");
@@ -50,25 +54,27 @@ void http_client_notify_network_down(void)
     task_scheduler_remove(&s_client.task_node);
 }
 
-/*
- * Returns a pointer to the most recently received response body.
- */
 const char *http_client_get_response(void)
 {
     return s_response_buf;
 }
 
-/*
- * Scheduler callback, fires once per poll interval.
- * Sends a GET request and stores the response in s_response_buf.
- * Always reschedules itself to keep polling indefinitely while the network is up.
+/**
+ * @brief Scheduler callback; fires once per poll interval.
+ *
+ * Sends a GET request to the configured endpoint and stores the response in
+ * @p s_response_buf. Always reschedules itself so polling continues
+ * indefinitely while the network is up.
+ *
+ * @param node Pointer to the embedded task_node inside http_client_ctx_t.
+ * @return TASK_RUN_AGAIN to keep the node active in the scheduler.
  */
 static task_status_t http_poll(task_node_t *node)
 {
     http_client_ctx_t *self = container_of(node, http_client_ctx_t, task_node);
     (void)self;
 
-    if (http_request_get("https://jsonplaceholder.typicode.com/todos/1", s_response_buf, CONFIG_REDMOLE_HTTP_RESPONSE_BUF_SIZE) != ESP_OK)
+    if (http_client_get("http://ubdev.emk530.net:10480/result.json", s_response_buf, CONFIG_REDMOLE_HTTP_RESPONSE_BUF_SIZE) != ESP_OK)
     {
         ESP_LOGW(TAG, "Poll request failed");
     }
@@ -77,10 +83,6 @@ static task_status_t http_poll(task_node_t *node)
     return TASK_RUN_AGAIN;
 }
 
-/*
- * Allocates the response buffer in SPIRAM, initializes TLS, and
- * assigns the poll callback so the node is ready to be scheduled.
- */
 esp_err_t http_client_init(http_client_tls_mode_t mode, const char *ca_cert_pem)
 {
     ESP_LOGD(TAG, "Initializing");
@@ -105,10 +107,6 @@ esp_err_t http_client_init(http_client_tls_mode_t mode, const char *ca_cert_pem)
     return ESP_OK;
 }
 
-/*
- * Sends a blocking GET request.
- * Bypasses the internal poll buffer; the caller supplies their own buf.
- */
 esp_err_t http_client_get(const char *url, char *buf, size_t buf_len)
 {
     if (!s_client.network_up)
@@ -131,9 +129,6 @@ esp_err_t http_client_get(const char *url, char *buf, size_t buf_len)
 //     return http_request_post(url, body, content_type);
 // }
 
-/*
- * Frees the response buffer and resets TLS state.
- */
 void http_client_deinit(void)
 {
     ESP_LOGD(TAG, "Deinitializing");

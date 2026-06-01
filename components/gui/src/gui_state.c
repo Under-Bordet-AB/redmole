@@ -14,6 +14,15 @@ static void gui_state_copy_status(gui_wifi_settings_t *wifi, const char *text)
     snprintf(wifi->status_text, sizeof(wifi->status_text), "%s", text);
 }
 
+static void gui_state_set_default_last_updated(char *text, size_t text_len)
+{
+    if ((text == NULL) || (text_len == 0U)) {
+        return;
+    }
+
+    snprintf(text, text_len, "%s", "Last updated: --:--:--");
+}
+
 static void gui_state_reset_wifi_scan(gui_state_t *state)
 {
     if (state == NULL) {
@@ -33,9 +42,12 @@ static void gui_state_init_forecast(gui_forecast_state_t *forecast)
     }
 
     memset(forecast, 0, sizeof(*forecast));
-    snprintf(forecast->title, sizeof(forecast->title), "%s", "Today");
+    snprintf(forecast->title, sizeof(forecast->title), "%s", "Right now");
     snprintf(forecast->condition, sizeof(forecast->condition), "%s", "Mostly cloudy");
+    forecast->current_icon = GUI_WEATHER_ICON_CLOUDY;
     snprintf(forecast->current_temperature, sizeof(forecast->current_temperature), "%s", "18 C");
+    snprintf(forecast->feels_like_temperature, sizeof(forecast->feels_like_temperature), "%s",
+             "Feels like 18 C");
     snprintf(forecast->range_text, sizeof(forecast->range_text), "%s", "High 21 C  |  Low 13 C");
     snprintf(forecast->summary, sizeof(forecast->summary), "%s", "Stays mild later today.");
     snprintf(forecast->details.rain_chance, sizeof(forecast->details.rain_chance), "%s",
@@ -47,27 +59,37 @@ static void gui_state_init_forecast(gui_forecast_state_t *forecast)
              "UV index: 3");
 
     snprintf(forecast->days[0].label, sizeof(forecast->days[0].label), "%s", "Mon");
-    snprintf(forecast->days[0].condition, sizeof(forecast->days[0].condition), "%s", "Cloudy");
+    snprintf(forecast->days[0].date_text, sizeof(forecast->days[0].date_text), "%s",
+             "May 25");
+    forecast->days[0].icon = GUI_WEATHER_ICON_CLOUDY;
     snprintf(forecast->days[0].range_text, sizeof(forecast->days[0].range_text), "%s",
              "20 / 12 C");
     snprintf(forecast->days[1].label, sizeof(forecast->days[1].label), "%s", "Tue");
-    snprintf(forecast->days[1].condition, sizeof(forecast->days[1].condition), "%s",
-             "Light rain");
+    snprintf(forecast->days[1].date_text, sizeof(forecast->days[1].date_text), "%s",
+             "May 26");
+    forecast->days[1].icon = GUI_WEATHER_ICON_RAIN;
     snprintf(forecast->days[1].range_text, sizeof(forecast->days[1].range_text), "%s",
              "17 / 10 C");
     snprintf(forecast->days[2].label, sizeof(forecast->days[2].label), "%s", "Wed");
-    snprintf(forecast->days[2].condition, sizeof(forecast->days[2].condition), "%s", "Sunny");
+    snprintf(forecast->days[2].date_text, sizeof(forecast->days[2].date_text), "%s",
+             "May 27");
+    forecast->days[2].icon = GUI_WEATHER_ICON_CLEAR;
     snprintf(forecast->days[2].range_text, sizeof(forecast->days[2].range_text), "%s",
              "22 / 11 C");
     snprintf(forecast->days[3].label, sizeof(forecast->days[3].label), "%s", "Thu");
-    snprintf(forecast->days[3].condition, sizeof(forecast->days[3].condition), "%s", "Windy");
+    snprintf(forecast->days[3].date_text, sizeof(forecast->days[3].date_text), "%s",
+             "May 28");
+    forecast->days[3].icon = GUI_WEATHER_ICON_CLOUDY;
     snprintf(forecast->days[3].range_text, sizeof(forecast->days[3].range_text), "%s",
              "19 / 9 C");
     snprintf(forecast->days[4].label, sizeof(forecast->days[4].label), "%s", "Fri");
-    snprintf(forecast->days[4].condition, sizeof(forecast->days[4].condition), "%s",
-             "Partly sunny");
+    snprintf(forecast->days[4].date_text, sizeof(forecast->days[4].date_text), "%s",
+             "May 29");
+    forecast->days[4].icon = GUI_WEATHER_ICON_PARTLY_CLOUDY;
     snprintf(forecast->days[4].range_text, sizeof(forecast->days[4].range_text), "%s",
              "21 / 13 C");
+    gui_state_set_default_last_updated(forecast->last_updated,
+                                       sizeof(forecast->last_updated));
 }
 
 static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
@@ -81,7 +103,8 @@ static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
            (left->humidity_deci_pct == right->humidity_deci_pct) &&
            (left->pressure_deci_hpa == right->pressure_deci_hpa) &&
            (left->is_fresh == right->is_fresh) &&
-           (left->update_count == right->update_count);
+           (left->update_count == right->update_count) &&
+           (strcmp(left->last_updated, right->last_updated) == 0);
 }
 
 static bool gui_state_energy_plan_equals(const gui_energy_plan_t *left,
@@ -184,6 +207,10 @@ void gui_state_init(gui_state_t *state)
     state->wifi_state = GUI_WIFI_STATE_IDLE;
     state->bluetooth_state = GUI_BLUETOOTH_STATE_IDLE;
     state->sd_card_state = GUI_SD_CARD_STATE_IDLE;
+    gui_state_set_default_last_updated(state->sensor.last_updated,
+                                       sizeof(state->sensor.last_updated));
+    gui_state_set_default_last_updated(state->energy_plan.last_updated,
+                                       sizeof(state->energy_plan.last_updated));
     gui_state_init_forecast(&state->forecast);
     gui_state_reset_wifi_scan(state);
     gui_state_copy_status(&state->wifi, "Press Scan to search for Wi-Fi networks.");

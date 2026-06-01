@@ -964,8 +964,7 @@ CONFIG_REDMOLE_BME280_BACKEND_HW=y
 #
 # RedMole LEOP Configuration
 #
-# default:
-CONFIG_REDMOLE_LEOP_REFRESH_URL="http://127.0.0.1:10480/endpoints/result.json"
+CONFIG_REDMOLE_LEOP_REFRESH_URL="http://ubdev.emk530.net:10480/result.json"
 # end of RedMole LEOP Configuration
 
 #

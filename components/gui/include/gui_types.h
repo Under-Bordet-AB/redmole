@@ -32,8 +32,25 @@ typedef enum {
     GUI_VIEW_THEME_SPONGEBOB,
 } gui_view_theme_t;
 
+/**
+ * @brief Weather icon identifiers rendered by the forecast panel.
+ */
+typedef enum {
+    GUI_WEATHER_ICON_CLEAR = 0,
+    GUI_WEATHER_ICON_PARTLY_CLOUDY,
+    GUI_WEATHER_ICON_CLOUDY,
+    GUI_WEATHER_ICON_FOG,
+    GUI_WEATHER_ICON_DRIZZLE,
+    GUI_WEATHER_ICON_RAIN,
+    GUI_WEATHER_ICON_SNOW,
+    GUI_WEATHER_ICON_THUNDERSTORM,
+    GUI_WEATHER_ICON_COUNT,
+} gui_weather_icon_t;
+
 /** Hourly points stored in an energy plan day profile. */
 #define GUI_ENERGY_PLAN_POINT_COUNT 24
+/** Hour labels shown under the energy plan chart. */
+#define GUI_ENERGY_PLAN_TIME_LABEL_COUNT 5
 /** Number of daily forecast entries rendered in the forecast panel. */
 #define GUI_FORECAST_DAY_COUNT 5
 /** Number of detail lines shown in the forecast details card. */
@@ -56,6 +73,8 @@ typedef enum {
 #define GUI_FORECAST_CONDITION_MAX_LEN 32
 /** Maximum length of a forecast temperature string. */
 #define GUI_FORECAST_TEMP_TEXT_MAX_LEN 20
+/** Maximum length of the forecast feels-like temperature string. */
+#define GUI_FORECAST_FEELS_LIKE_TEXT_MAX_LEN 24
 /** Maximum length of the forecast range string. */
 #define GUI_FORECAST_RANGE_TEXT_MAX_LEN 32
 /** Maximum length of the forecast summary string. */
@@ -64,8 +83,12 @@ typedef enum {
 #define GUI_FORECAST_DETAIL_TEXT_MAX_LEN 32
 /** Maximum length of a compact forecast day label. */
 #define GUI_FORECAST_DAY_LABEL_MAX_LEN 12
+/** Maximum length of a daily forecast date string. */
+#define GUI_FORECAST_DAY_DATE_TEXT_MAX_LEN 16
 /** Maximum length of a daily forecast range string. */
 #define GUI_FORECAST_DAY_RANGE_TEXT_MAX_LEN 20
+/** Maximum length of a last-updated timestamp label. */
+#define GUI_LAST_UPDATED_TEXT_MAX_LEN 32
 
 /**
  * @brief Latest sensor readings displayed by the GUI.
@@ -76,6 +99,7 @@ typedef struct {
     int32_t pressure_deci_hpa; /*!< Pressure in deci-hectopascals. */
     bool is_fresh;             /*!< True when the readings reflect a recent sensor update. */
     uint32_t update_count;     /*!< Monotonic counter of applied sensor updates. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
 } gui_sensor_state_t;
 
 /**
@@ -86,6 +110,8 @@ typedef struct {
     uint16_t use_solar_directly[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Direct solar consumption per hour. */
     uint16_t charge_battery[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Battery charging values per hour. */
     uint16_t sell_excess[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Excess energy sold back per hour. */
+    uint8_t start_hour; /*!< Hour represented by the first chart point, 0-23. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
 } gui_energy_plan_t;
 
 /**
@@ -103,7 +129,8 @@ typedef struct {
  */
 typedef struct {
     char label[GUI_FORECAST_DAY_LABEL_MAX_LEN]; /*!< Day label such as Mon or Tue. */
-    char condition[GUI_FORECAST_CONDITION_MAX_LEN]; /*!< Short condition summary. */
+    char date_text[GUI_FORECAST_DAY_DATE_TEXT_MAX_LEN]; /*!< Calendar date such as May 26. */
+    gui_weather_icon_t icon; /*!< Icon matching the daily weather condition. */
     char range_text[GUI_FORECAST_DAY_RANGE_TEXT_MAX_LEN]; /*!< Daily high/low temperature text. */
 } gui_forecast_day_t;
 
@@ -114,11 +141,14 @@ typedef struct {
     bool has_data; /*!< True when the values came from a parsed forecast response. */
     char title[GUI_FORECAST_TITLE_MAX_LEN]; /*!< Primary forecast heading. */
     char condition[GUI_FORECAST_CONDITION_MAX_LEN]; /*!< Current condition text. */
+    gui_weather_icon_t current_icon; /*!< Icon matching the current weather condition. */
     char current_temperature[GUI_FORECAST_TEMP_TEXT_MAX_LEN]; /*!< Current temperature text. */
+    char feels_like_temperature[GUI_FORECAST_FEELS_LIKE_TEXT_MAX_LEN]; /*!< Apparent temperature text. */
     char range_text[GUI_FORECAST_RANGE_TEXT_MAX_LEN]; /*!< High/low summary text. */
     char summary[GUI_FORECAST_SUMMARY_TEXT_MAX_LEN]; /*!< One-line forecast summary. */
     gui_forecast_details_t details; /*!< Detail lines for the side card. */
     gui_forecast_day_t days[GUI_FORECAST_DAY_COUNT]; /*!< Daily forecast entries shown below the summary cards. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
 } gui_forecast_state_t;
 
 /**

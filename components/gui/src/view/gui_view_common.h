@@ -92,9 +92,12 @@ lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord
  * @param width Legend item width.
  * @param color Legend marker color.
  * @param text Null-terminated legend label.
- * @return Newly created LVGL container object for the legend item.
+ * @param label_out Optional output pointer receiving the created label.
+ * @return Newly created LVGL marker dot object for the legend item.
  */
-lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t y, lv_coord_t width, lv_color_t color, const char *text);
+lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
+                                      lv_coord_t width, lv_color_t color, const char *text,
+                                      lv_obj_t **label_out);
 
 /**
  * @brief Create a metric card with a static label and caller-owned value label pointer.

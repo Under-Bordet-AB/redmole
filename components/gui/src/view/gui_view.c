@@ -10,6 +10,9 @@
 #include "panels/gui_view_forecast_panel.h"
 #include "panels/gui_view_settings_panel.h"
 
+#define GUI_VIEW_UPDATE_LABEL_X_OFFSET 24
+#define GUI_VIEW_UPDATE_LABEL_Y_OFFSET 9
+
 static gui_view_theme_t gui_view_effective_theme(gui_view_theme_t base_theme,
                                                  bool night_variant_enabled)
 {
@@ -103,6 +106,41 @@ static void gui_view_update_sidebar_clock_impl(gui_view_t *view)
     strftime(date_text, sizeof(date_text), "%a %d %b", &time_info);
     gui_view_set_label_text_if_changed(view->sidebar_clock_label, clock_text);
     gui_view_set_label_text_if_changed(view->sidebar_date_label, date_text);
+}
+
+static void gui_view_apply_update_label(gui_view_t *view, const gui_view_model_t *model)
+{
+    lv_obj_t *panel = NULL;
+    const char *text = NULL;
+
+    if ((view == NULL) || (model == NULL) || (view->update_label == NULL)) {
+        return;
+    }
+
+    if (model->active_panel == GUI_PANEL_BME280) {
+        panel = view->bme280_panel;
+        text = model->sensor.last_updated;
+    } else if (model->active_panel == GUI_PANEL_ENERGY_PLAN) {
+        panel = view->energy_plan_panel;
+        text = model->energy_plan.last_updated;
+    } else if (model->active_panel == GUI_PANEL_FORECAST) {
+        panel = view->forecast_panel;
+        text = model->forecast.last_updated;
+    } else {
+        lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    if (panel == NULL) {
+        lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    gui_view_set_label_text_if_changed(view->update_label, text);
+     lv_obj_align_to(view->update_label, panel, LV_ALIGN_OUT_BOTTOM_LEFT,
+                     GUI_VIEW_UPDATE_LABEL_X_OFFSET, GUI_VIEW_UPDATE_LABEL_Y_OFFSET);
+    lv_obj_clear_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(view->update_label);
 }
 
 static void gui_view_apply_header(gui_view_t *view, const gui_view_model_t *model)
@@ -240,16 +278,18 @@ static void gui_view_style_wifi_card(gui_view_t *view, lv_color_t bg_color,
 
 static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
                                         lv_color_t card_border, lv_color_t label_color,
-                                        lv_color_t value_color, gui_view_theme_t theme)
+                                        lv_color_t accent_color, gui_view_theme_t theme)
 {
     uint32_t child_count;
     const lv_font_t *body_font;
+    const lv_font_t *emphasis_font;
 
     if ((view == NULL) || (view->bme280_panel == NULL)) {
         return;
     }
 
-    body_font = gui_theme_get(theme)->body_font;
+    body_font     = gui_theme_get(theme)->body_font;
+    emphasis_font = gui_theme_get(theme)->emphasis_font;
 
     child_count = lv_obj_get_child_cnt(view->bme280_panel);
     for (uint32_t index = 0; index < child_count; index++) {
@@ -273,10 +313,22 @@ static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
             lv_obj_set_style_text_font(label, body_font, 0);
         }
         if (value_label != NULL) {
-            lv_obj_set_style_text_color(value_label, value_color, 0);
-            lv_obj_set_style_text_font(value_label, body_font, 0);
+            lv_obj_set_style_text_color(value_label, accent_color, 0);
+            lv_obj_set_style_text_font(value_label, emphasis_font, 0);
+            lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 0);
         }
     }
+}
+
+static void gui_view_style_update_label(lv_obj_t *label, lv_color_t text_color,
+                                        const lv_font_t *font)
+{
+    if (label == NULL) {
+        return;
+    }
+
+    lv_obj_set_style_text_color(label, text_color, 0);
+    lv_obj_set_style_text_font(label, font, 0);
 }
 
 static void gui_view_style_energy_labels(lv_obj_t *parent, lv_color_t text_color,
@@ -317,6 +369,88 @@ static void gui_view_style_energy_labels(lv_obj_t *parent, lv_color_t text_color
     }
 }
 
+static void gui_view_style_energy_legend_labels(gui_view_t *view, lv_color_t text_color)
+{
+    uint32_t index;
+
+    if (view == NULL) {
+        return;
+    }
+
+    for (index = 0;
+         index < (sizeof(view->energy_legend_labels) / sizeof(view->energy_legend_labels[0]));
+         index++) {
+        if (view->energy_legend_labels[index] != NULL) {
+            lv_obj_set_style_text_color(view->energy_legend_labels[index], text_color, 0);
+        }
+    }
+}
+
+static void gui_view_style_energy_action_widgets(gui_view_t *view, lv_color_t card_bg,
+                                                 lv_color_t card_border,
+                                                 lv_color_t title_color,
+                                                 lv_color_t subtitle_color,
+                                                 lv_color_t accent_color,
+                                                 lv_color_t idle_color,
+                                                 gui_view_theme_t theme)
+{
+    const gui_theme_def_t *def;
+    const lv_font_t *body_font;
+    const lv_font_t *emphasis_font;
+
+    if (view == NULL) {
+        return;
+    }
+
+    def = gui_theme_get(theme);
+    if (def == NULL) {
+        return;
+    }
+
+    body_font = def->body_font;
+    emphasis_font = def->emphasis_font;
+
+    if (view->energy_action_card != NULL) {
+        lv_obj_set_style_bg_color(view->energy_action_card, card_bg, 0);
+        lv_obj_set_style_bg_opa(view->energy_action_card, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(view->energy_action_card, card_border, 0);
+        //lv_obj_set_style_border_opa(view->energy_action_card, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_text_font(view->energy_action_card, body_font, 0);
+    }
+    if (view->energy_action_icon != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_icon, accent_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_24, 0);
+    }
+    if (view->energy_action_eyebrow != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_eyebrow, subtitle_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_eyebrow, body_font, 0);
+    }
+    if (view->energy_action_title != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_title, title_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_title, emphasis_font, 0);
+        lv_obj_set_style_pad_bottom(view->energy_action_title, 6, 0);
+    }
+    if (view->energy_action_value != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_value, accent_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_value, body_font, 0);
+    }
+
+    for (uint32_t index = 0; index < GUI_ENERGY_PLAN_POINT_COUNT; index++) {
+        lv_obj_t *segment = view->energy_action_segments[index];
+
+        if (segment == NULL) {
+            continue;
+        }
+
+        lv_obj_set_style_radius(segment, 7, 0);
+        lv_obj_set_style_bg_color(segment, idle_color, 0);
+        lv_obj_set_style_bg_opa(segment, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(segment, 2, 0);
+        lv_obj_set_style_border_color(segment, title_color, 0);
+        lv_obj_set_style_border_opa(segment, LV_OPA_TRANSP, 0);
+    }
+}
+
 static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
                                              lv_color_t card_border, lv_color_t title_color,
                                              lv_color_t subtitle_color,
@@ -325,6 +459,8 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
 {
     lv_obj_t *day_label;
     lv_obj_t *condition_label;
+    lv_obj_t *icon_area;
+    lv_obj_t *icon_slot;
     lv_obj_t *temp_label;
     const lv_font_t *body_font;
     const lv_font_t *emphasis_font;
@@ -343,6 +479,8 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
 
     day_label = lv_obj_get_child(card, 0);
     condition_label = lv_obj_get_child(card, 1);
+    icon_area = lv_obj_get_child(card, 2);
+    icon_slot = (icon_area != NULL) ? lv_obj_get_child(icon_area, 0) : NULL;
     temp_label = lv_obj_get_child(card, 3);
 
     if (day_label != NULL) {
@@ -356,6 +494,10 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
     if (temp_label != NULL) {
         lv_obj_set_style_text_color(temp_label, accent_color, 0);
         lv_obj_set_style_text_font(temp_label, emphasis_font, 0);
+    }
+    if ((icon_slot != NULL) && (lv_obj_get_child(icon_slot, 0) != NULL)) {
+        lv_obj_t *icon = lv_obj_get_child(icon_slot, 0);
+        lv_obj_set_style_text_color(icon, accent_color, 0);
     }
 }
 
@@ -411,30 +553,48 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
     gui_view_style_forecast_card(details_card, card_bg, card_border, theme);
 
     if (today_card != NULL) {
-        label = lv_obj_get_child(today_card, 0);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, subtitle_color, 0);
-            lv_obj_set_style_text_font(label, body_font, 0);
+        lv_obj_t *today_text_column = lv_obj_get_child(today_card, 0);
+        lv_obj_t *today_icon_slot = lv_obj_get_child(today_card, 1);
+
+        if (today_text_column != NULL) {
+            label = lv_obj_get_child(today_text_column, 0);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, subtitle_color, 0);
+                lv_obj_set_style_text_font(label, body_font, 0);
+            }
+            label = lv_obj_get_child(today_text_column, 1);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, title_color, 0);
+                lv_obj_set_style_text_font(label, emphasis_font, 0);
+            }
+            label = lv_obj_get_child(today_text_column, 2);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, accent_color, 0);
+                lv_obj_set_style_text_font(label, emphasis_font, 0);
+            }
+            label = lv_obj_get_child(today_text_column, 3);
+            if (label != NULL) {
+                lv_obj_t *prefix_label = lv_obj_get_child(label, 0);
+                lv_obj_t *value_label = lv_obj_get_child(label, 1);
+
+                if (prefix_label != NULL) {
+                    lv_obj_set_style_text_color(prefix_label, subtitle_color, 0);
+                    lv_obj_set_style_text_font(prefix_label, body_font, 0);
+                }
+                if (value_label != NULL) {
+                    lv_obj_set_style_text_color(value_label, accent_color, 0);
+                    lv_obj_set_style_text_font(value_label, body_font, 0);
+                }
+            }
+            label = lv_obj_get_child(today_text_column, 4);
+            if (label != NULL) {
+                lv_obj_set_style_text_color(label, subtitle_color, 0);
+                lv_obj_set_style_text_font(label, body_font, 0);
+            }
         }
-        label = lv_obj_get_child(today_card, 1);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, title_color, 0);
-            lv_obj_set_style_text_font(label, emphasis_font, 0);
-        }
-        label = lv_obj_get_child(today_card, 2);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, accent_color, 0);
-            lv_obj_set_style_text_font(label, emphasis_font, 0);
-        }
-        label = lv_obj_get_child(today_card, 3);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, subtitle_color, 0);
-            lv_obj_set_style_text_font(label, body_font, 0);
-        }
-        label = lv_obj_get_child(today_card, 4);
-        if (label != NULL) {
-            lv_obj_set_style_text_color(label, subtitle_color, 0);
-            lv_obj_set_style_text_font(label, body_font, 0);
+        if ((today_icon_slot != NULL) && (lv_obj_get_child(today_icon_slot, 0) != NULL)) {
+            lv_obj_t *icon = lv_obj_get_child(today_icon_slot, 0);
+            lv_obj_set_style_text_color(icon, accent_color, 0);
         }
     }
 
@@ -446,10 +606,18 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
         }
 
         for (uint32_t index = 1; index < lv_obj_get_child_cnt(details_card); index++) {
-            label = lv_obj_get_child(details_card, (int32_t)index);
-            if (label != NULL) {
-                lv_obj_set_style_text_color(label, title_color, 0);
-                lv_obj_set_style_text_font(label, body_font, 0);
+            lv_obj_t *row = lv_obj_get_child(details_card, (int32_t)index);
+            lv_obj_t *name_label = (row != NULL) ? lv_obj_get_child(row, 0) : NULL;
+            lv_obj_t *value_label = (row != NULL) ? lv_obj_get_child(row, 1) : NULL;
+
+            if (name_label != NULL) {
+                lv_obj_set_style_text_color(name_label, title_color, 0);
+                lv_obj_set_style_text_font(name_label, body_font, 0);
+            }
+            if (value_label != NULL) {
+                lv_obj_set_style_text_color(value_label, accent_color, 0);
+                lv_obj_set_style_text_font(value_label, body_font, 0);
+                lv_obj_set_style_text_align(value_label, LV_TEXT_ALIGN_RIGHT, 0);
             }
         }
     }
@@ -554,7 +722,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_color_t item_bg;
     lv_color_t item_border;
     lv_color_t muted_text;
-    lv_color_t value_text;
     lv_color_t keyboard_bg;
     lv_color_t keyboard_border;
     lv_color_t keyboard_key_bg;
@@ -613,7 +780,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         sidebar_grad   = lv_color_hex(def->sidebar_grad);
         sidebar_shadow = lv_color_hex(def->sidebar_shadow);
         sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        brand_text     = lv_color_hex(def->brand_text);
+        //brand_text     = lv_color_hex(def->brand_text);
+        brand_text     = lv_color_hex(def->accent_color);
 
         content_bg     = lv_color_hex(def->content_bg);
         content_shadow = lv_color_hex(def->content_shadow);
@@ -629,7 +797,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         item_bg       = lv_color_hex(def->item_bg);
         item_border   = lv_color_hex(def->item_border);
         muted_text    = lv_color_hex(def->muted_text);
-        value_text    = lv_color_hex(def->value_text);
 
         keyboard_bg             = lv_color_hex(def->keyboard_bg);
         keyboard_border         = lv_color_hex(def->keyboard_border);
@@ -694,7 +861,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     brand = lv_obj_get_child(view->sidebar, 0);
     if (brand != NULL) {
         lv_obj_set_style_text_color(brand, brand_text, 0);
-        lv_obj_set_style_text_font(brand, body_font, 0);
+        lv_obj_set_style_text_font(brand, emphasis_font, 0);
     }
 
     lv_obj_set_style_bg_color(view->content, content_bg, 0);
@@ -714,7 +881,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_bg_opa(view->bme280_panel, panel_bg_opa, 0);
     lv_obj_set_style_border_color(view->bme280_panel, panel_border, 0);
     lv_obj_set_style_text_font(view->bme280_panel, body_font, 0);
-    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, value_text,
+    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, accent_color,
                                 effective_theme);
 
     lv_obj_set_style_bg_color(view->energy_plan_panel, panel_bg, 0);
@@ -757,10 +924,16 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     }
     lv_obj_set_style_text_font(view->energy_plan_panel, body_font, 0);
     gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, effective_theme);
+    //gui_view_style_energy_legend_labels(view, accent_soft_color);
+    gui_view_style_energy_legend_labels(view, subtitle_text);
+    gui_view_style_energy_action_widgets(view, card_bg, card_border, title_text,
+                                         subtitle_text, accent_color, panel_border,
+                                         effective_theme);
 
     gui_view_style_forecast_panel(view, panel_bg, panel_border, panel_bg_opa, card_bg,
                                   card_border, title_text, subtitle_text, accent_color,
                                   effective_theme);
+    gui_view_style_update_label(view->update_label, muted_text, body_font);
 
     gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
                                  subtitle_text, effective_theme);
@@ -1163,7 +1336,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 
     brand = lv_label_create(sidebar);
     lv_label_set_text(brand, "Redmole");
-    lv_obj_set_style_text_font(brand, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(brand, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(brand, lv_color_hex(0xF8FAFC), 0);
     lv_obj_align(brand, LV_ALIGN_TOP_MID, 0, 28);
 
@@ -1177,11 +1350,12 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_label_set_text(view->sidebar_date_label, "--- -- ---");
     lv_obj_set_style_text_font(view->sidebar_date_label, &lv_font_montserrat_18, 0);
     lv_obj_set_style_text_color(view->sidebar_date_label, lv_color_hex(0x94A3B8), 0);
-    lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 84);
+    //lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 84);
+    lv_obj_align(view->sidebar_date_label, LV_ALIGN_TOP_MID, 0, 88);
 
     view->bme280_button = gui_view_create_nav_button(sidebar, 140, "BME280", nav_event_cb,
                                                        event_user_data);
-    view->energy_plan_button = gui_view_create_nav_button(sidebar, 212, "Energy plan",
+    view->energy_plan_button = gui_view_create_nav_button(sidebar, 212, "LEOP",
                                                           nav_event_cb, event_user_data);
     view->forecast_button = gui_view_create_nav_button(sidebar, 284, "Forecast", nav_event_cb,
                                                        event_user_data);
@@ -1247,6 +1421,14 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     gui_view_init_energy_panel(view, content);
     gui_view_init_forecast_panel(view, content);
 
+    view->update_label = lv_label_create(view->screen);
+    lv_label_set_text(view->update_label, "Last updated: --:--:--");
+    lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_IGNORE_LAYOUT | LV_OBJ_FLAG_FLOATING);
+    lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_text_opa(view->update_label, LV_OPA_70, 0);
+    lv_obj_set_style_text_color(view->update_label, lv_color_hex(0x607089), 0);
+    lv_obj_move_foreground(view->update_label);
+
     gui_view_apply(view, model);
     gui_view_update_sidebar_clock_impl(view);
 }
@@ -1303,4 +1485,6 @@ void gui_view_apply(gui_view_t *view, const gui_view_model_t *model)
     } else {
         gui_view_apply_settings_panel(view, model);
     }
+
+    gui_view_apply_update_label(view, model);
 }

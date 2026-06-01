@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
 #include "gui_module.h"
 #include "gui_screen.h"
 #include "gui_state.h"
@@ -27,6 +28,7 @@ typedef struct {
     gui_state_t state;                 /*!< Mutable GUI state owned by the runtime. */
     gui_screen_t screen;               /*!< Screen/view object used to render the current model. */
     lv_timer_t *refresh_timer;         /*!< Periodic LVGL timer used to trigger refresh work. */
+    TickType_t last_heartbeat_tick;    /*!< Last tick when the GUI refresh timer ran. */
     gui_ctx_t *owner;                  /*!< Back-reference to the owning public GUI context. */
     gui_module_bindings_t bindings;    /*!< Application callbacks currently registered with the GUI. */
 } gui_runtime_t;
