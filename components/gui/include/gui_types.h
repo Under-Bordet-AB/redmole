@@ -30,6 +30,7 @@ typedef enum {
     GUI_VIEW_THEME_HELLO_KITTY_NIGHT,
     GUI_VIEW_THEME_DEATH_NOTE,
     GUI_VIEW_THEME_SPONGEBOB,
+    GUI_VIEW_THEME_BONZI_BUDDY,
 } gui_view_theme_t;
 
 /**

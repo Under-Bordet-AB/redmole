@@ -17,7 +17,7 @@
  * Number of entries in the theme table.
  * Update when adding new enum values to gui_view_theme_t.
  */
-#define GUI_THEME_COUNT 7
+#define GUI_THEME_COUNT 8
 
 /*
  * Per-theme descriptor. All colors are stored as 0xRRGGBB uint32_t values.
