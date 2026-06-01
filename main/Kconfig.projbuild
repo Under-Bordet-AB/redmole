@@ -20,3 +20,13 @@ menu "RedMole Sensor Configuration"
     endchoice
 
 endmenu
+
+menu "RedMole LEOP Configuration"
+
+    config REDMOLE_LEOP_REFRESH_URL
+        string "LEOP refresh URL"
+        default "http://ubdev.emk530.net:10480/result.json"
+        help
+            URL used to refresh the LEOP energy plan data.
+
+endmenu

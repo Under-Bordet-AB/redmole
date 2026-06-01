@@ -10,6 +10,13 @@
 
 #include "../gui_defs.h"
 
+typedef enum {
+    GUI_SETTINGS_SUBPAGE_HOME = 0,
+    GUI_SETTINGS_SUBPAGE_CONNECTIVITY,
+    GUI_SETTINGS_SUBPAGE_DISPLAY,
+    GUI_SETTINGS_SUBPAGE_SYSTEM,
+} gui_settings_subpage_t;
+
 /**
  * @brief Concrete LVGL object tree for the GUI screen.
  *
@@ -42,7 +49,15 @@ typedef struct {
     lv_obj_t *settings_panel;     /*!< Root container for the settings panel. */
 
     lv_obj_t *settings_home_panel;    /*!< Top-level settings content container. */
-    lv_obj_t *connectivity_card;      /*!< Settings card containing connectivity controls. */
+    lv_obj_t *settings_connectivity_panel; /*!< Settings subpage for connectivity controls. */
+    lv_obj_t *settings_display_panel; /*!< Settings subpage for display controls. */
+    lv_obj_t *settings_system_panel;  /*!< Settings subpage reserved for future system controls. */
+    lv_obj_t *settings_connectivity_button; /*!< Category button that opens the connectivity subpage. */
+    lv_obj_t *settings_display_button; /*!< Category button that opens the display subpage. */
+    lv_obj_t *settings_system_button;  /*!< Category button that opens the system subpage. */
+    lv_obj_t *settings_connectivity_back_button; /*!< Back button on the connectivity subpage. */
+    lv_obj_t *settings_display_back_button; /*!< Back button on the display subpage. */
+    lv_obj_t *settings_system_back_button; /*!< Back button on the system subpage. */
     lv_obj_t *other_settings_card;    /*!< Settings card containing non-connectivity options. */
     lv_obj_t *wifi_card;              /*!< Settings subsection for Wi-Fi controls. */
     lv_obj_t *wifi_header_row;        /*!< Row containing the Wi-Fi section title and status. */
@@ -62,6 +77,12 @@ typedef struct {
     lv_obj_t *theme_night_switch;     /*!< Switch controlling the night variant setting. */
     lv_obj_t *brightness_slider;      /*!< Slider used to change display brightness. */
     lv_obj_t *brightness_value_label; /*!< Label showing the current brightness percentage. */
+    lv_obj_t *location_card;          /*!< Settings subsection containing location controls. */
+    lv_obj_t *location_latitude_label; /*!< Label for the latitude textarea. */
+    lv_obj_t *location_latitude_textarea; /*!< Text area used to edit latitude. */
+    lv_obj_t *location_longitude_label; /*!< Label for the longitude textarea. */
+    lv_obj_t *location_longitude_textarea; /*!< Text area used to edit longitude. */
+    lv_obj_t *location_keyboard;      /*!< On-screen keyboard dedicated to location input. */
 
     lv_obj_t *dialog_scrim;                    /*!< Shared modal scrim behind dialog content. */
     lv_obj_t *network_dialog;                  /*!< Wi-Fi network selection dialog container. */
@@ -86,7 +107,15 @@ typedef struct {
     lv_obj_t *status_line;         /*!< BME280 status line under the metric cards. */
 
     lv_obj_t *energy_plan_chart;   /*!< Chart widget used by the energy panel. */
+    lv_obj_t *energy_action_card;   /*!< Hero card showing the current energy plan action. */
+    lv_obj_t *energy_action_icon;   /*!< Symbol label for the current energy plan action. */
+    lv_obj_t *energy_action_eyebrow; /*!< Time context label for the current energy action. */
+    lv_obj_t *energy_action_title;  /*!< Primary label for the current energy action. */
+    lv_obj_t *energy_action_value;  /*!< Numeric level label for the current energy action. */
+    lv_obj_t *energy_action_segments[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< 24-hour action strip cells. */
     lv_obj_t *energy_legend_dots[4]; /*!< Legend markers for the four energy series. */
+    lv_obj_t *energy_legend_labels[4]; /*!< Legend labels for the four energy series. */
+    lv_obj_t *energy_time_labels[GUI_ENERGY_PLAN_TIME_LABEL_COUNT]; /*!< Time labels under the energy chart. */
     lv_chart_series_t *buy_series; /*!< Grid purchase chart series. */
     lv_chart_series_t *solar_series; /*!< Solar usage chart series. */
     lv_chart_series_t *charge_series; /*!< Battery charging chart series. */
@@ -98,10 +127,13 @@ typedef struct {
     bool has_last_energy_plan;               /*!< True when last_energy_plan contains a valid cached value. */
     gui_wifi_settings_t last_wifi_settings;  /*!< Last Wi-Fi settings model applied to the dialogs and cards. */
     bool has_last_wifi_settings;             /*!< True when last_wifi_settings contains a valid cached value. */
+    gui_location_settings_t last_location_settings; /*!< Last location settings model applied to the System page. */
+    bool has_last_location_settings;         /*!< True when last_location_settings contains a valid cached value. */
     gui_view_theme_t current_theme;          /*!< Theme currently applied to the view. */
     bool current_show_background_image;      /*!< Cached background image visibility setting. */
     bool current_night_variant_enabled;      /*!< Cached night variant setting. */
     bool has_current_appearance;             /*!< True when the cached appearance settings are initialized. */
+    gui_settings_subpage_t active_settings_subpage; /*!< Settings subpage currently visible inside the settings panel. */
 } gui_view_t;
 
 /**
@@ -188,5 +220,20 @@ void gui_view_show_network_dialog(gui_view_t *view);
  * @param view Initialized view object.
  */
 void gui_view_show_password_dialog(gui_view_t *view);
+
+/**
+ * @brief Switch the settings panel to a specific internal subpage.
+ *
+ * @param view Initialized view object.
+ * @param subpage Settings subpage to show.
+ */
+void gui_view_show_settings_subpage(gui_view_t *view, gui_settings_subpage_t subpage);
+
+/**
+ * @brief Reset the settings panel to the category chooser home page.
+ *
+ * @param view Initialized view object.
+ */
+void gui_view_reset_settings_navigation(gui_view_t *view);
 
 #endif

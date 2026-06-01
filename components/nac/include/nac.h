@@ -13,6 +13,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "task_scheduler.h"
+#include "uart_mole.h"
 
 #define WIFI_SSID_MAX_LENGTH  32
 #define WIFI_PASS_MAX_LENGTH  64
@@ -30,15 +31,6 @@ typedef enum
     WIFI_STATE_ERROR,
 } wifi_state_t;
 
-typedef enum
-{
-    BLUETOOTH_STATE_IDLE = 0,
-    BLUETOOTH_STATE_DISCONNECTED,
-    BLUETOOTH_STATE_CONNECTING,
-    BLUETOOTH_STATE_CONNECTED,
-    BLUETOOTH_STATE_RECONNECTING,
-} bluetooth_state_t;
-
 typedef struct wifi_ctx
 {
     task_node_t       task_node;
@@ -52,12 +44,6 @@ typedef struct wifi_ctx
     uint8_t           hw_online;
     uint8_t           scan_complete; /* set by wifi_scan_done(), cleared by nac_request_wifi_scan() */
 } wifi_ctx_t;
-
-typedef struct bluetooth_ctx
-{
-    bluetooth_state_t  state;
-    EventGroupHandle_t bluetooth_event_group;
-} bluetooth_ctx_t;
 
 typedef enum
 {
@@ -73,7 +59,7 @@ typedef enum
  * @note also calls esp_netif_init() and esp_event_loop_create_default().
  * @return ESP_OK on success, an error code on failure.
  */
-esp_err_t nac_init(void);
+esp_err_t nac_init(EventGroupHandle_t *event_group);
 
 /**
  * @brief Tear down the NAC module and release all resources.

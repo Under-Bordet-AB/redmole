@@ -14,6 +14,15 @@ static void gui_state_copy_status(gui_wifi_settings_t *wifi, const char *text)
     snprintf(wifi->status_text, sizeof(wifi->status_text), "%s", text);
 }
 
+static void gui_state_set_default_last_updated(char *text, size_t text_len)
+{
+    if ((text == NULL) || (text_len == 0U)) {
+        return;
+    }
+
+    snprintf(text, text_len, "%s", "Last updated: --:--:--");
+}
+
 static void gui_state_reset_wifi_scan(gui_state_t *state)
 {
     if (state == NULL) {
@@ -26,13 +35,61 @@ static void gui_state_reset_wifi_scan(gui_state_t *state)
     state->wifi.known_network_count = 0;
 }
 
-static void gui_state_clear_energy_plan(gui_energy_plan_t *energy_plan)
+static void gui_state_init_forecast(gui_forecast_state_t *forecast)
 {
-    if (energy_plan == NULL) {
+    if (forecast == NULL) {
         return;
     }
 
-    memset(energy_plan, 0, sizeof(*energy_plan));
+    memset(forecast, 0, sizeof(*forecast));
+    snprintf(forecast->title, sizeof(forecast->title), "%s", "Right now");
+    snprintf(forecast->condition, sizeof(forecast->condition), "%s", "Mostly cloudy");
+    forecast->current_icon = GUI_WEATHER_ICON_CLOUDY;
+    snprintf(forecast->current_temperature, sizeof(forecast->current_temperature), "%s", "18 C");
+    snprintf(forecast->feels_like_temperature, sizeof(forecast->feels_like_temperature), "%s",
+             "Feels like 18 C");
+    snprintf(forecast->range_text, sizeof(forecast->range_text), "%s", "High 21 C  |  Low 13 C");
+    snprintf(forecast->summary, sizeof(forecast->summary), "%s", "Stays mild later today.");
+    snprintf(forecast->details.rain_chance, sizeof(forecast->details.rain_chance), "%s",
+             "Rain chance: 20%%");
+    snprintf(forecast->details.wind, sizeof(forecast->details.wind), "%s", "Wind: 4 m/s NW");
+    snprintf(forecast->details.humidity, sizeof(forecast->details.humidity), "%s",
+             "Humidity: 61%%");
+    snprintf(forecast->details.uv_index, sizeof(forecast->details.uv_index), "%s",
+             "UV index: 3");
+
+    snprintf(forecast->days[0].label, sizeof(forecast->days[0].label), "%s", "Mon");
+    snprintf(forecast->days[0].date_text, sizeof(forecast->days[0].date_text), "%s",
+             "May 25");
+    forecast->days[0].icon = GUI_WEATHER_ICON_CLOUDY;
+    snprintf(forecast->days[0].range_text, sizeof(forecast->days[0].range_text), "%s",
+             "20 / 12 C");
+    snprintf(forecast->days[1].label, sizeof(forecast->days[1].label), "%s", "Tue");
+    snprintf(forecast->days[1].date_text, sizeof(forecast->days[1].date_text), "%s",
+             "May 26");
+    forecast->days[1].icon = GUI_WEATHER_ICON_RAIN;
+    snprintf(forecast->days[1].range_text, sizeof(forecast->days[1].range_text), "%s",
+             "17 / 10 C");
+    snprintf(forecast->days[2].label, sizeof(forecast->days[2].label), "%s", "Wed");
+    snprintf(forecast->days[2].date_text, sizeof(forecast->days[2].date_text), "%s",
+             "May 27");
+    forecast->days[2].icon = GUI_WEATHER_ICON_CLEAR;
+    snprintf(forecast->days[2].range_text, sizeof(forecast->days[2].range_text), "%s",
+             "22 / 11 C");
+    snprintf(forecast->days[3].label, sizeof(forecast->days[3].label), "%s", "Thu");
+    snprintf(forecast->days[3].date_text, sizeof(forecast->days[3].date_text), "%s",
+             "May 28");
+    forecast->days[3].icon = GUI_WEATHER_ICON_CLOUDY;
+    snprintf(forecast->days[3].range_text, sizeof(forecast->days[3].range_text), "%s",
+             "19 / 9 C");
+    snprintf(forecast->days[4].label, sizeof(forecast->days[4].label), "%s", "Fri");
+    snprintf(forecast->days[4].date_text, sizeof(forecast->days[4].date_text), "%s",
+             "May 29");
+    forecast->days[4].icon = GUI_WEATHER_ICON_PARTLY_CLOUDY;
+    snprintf(forecast->days[4].range_text, sizeof(forecast->days[4].range_text), "%s",
+             "21 / 13 C");
+    gui_state_set_default_last_updated(forecast->last_updated,
+                                       sizeof(forecast->last_updated));
 }
 
 static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
@@ -46,7 +103,28 @@ static bool gui_state_sensor_equals(const gui_sensor_state_t *left,
            (left->humidity_deci_pct == right->humidity_deci_pct) &&
            (left->pressure_deci_hpa == right->pressure_deci_hpa) &&
            (left->is_fresh == right->is_fresh) &&
-           (left->update_count == right->update_count);
+           (left->update_count == right->update_count) &&
+           (strcmp(left->last_updated, right->last_updated) == 0);
+}
+
+static bool gui_state_energy_plan_equals(const gui_energy_plan_t *left,
+                                         const gui_energy_plan_t *right)
+{
+    if ((left == NULL) || (right == NULL)) {
+        return false;
+    }
+
+    return memcmp(left, right, sizeof(*left)) == 0;
+}
+
+static bool gui_state_forecast_equals(const gui_forecast_state_t *left,
+                                      const gui_forecast_state_t *right)
+{
+    if ((left == NULL) || (right == NULL)) {
+        return false;
+    }
+
+    return memcmp(left, right, sizeof(*left)) == 0;
 }
 
 static bool gui_state_wifi_network_equals(const gui_wifi_network_t *left,
@@ -99,6 +177,17 @@ static bool gui_state_wifi_settings_equals(const gui_wifi_settings_t *left,
     return true;
 }
 
+static bool gui_state_location_settings_equals(const gui_location_settings_t *left,
+                                               const gui_location_settings_t *right)
+{
+    if ((left == NULL) || (right == NULL)) {
+        return false;
+    }
+
+    return (strcmp(left->latitude, right->latitude) == 0) &&
+           (strcmp(left->longitude, right->longitude) == 0);
+}
+
 void gui_state_init(gui_state_t *state)
 {
     if (state == NULL) {
@@ -118,6 +207,11 @@ void gui_state_init(gui_state_t *state)
     state->wifi_state = GUI_WIFI_STATE_IDLE;
     state->bluetooth_state = GUI_BLUETOOTH_STATE_IDLE;
     state->sd_card_state = GUI_SD_CARD_STATE_IDLE;
+    gui_state_set_default_last_updated(state->sensor.last_updated,
+                                       sizeof(state->sensor.last_updated));
+    gui_state_set_default_last_updated(state->energy_plan.last_updated,
+                                       sizeof(state->energy_plan.last_updated));
+    gui_state_init_forecast(&state->forecast);
     gui_state_reset_wifi_scan(state);
     gui_state_copy_status(&state->wifi, "Press Scan to search for Wi-Fi networks.");
 }
@@ -140,6 +234,28 @@ bool gui_state_set_sensor(gui_state_t *state, const gui_sensor_state_t *sensor)
     }
 
     state->sensor = *sensor;
+    return true;
+}
+
+bool gui_state_set_energy_plan(gui_state_t *state, const gui_energy_plan_t *energy_plan)
+{
+    if ((state == NULL) || (energy_plan == NULL) ||
+        gui_state_energy_plan_equals(&state->energy_plan, energy_plan)) {
+        return false;
+    }
+
+    state->energy_plan = *energy_plan;
+    return true;
+}
+
+bool gui_state_set_forecast(gui_state_t *state, const gui_forecast_state_t *forecast)
+{
+    if ((state == NULL) || (forecast == NULL) ||
+        gui_state_forecast_equals(&state->forecast, forecast)) {
+        return false;
+    }
+
+    state->forecast = *forecast;
     return true;
 }
 
@@ -212,6 +328,17 @@ bool gui_state_set_night_variant_enabled(gui_state_t *state, bool enabled)
     }
 
     state->appearance.night_variant_enabled = enabled;
+    return true;
+}
+
+bool gui_state_set_location_settings(gui_state_t *state, const gui_location_settings_t *location)
+{
+    if ((state == NULL) || (location == NULL) ||
+        gui_state_location_settings_equals(&state->location, location)) {
+        return false;
+    }
+
+    state->location = *location;
     return true;
 }
 
@@ -362,10 +489,12 @@ void gui_state_build_screen_model(const gui_state_t *state, gui_view_model_t *mo
 
     model->active_panel = state->active_panel;
     model->sensor = state->sensor;
-    gui_state_clear_energy_plan(&model->energy_plan);
+    model->energy_plan = state->energy_plan;
+    model->forecast = state->forecast;
     model->wifi = state->wifi;
     model->wifi_state = state->wifi_state;
     model->bluetooth_state = state->bluetooth_state;
     model->sd_card_state = state->sd_card_state;
     model->appearance = state->appearance;
+    model->location = state->location;
 }

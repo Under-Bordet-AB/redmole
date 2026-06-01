@@ -47,3 +47,13 @@ void gui_screen_sync_brightness(gui_screen_t *screen, int32_t brightness_percent
     snprintf(brightness_text, sizeof(brightness_text), "%ld%%", (long)brightness_percent);
     lv_label_set_text(screen->brightness_value_label, brightness_text);
 }
+
+void gui_screen_show_settings_subpage(gui_screen_t *screen, gui_settings_subpage_t subpage)
+{
+    gui_view_show_settings_subpage(screen, subpage);
+}
+
+void gui_screen_reset_settings_navigation(gui_screen_t *screen)
+{
+    gui_view_reset_settings_navigation(screen);
+}

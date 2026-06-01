@@ -108,12 +108,12 @@ int8_t gui_view_find_known_network_index(const gui_view_model_t *model, const ch
 }
 
 lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
-                                        lv_coord_t width, const char *text,
+                                        lv_coord_t width, lv_coord_t height, const char *text,
                                         lv_event_code_t event_code, lv_event_cb_t event_cb,
                                         void *event_user_data)
 {
     lv_obj_t *button = lv_btn_create(parent);
-    lv_obj_set_size(button, width, 40);
+    lv_obj_set_size(button, width, height);
     lv_obj_set_pos(button, x, y);
     lv_obj_set_style_radius(button, 14, 0);
     lv_obj_set_style_shadow_width(button, 0, 0);
@@ -128,7 +128,7 @@ lv_obj_t *gui_view_create_action_button(lv_obj_t *parent, lv_coord_t x, lv_coord
 
 lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t y,
                                       lv_coord_t width, lv_color_t color,
-                                      const char *text)
+                                      const char *text, lv_obj_t **label_out)
 {
     (void)x;
     (void)y;
@@ -157,6 +157,9 @@ lv_obj_t *gui_view_create_legend_item(lv_obj_t *parent, lv_coord_t x, lv_coord_t
     lv_obj_set_width(label, width - 18);
     lv_obj_set_style_text_color(label, lv_color_hex(0x4A5C78), 0);
     lv_obj_align(label, LV_ALIGN_LEFT_MID, 18, 0);
+    if (label_out != NULL) {
+        *label_out = label;
+    }
 
     return dot;
 }
@@ -185,7 +188,10 @@ lv_obj_t *gui_view_create_metric_card(lv_obj_t *parent, lv_coord_t x, lv_coord_t
     *value_label = lv_label_create(card);
     lv_obj_set_style_text_color(*value_label, lv_color_hex(0x0F172A), 0);
     lv_obj_set_style_text_font(*value_label, &lv_font_montserrat_18, 0);
-    lv_obj_align(*value_label, LV_ALIGN_TOP_LEFT, 0, 48);
+    lv_obj_set_width(*value_label, LV_PCT(100));
+    lv_obj_set_style_text_align(*value_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(*value_label, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_pad_top(*value_label, 28, 0);
 
     return card;
 }

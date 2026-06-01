@@ -1,25 +1,24 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/projdefs.h"
+#include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "app_gui_bindings.h"
 #include "task_scheduler.h"
-#include "bme280_hal.h"
 #include "gui_module.h"
+#include "local_sensor_service.h"
 #include "nac.h"
 #include "rm_nvs.h"
 #include "sensor_data.h"
 #include "http_client.h"
 #include "blufi_main.h"
+#include "uart_mole.h"
 
-static const char* TAG = "MAIN";
-static bme280_hal s_sensor_hal = {0};
-static gui_ctx_t s_gui = {0};
+static const char *TAG = "MAIN";
+static gui_ctx_t        s_gui         = {0};
+static EventGroupHandle_t s_event_group = NULL;
 
-static esp_err_t init_single_instance_modules(void) {
+static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
     esp_err_t rv = rm_nvs_init("app");
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "rm_nvs_init failed: %s", esp_err_to_name(rv));
@@ -31,12 +30,12 @@ static esp_err_t init_single_instance_modules(void) {
         return rv;
     }
 
-    if (nac_init() != ESP_OK) {
+    if (nac_init(event_group) != ESP_OK) {
         ESP_LOGE(TAG, "nac_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
-    if (http_client_init(HTTP_CLIENT_TLS_NONE, NULL) != ESP_OK) {
+    if (http_client_init(HTTP_CLIENT_TLS_BUNDLE, NULL) != ESP_OK) {
         ESP_LOGE(TAG, "http_client_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
@@ -47,19 +46,25 @@ static esp_err_t init_single_instance_modules(void) {
         return rv;
     }
 
+    rv = uart_mole_init(event_group);
+    if (rv != ESP_OK) {
+        ESP_LOGE(TAG, "uart_mole_init failed: %s", esp_err_to_name(rv));
+        return rv;
+    }
+
     return ESP_OK;
 }
 
 static esp_err_t init_runtime_modules(void) {
-    if (task_scheduler_init() != ESP_OK) {
+/*     if (task_scheduler_init() != ESP_OK) {
         ESP_LOGE(TAG, "task_scheduler_init failed");
         return ESP_FAIL;
     }
-    ESP_LOGI(TAG, "task_scheduler_init started");
+        ESP_LOGI(TAG, "task_scheduler_init started"); */
 
-    esp_err_t rv = bme280_hal_init(&s_sensor_hal);
+    esp_err_t rv = local_sensor_service_init();
     if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "bme280_hal_init failed: %s", esp_err_to_name(rv));
+        ESP_LOGE(TAG, "local_sensor_service_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
@@ -73,7 +78,7 @@ static esp_err_t init_runtime_modules(void) {
     gui_init(&s_gui, &gui_init_config);
 
     // Initialize the GUI bindings
-    rv = app_gui_bindings_init(&s_gui);
+    rv = app_gui_bindings_init(&s_gui, &s_event_group);
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "app_gui_bindings_init failed: %s", esp_err_to_name(rv));
         return rv;
@@ -82,47 +87,12 @@ static esp_err_t init_runtime_modules(void) {
     return ESP_OK;
 }
 
-static void sensor_local_source_task(void* pvParameters) {
-    bme280_measurement measurement = {0};
-    sensor_data_sample sample = {0};
-    uint32_t period_ms = 1000U;
-
-    (void)pvParameters;
-
-    period_ms = bme280_hal_get_period_ms(&s_sensor_hal);
-    if (period_ms == 0U) {
-        period_ms = 1000U;
-    }
-
-    while (true) {
-        esp_err_t rv = bme280_hal_read(&s_sensor_hal, &measurement);
-        if (rv == ESP_OK) {
-            sample.timestamp_ms = measurement.timestamp_ms;
-            sample.temperature_deci_c = measurement.temperature_deci_c;
-            sample.humidity_deci_pct = measurement.humidity_deci_pct;
-            sample.pressure_deci_hpa = measurement.pressure_deci_hpa;
-            sample.valid = true;
-
-            rv = sensor_data_submit_local(&sample);
-            if (rv != ESP_OK) {
-                ESP_LOGE(TAG, "sensor_data_submit_local failed: %s", esp_err_to_name(rv));
-            }
-        } else {
-            ESP_LOGW(TAG, "bme280_hal_read failed: %s", esp_err_to_name(rv));
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(period_ms));
-    }
-}
-
 static esp_err_t start_runtime_modules() {
-    BaseType_t sensor =
-        xTaskCreate(sensor_local_source_task, "sensor_local_source_task", 4096, NULL, 5, NULL);
-    if (sensor != pdPASS) {
-        ESP_LOGE(TAG, "Could not spawn sensor_local_source_task!");
-        return ESP_FAIL;
+    esp_err_t rv = local_sensor_service_start();
+    if (rv != ESP_OK) {
+        ESP_LOGE(TAG, "local_sensor_service_start failed: %s", esp_err_to_name(rv));
+        return rv;
     }
-    ESP_LOGI(TAG, "sensor_local_source_task started");
 
     if (!s_gui.is_ready) {
         ESP_LOGW(TAG, "GUI not ready after initialization");
@@ -134,8 +104,14 @@ static esp_err_t start_runtime_modules() {
 void app_main(void) {
     ESP_LOGI(TAG, "app_main entered");
 
+    s_event_group = xEventGroupCreate();
+    if (!s_event_group) {
+        ESP_LOGE(TAG, "xEventGroupCreate failed");
+        goto fatal_error;
+    }
+
     ESP_LOGI(TAG, "Initializing single-instance modules");
-    if (init_single_instance_modules() != ESP_OK) {
+    if (init_single_instance_modules(&s_event_group) != ESP_OK) {
         goto fatal_error;
     }
 
@@ -148,7 +124,7 @@ void app_main(void) {
         goto fatal_error;
     }
 
-    //vTaskDelay(pdMS_TO_TICKS(5000));
+    // vTaskDelay(pdMS_TO_TICKS(5000));
     ESP_LOGI(TAG, "Startup complete");
 
     /* Pump the task scheduler to start tasks, needed to connect wifi in this mock code

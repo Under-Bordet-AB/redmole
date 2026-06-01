@@ -13,7 +13,7 @@
 #include "esp_log.h"
 #include "esp_check.h"
 
-#include "i2c.h"
+#include "board_i2c.h"
 #include "gpio.h"
 #include "io_extension.h"
 #include "rgb_lcd_port.h"
@@ -369,11 +369,13 @@ static esp_err_t esp_lcd_touch_gt911_del(esp_lcd_touch_handle_t tp)
 esp_lcd_touch_handle_t touch_gt911_init()
 {
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;  // Declare a handle for touch panel I/O
+    i2c_master_bus_handle_t i2c_bus = NULL;
     // Configure the I2C communication settings for the GT911 touch controller
     const esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
 
     // Reset the touch screen before usage
-    DEV_I2C_Port port = DEV_I2C_Init();  // Initialize I2C port
+    i2c_bus = board_i2c_get_bus();  // Initialize shared board I2C bus
+    ESP_ERROR_CHECK(i2c_bus != NULL ? ESP_OK : ESP_FAIL);
     IO_EXTENSION_Init();  // Initialize the IO EXTENSION GPIO chip for backlight control
     DEV_GPIO_Mode(EXAMPLE_PIN_NUM_TOUCH_INT, GPIO_MODE_INPUT_OUTPUT);  // Set GPIO pin mode for interrupt
     IO_EXTENSION_Output(IO_EXTENSION_IO_1, 0);  // Set GPIO for backlight control to low (off)
@@ -388,7 +390,7 @@ esp_lcd_touch_handle_t touch_gt911_init()
 
     ESP_LOGI(TAG, "Initialize I2C panel IO");  // Log I2C panel I/O initialization
     // Create a new I2C panel I/O handle for the touch controller
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(port.bus, &tp_io_config, &tp_io_handle));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(i2c_bus, &tp_io_config, &tp_io_handle));
 
     ESP_LOGI(TAG, "Initialize touch controller GT911");  // Log touch controller initialization
     // Configure the touch controller with necessary settings (coordinates, GPIO pins, etc.)
