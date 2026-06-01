@@ -12,6 +12,9 @@
 
 #define FORECAST_REFRESH_DELAY_MS 60000U
 #define FORECAST_INITIAL_DELAY_MS 5000U
+#define FORECAST_RESPONSE_BUF_LEN 16384U
+
+static char s_forecast_response_buf[FORECAST_RESPONSE_BUF_LEN + 1U];
 
 static const char *forecast_weather_code_to_condition(int weather_code)
 {
@@ -553,8 +556,6 @@ static task_status_t forecast_work(task_node_t *node)
     char url[1024];
     double latitude;
     double longitude;
-    enum { RESPONSE_BUF_LEN = 16384 };
-    char *buf;
     gui_forecast_state_t forecast;
     esp_err_t http_rc;
 
@@ -587,36 +588,26 @@ static task_status_t forecast_work(task_node_t *node)
              "&forecast_days=5",
              latitude, longitude);
 
-    buf = malloc(RESPONSE_BUF_LEN + 1U);
-
-    if (buf == NULL) {
-        ESP_LOGE(APP_GUI_BINDINGS_TAG, "Failed to allocate forecast response buffer");
-        return TASK_RUN_AGAIN;
-    }
-
-    buf[0] = '\0';
-    http_rc = http_client_get(url, buf, RESPONSE_BUF_LEN + 1U);
+    s_forecast_response_buf[0] = '\0';
+    http_rc = http_client_get(url, s_forecast_response_buf,
+                              sizeof(s_forecast_response_buf));
     if (http_rc != ESP_OK) {
         ESP_LOGW(APP_GUI_BINDINGS_TAG, "Forecast request failed: %s", esp_err_to_name(http_rc));
-        free(buf);
         return TASK_RUN_AGAIN;
     }
 
     if (!gui_get_forecast_state(ctx->gui, &forecast)) {
         ESP_LOGW(APP_GUI_BINDINGS_TAG, "Failed to load current forecast GUI state.");
-        free(buf);
         return TASK_RUN_AGAIN;
     }
 
-    if (!forecast_parse_response(buf, &forecast)) {
+    if (!forecast_parse_response(s_forecast_response_buf, &forecast)) {
         ESP_LOGW(APP_GUI_BINDINGS_TAG, "Failed to parse forecast response.");
-        free(buf);
         return TASK_RUN_AGAIN;
     }
 
     app_gui_time_format_last_updated_now(forecast.last_updated, sizeof(forecast.last_updated));
     gui_set_forecast_state(ctx->gui, &forecast);
-    free(buf);
     return TASK_RUN_AGAIN;
 }
 

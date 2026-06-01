@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -17,11 +16,14 @@
 #define LEOP_POINTS_PER_HOUR 4
 #define LEOP_REFRESH_DELAY_MS 60000U
 #define LEOP_INITIAL_DELAY_MS 10000U
+#define LEOP_RESPONSE_BUF_LEN 8192U
 /*
  * Scale LEOP normalized hourly averages into integer chart values using
  * milli-units so the chart can render one decimal place on its 0.0-1.0 axis.
  */
 #define LEOP_VALUE_SCALE 1000.0
+
+static char s_leop_response_buf[LEOP_RESPONSE_BUF_LEN + 1U];
 
 static uint16_t leop_scale_hourly_average(double hourly_average)
 {
@@ -201,8 +203,6 @@ static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_
 static task_status_t leop_work(task_node_t *node)
 {
     app_gui_bindings_ctx_t *ctx;
-    enum { RESPONSE_BUF_LEN = 8192 };
-    char *buf;
     gui_energy_plan_t energy_plan;
     esp_err_t http_rc;
 
@@ -220,36 +220,26 @@ static task_status_t leop_work(task_node_t *node)
         return TASK_RUN_AGAIN;
     }
 
-    buf = malloc(RESPONSE_BUF_LEN + 1U);
-
-    if (buf == NULL) {
-        ESP_LOGE(APP_GUI_BINDINGS_TAG, "Failed to allocate LEOP response buffer");
-        return TASK_RUN_AGAIN;
-    }
-
-    buf[0] = '\0';
-    http_rc = http_client_get(LEOP_REFRESH_URL, buf, RESPONSE_BUF_LEN + 1U);
+    s_leop_response_buf[0] = '\0';
+    http_rc = http_client_get(LEOP_REFRESH_URL, s_leop_response_buf,
+                              sizeof(s_leop_response_buf));
     if (http_rc != ESP_OK) {
         ESP_LOGW(APP_GUI_BINDINGS_TAG, "LEOP request failed: %s", esp_err_to_name(http_rc));
-        free(buf);
         return TASK_RUN_AGAIN;
     }
 
     if (!gui_get_energy_plan_state(ctx->gui, &energy_plan)) {
         ESP_LOGW(APP_GUI_BINDINGS_TAG, "Failed to load current LEOP GUI state.");
-        free(buf);
         return TASK_RUN_AGAIN;
     }
 
-    if (!leop_parse_response(buf, &energy_plan)) {
+    if (!leop_parse_response(s_leop_response_buf, &energy_plan)) {
         ESP_LOGW(APP_GUI_BINDINGS_TAG, "Failed to parse LEOP response.");
-        free(buf);
         return TASK_RUN_AGAIN;
     }
 
     app_gui_time_format_last_updated_now(energy_plan.last_updated, sizeof(energy_plan.last_updated));
     gui_set_energy_plan_state(ctx->gui, &energy_plan);
-    free(buf);
     return TASK_RUN_AGAIN;
 }
 
