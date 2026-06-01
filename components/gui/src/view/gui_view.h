@@ -107,8 +107,15 @@ typedef struct {
     lv_obj_t *status_line;         /*!< BME280 status line under the metric cards. */
 
     lv_obj_t *energy_plan_chart;   /*!< Chart widget used by the energy panel. */
+    lv_obj_t *energy_action_card;   /*!< Hero card showing the current energy plan action. */
+    lv_obj_t *energy_action_icon;   /*!< Symbol label for the current energy plan action. */
+    lv_obj_t *energy_action_eyebrow; /*!< Time context label for the current energy action. */
+    lv_obj_t *energy_action_title;  /*!< Primary label for the current energy action. */
+    lv_obj_t *energy_action_value;  /*!< Numeric level label for the current energy action. */
+    lv_obj_t *energy_action_segments[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< 24-hour action strip cells. */
     lv_obj_t *energy_legend_dots[4]; /*!< Legend markers for the four energy series. */
     lv_obj_t *energy_legend_labels[4]; /*!< Legend labels for the four energy series. */
+    lv_obj_t *energy_time_labels[GUI_ENERGY_PLAN_TIME_LABEL_COUNT]; /*!< Time labels under the energy chart. */
     lv_chart_series_t *buy_series; /*!< Grid purchase chart series. */
     lv_chart_series_t *solar_series; /*!< Solar usage chart series. */
     lv_chart_series_t *charge_series; /*!< Battery charging chart series. */

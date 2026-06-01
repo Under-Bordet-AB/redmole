@@ -49,6 +49,8 @@ typedef enum {
 
 /** Hourly points stored in an energy plan day profile. */
 #define GUI_ENERGY_PLAN_POINT_COUNT 24
+/** Hour labels shown under the energy plan chart. */
+#define GUI_ENERGY_PLAN_TIME_LABEL_COUNT 5
 /** Number of daily forecast entries rendered in the forecast panel. */
 #define GUI_FORECAST_DAY_COUNT 5
 /** Number of detail lines shown in the forecast details card. */
@@ -108,6 +110,7 @@ typedef struct {
     uint16_t use_solar_directly[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Direct solar consumption per hour. */
     uint16_t charge_battery[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Battery charging values per hour. */
     uint16_t sell_excess[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Excess energy sold back per hour. */
+    uint8_t start_hour; /*!< Hour represented by the first chart point, 0-23. */
     char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
 } gui_energy_plan_t;
 
