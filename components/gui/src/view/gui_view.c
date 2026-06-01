@@ -278,16 +278,18 @@ static void gui_view_style_wifi_card(gui_view_t *view, lv_color_t bg_color,
 
 static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
                                         lv_color_t card_border, lv_color_t label_color,
-                                        lv_color_t value_color, gui_view_theme_t theme)
+                                        lv_color_t accent_color, gui_view_theme_t theme)
 {
     uint32_t child_count;
     const lv_font_t *body_font;
+    const lv_font_t *emphasis_font;
 
     if ((view == NULL) || (view->bme280_panel == NULL)) {
         return;
     }
 
-    body_font = gui_theme_get(theme)->body_font;
+    body_font     = gui_theme_get(theme)->body_font;
+    emphasis_font = gui_theme_get(theme)->emphasis_font;
 
     child_count = lv_obj_get_child_cnt(view->bme280_panel);
     for (uint32_t index = 0; index < child_count; index++) {
@@ -311,8 +313,9 @@ static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
             lv_obj_set_style_text_font(label, body_font, 0);
         }
         if (value_label != NULL) {
-            lv_obj_set_style_text_color(value_label, value_color, 0);
-            lv_obj_set_style_text_font(value_label, body_font, 0);
+            lv_obj_set_style_text_color(value_label, accent_color, 0);
+            lv_obj_set_style_text_font(value_label, emphasis_font, 0);
+            lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 0);
         }
     }
 }
@@ -380,6 +383,71 @@ static void gui_view_style_energy_legend_labels(gui_view_t *view, lv_color_t tex
         if (view->energy_legend_labels[index] != NULL) {
             lv_obj_set_style_text_color(view->energy_legend_labels[index], text_color, 0);
         }
+    }
+}
+
+static void gui_view_style_energy_action_widgets(gui_view_t *view, lv_color_t card_bg,
+                                                 lv_color_t card_border,
+                                                 lv_color_t title_color,
+                                                 lv_color_t subtitle_color,
+                                                 lv_color_t accent_color,
+                                                 lv_color_t idle_color,
+                                                 gui_view_theme_t theme)
+{
+    const gui_theme_def_t *def;
+    const lv_font_t *body_font;
+    const lv_font_t *emphasis_font;
+
+    if (view == NULL) {
+        return;
+    }
+
+    def = gui_theme_get(theme);
+    if (def == NULL) {
+        return;
+    }
+
+    body_font = def->body_font;
+    emphasis_font = def->emphasis_font;
+
+    if (view->energy_action_card != NULL) {
+        lv_obj_set_style_bg_color(view->energy_action_card, card_bg, 0);
+        lv_obj_set_style_bg_opa(view->energy_action_card, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(view->energy_action_card, card_border, 0);
+        //lv_obj_set_style_border_opa(view->energy_action_card, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_text_font(view->energy_action_card, body_font, 0);
+    }
+    if (view->energy_action_icon != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_icon, accent_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_icon, &lv_font_montserrat_24, 0);
+    }
+    if (view->energy_action_eyebrow != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_eyebrow, subtitle_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_eyebrow, body_font, 0);
+    }
+    if (view->energy_action_title != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_title, title_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_title, emphasis_font, 0);
+        lv_obj_set_style_pad_bottom(view->energy_action_title, 6, 0);
+    }
+    if (view->energy_action_value != NULL) {
+        lv_obj_set_style_text_color(view->energy_action_value, accent_color, 0);
+        lv_obj_set_style_text_font(view->energy_action_value, body_font, 0);
+    }
+
+    for (uint32_t index = 0; index < GUI_ENERGY_PLAN_POINT_COUNT; index++) {
+        lv_obj_t *segment = view->energy_action_segments[index];
+
+        if (segment == NULL) {
+            continue;
+        }
+
+        lv_obj_set_style_radius(segment, 7, 0);
+        lv_obj_set_style_bg_color(segment, idle_color, 0);
+        lv_obj_set_style_bg_opa(segment, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(segment, 2, 0);
+        lv_obj_set_style_border_color(segment, title_color, 0);
+        lv_obj_set_style_border_opa(segment, LV_OPA_TRANSP, 0);
     }
 }
 
@@ -654,7 +722,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_color_t item_bg;
     lv_color_t item_border;
     lv_color_t muted_text;
-    lv_color_t value_text;
     lv_color_t keyboard_bg;
     lv_color_t keyboard_border;
     lv_color_t keyboard_key_bg;
@@ -730,7 +797,6 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         item_bg       = lv_color_hex(def->item_bg);
         item_border   = lv_color_hex(def->item_border);
         muted_text    = lv_color_hex(def->muted_text);
-        value_text    = lv_color_hex(def->value_text);
 
         keyboard_bg             = lv_color_hex(def->keyboard_bg);
         keyboard_border         = lv_color_hex(def->keyboard_border);
@@ -815,7 +881,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_bg_opa(view->bme280_panel, panel_bg_opa, 0);
     lv_obj_set_style_border_color(view->bme280_panel, panel_border, 0);
     lv_obj_set_style_text_font(view->bme280_panel, body_font, 0);
-    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, value_text,
+    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, accent_color,
                                 effective_theme);
 
     lv_obj_set_style_bg_color(view->energy_plan_panel, panel_bg, 0);
@@ -860,6 +926,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, effective_theme);
     //gui_view_style_energy_legend_labels(view, accent_soft_color);
     gui_view_style_energy_legend_labels(view, subtitle_text);
+    gui_view_style_energy_action_widgets(view, card_bg, card_border, title_text,
+                                         subtitle_text, accent_color, panel_border,
+                                         effective_theme);
 
     gui_view_style_forecast_panel(view, panel_bg, panel_border, panel_bg_opa, card_bg,
                                   card_border, title_text, subtitle_text, accent_color,
@@ -1286,7 +1355,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 
     view->bme280_button = gui_view_create_nav_button(sidebar, 140, "BME280", nav_event_cb,
                                                        event_user_data);
-    view->energy_plan_button = gui_view_create_nav_button(sidebar, 212, "Energy plan",
+    view->energy_plan_button = gui_view_create_nav_button(sidebar, 212, "LEOP",
                                                           nav_event_cb, event_user_data);
     view->forecast_button = gui_view_create_nav_button(sidebar, 284, "Forecast", nav_event_cb,
                                                        event_user_data);
@@ -1356,6 +1425,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_label_set_text(view->update_label, "Last updated: --:--:--");
     lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_IGNORE_LAYOUT | LV_OBJ_FLAG_FLOATING);
     lv_obj_add_flag(view->update_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_text_opa(view->update_label, LV_OPA_70, 0);
     lv_obj_set_style_text_color(view->update_label, lv_color_hex(0x607089), 0);
     lv_obj_move_foreground(view->update_label);
 
