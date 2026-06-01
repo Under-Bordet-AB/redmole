@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "sdcard.h"
 #include "sensor_data.h"
 #include "uart_mole.h"
 
@@ -49,7 +50,8 @@ static void sync_sensor(gui_ctx_t *gui)
 
 static gui_sd_card_state_t get_sd_card_state(void)
 {
-    return GUI_SD_CARD_STATE_IDLE;
+    return sdcard_is_initialized() ? GUI_SD_CARD_STATE_CONNECTED
+                                   : GUI_SD_CARD_STATE_UNAVAILABLE;
 }
 
 static void sync_gui_online_bit(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
@@ -103,9 +105,7 @@ void app_gui_sync_runtime(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
 
     sync_sensor(gui);
 
-    if (sync_sd_card_state(ctx, gui)) {
-        ESP_LOGE(APP_GUI_BINDINGS_TAG, "Syncing SD-card state failed.");
-    }
+    (void)sync_sd_card_state(ctx, gui);
 }
 
 static task_status_t sensor_work(task_node_t *node)
