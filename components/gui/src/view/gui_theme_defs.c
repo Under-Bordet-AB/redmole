@@ -27,6 +27,12 @@ LV_FONT_DECLARE(spongebob18);
 LV_FONT_DECLARE(spongebob24);
 #endif
 
+#if CONFIG_REDMOLE_GUI_THEME_BONZI_BUDDY
+LV_IMG_DECLARE(bonzibuddy_bg);
+LV_FONT_DECLARE(bonzibuddy18);
+LV_FONT_DECLARE(bonzibuddy24);
+#endif
+
 #if CONFIG_REDMOLE_GUI_THEME_HELLO_KITTY
 LV_FONT_DECLARE(hellokitty18);
 LV_FONT_DECLARE(hellokitty24);
@@ -638,6 +644,91 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
 #else
     GUI_THEME_DISABLED_ENTRY(GUI_VIEW_THEME_SPONGEBOB),
 #endif
+
+    /* ------------------------------------------------------------------ */
+    /* [7] GUI_VIEW_THEME_BONZI_BUDDY                                      */
+    /* ------------------------------------------------------------------ */
+#if CONFIG_REDMOLE_GUI_THEME_BONZI_BUDDY
+    {
+        .display_name        = "Bonzi Buddy",
+        .is_user_selectable  = true,
+        .has_night_variant   = false,
+        .night_variant       = GUI_VIEW_THEME_BONZI_BUDDY,
+        .dialog_has_border   = true,
+        .body_font           = &bonzibuddy18,
+        .emphasis_font       = &bonzibuddy24,
+        .background_image    = &bonzibuddy_bg,
+
+        .screen_bg           = 0x6D3FA0,
+        .screen_grad         = 0xC7B7EA,
+        .sidebar_bg          = 0x4B217A,
+        .sidebar_grad        = 0x6D3FA0,
+        .sidebar_shadow      = 0x2C1648,
+        .brand_text          = 0xF6F0C4,
+        .content_bg          = 0xF8F1D8,
+        .content_shadow      = 0x8C6BC2,
+        .title_text          = 0x2D174A,
+        .subtitle_text       = 0x5F4A7C,
+        .muted_text          = 0x6A5C7A,
+        .value_text          = 0x1F1430,
+        .panel_bg            = 0xFFF8DC,
+        .panel_border        = 0xB69ED6,
+        .card_bg             = 0xFFFCEB,
+        .card_border         = 0xD5C48B,
+        .item_bg             = 0xF5EBC8,
+        .item_border         = 0xBCA86C,
+        .accent_color        = 0x39A935,
+        .accent_soft_color   = 0x65C95C,
+        .keyboard_bg         = 0xE8D8B8,
+        .keyboard_border     = 0xB69ED6,
+        .keyboard_key_bg     = 0xFFFCEB,
+        .keyboard_key_text   = 0x2D174A,
+        .keyboard_special_bg     = 0x39A935,
+        .keyboard_special_text   = 0xFFFFFF,
+        .keyboard_special_border = 0x237A22,
+        .slider_bg           = 0xC8B8DC,
+        .slider_knob_bg      = 0xFFFCEB,
+        .dropdown_bg         = 0xFFFCEB,
+        .dropdown_border     = 0x8C6BC2,
+        .dropdown_selected_bg   = 0x39A935,
+        .dropdown_selected_text = 0xFFFFFF,
+        .energy_chart_bg     = 0xFFFCEB,
+        .energy_chart_grid   = 0xC7B7EA,
+        .energy_chart_tick   = 0x5F4A7C,
+        .energy_buy_color    = 0x6D3FA0,
+        .energy_solar_color  = 0xE3A51A,
+        .energy_charge_color = 0x39A935,
+        .energy_sell_color   = 0xD04A7A,
+        .wifi_connected_color = 0x39A935,
+        .wifi_idle_color      = 0x6A5C7A,
+        .nav_active_bg       = 0x39A935,
+        .nav_active_text     = 0xFFFFFF,
+        .nav_active_border   = 0xB6F08D,
+        .nav_inactive_bg     = 0x5A2D88,
+        .nav_inactive_text   = 0xF6F0C4,
+        .nav_inactive_border = 0x8C6BC2,
+        .action_primary_bg     = 0x39A935,
+        .action_primary_text   = 0xFFFFFF,
+        .action_primary_border = 0x237A22,
+        .action_secondary_bg     = 0xFFFCEB,
+        .action_secondary_text   = 0x2D174A,
+        .action_secondary_border = 0x8C6BC2,
+        .wifi_btn_bg             = 0xFFFCEB,
+        .wifi_btn_border         = 0xC8B8DC,
+        .wifi_btn_text           = 0x2D174A,
+        .wifi_btn_connected_bg   = 0xE5F9D8,
+        .wifi_btn_connected_border = 0x39A935,
+        .wifi_btn_connected_text   = 0x1D5E1E,
+        .wifi_btn_known_bg       = 0xF1E8C7,
+        .wifi_btn_known_border   = 0xC9B978,
+        .wifi_btn_known_text     = 0x4B3C1F,
+        .wifi_btn_selected_bg     = 0xE6DCF8,
+        .wifi_btn_selected_border = 0x6D3FA0,
+        .wifi_btn_selected_text   = 0x2D174A,
+    },
+#else
+    GUI_THEME_DISABLED_ENTRY(GUI_VIEW_THEME_BONZI_BUDDY),
+#endif
 };
 
 static bool gui_theme_is_enabled(gui_view_theme_t theme)
@@ -667,6 +758,12 @@ static bool gui_theme_is_enabled(gui_view_theme_t theme)
 #endif
         case GUI_VIEW_THEME_SPONGEBOB:
 #if CONFIG_REDMOLE_GUI_THEME_SPONGEBOB
+            return true;
+#else
+            return false;
+#endif
+        case GUI_VIEW_THEME_BONZI_BUDDY:
+#if CONFIG_REDMOLE_GUI_THEME_BONZI_BUDDY
             return true;
 #else
             return false;
