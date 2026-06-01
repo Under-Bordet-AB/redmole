@@ -650,7 +650,7 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
     /* ------------------------------------------------------------------ */
 #if CONFIG_REDMOLE_GUI_THEME_BONZI_BUDDY
     {
-        .display_name        = "Bonzi Buddy",
+        .display_name        = "BonziBuddy",
         .is_user_selectable  = true,
         .has_night_variant   = false,
         .night_variant       = GUI_VIEW_THEME_BONZI_BUDDY,
