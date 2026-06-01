@@ -27,6 +27,8 @@
 #include "sdkconfig.h"
 #include "uart_mole.h"
 
+#include "blufi_main.h"
+
 static const char *TAG = "APP_GUI_BINDINGS";
 
 // Defines for NVS keys
@@ -1773,6 +1775,8 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui, EventGroupHandle_t *event_group)
     bindings.on_wifi_connect_requested = on_wifi_connect_requested;
     bindings.on_wifi_disconnect_requested = on_wifi_disconnect_requested;
     gui_set_bindings(gui, &bindings);
+
+    blufi_main();
 
     cache_current_appearance(gui);
     cache_current_location(gui);

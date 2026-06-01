@@ -11,6 +11,7 @@
 #include "rm_nvs.h"
 #include "sensor_data.h"
 #include "http_client.h"
+#include "blufi_main.h"
 #include "uart_mole.h"
 
 static const char *TAG = "MAIN";
@@ -66,6 +67,8 @@ static esp_err_t init_runtime_modules(void) {
         ESP_LOGE(TAG, "local_sensor_service_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
+
+    blufi_main();
 
     // Load previously saved GUI settings
     gui_init_config_t gui_init_config = {0};
