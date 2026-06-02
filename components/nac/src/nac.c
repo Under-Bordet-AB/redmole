@@ -25,6 +25,7 @@
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
+#include "task_scheduler.h"
 
 #define REDMOLE_WIFI_SSID   CONFIG_REDMOLE_WIFI_SSID
 #define REDMOLE_WIFI_PASS   CONFIG_REDMOLE_WIFI_PASSWORD
@@ -146,11 +147,11 @@ esp_err_t nac_request_wifi_connect(const char *ssid, const char *password)
         strncpy(s_wifi_pass, password, WIFI_CRED_MAX_LENGTH - 1);
         s_wifi_pass[WIFI_CRED_MAX_LENGTH - 1] = '\0';
     }
-    ESP_LOGI("NAC", "Got ssid=%s, password=%s", ssid, password);
+    ESP_LOGI("NAC", "Got ssid=%s, password=%s", ssid ? ssid : "(null)", password ? password : "(null)");
 
     s_nac.wifi.retry_count    = 0;
     s_nac.wifi.saved_to_nvs   = 0;
-    s_nac.wifi.state          = WIFI_STATE_IDLE;
+    s_nac.wifi.state          = WIFI_REQUEST_CONNECT;
     s_nac.wifi.task_node.work = wifi_connect;
 
     return task_scheduler_add(&s_nac.wifi.task_node, 0) == 0 ? ESP_OK : ESP_FAIL;
@@ -372,8 +373,9 @@ static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
  * @return TASK_ERROR  Driver failure or retry limit reached; node removed.
  *                     Call nac_request_wifi_connect() to start over.
  *
- * @note TASK_RUN_AGAIN is unused — all rescheduling goes through
- *       task_scheduler_add() so back-off delay is enforced explicitly.
+ * @note TASK_RUN_AGAIN is used only for the WIFI_REQUEST_CONNECT → RECONNECT
+ *       handoff. All other rescheduling goes through task_scheduler_add()
+ *       so back-off delay is enforced explicitly.
  */
 task_status_t wifi_connect(task_node_t *task_node)
 {
@@ -383,6 +385,16 @@ task_status_t wifi_connect(task_node_t *task_node)
     {
         /*  Initial connect or scheduled reconnect */
         case WIFI_STATE_IDLE:
+        {
+            ESP_LOGI(self->tag, "WIFI statemachine idle and sleepy... ZzZZz.");
+            return TASK_DONE;
+        }
+        case WIFI_REQUEST_CONNECT: /* Fall through */
+        {
+            ESP_LOGI(self->tag, "WIFI request received!");
+            self->state = WIFI_STATE_RECONNECT;
+            return TASK_RUN_AGAIN;
+        }
         case WIFI_STATE_RECONNECT:
         {
             if (self->retry_count >= REDMOLE_MAX_RETRY)

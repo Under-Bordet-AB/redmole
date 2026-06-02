@@ -30,6 +30,7 @@
 typedef enum
 {
     WIFI_STATE_IDLE = 0,   /*!< No WiFi activity in progress. */
+    WIFI_REQUEST_CONNECT,  /*!< Connetion request received */
     WIFI_STATE_CONNECTING, /*!< Association in progress. */
     WIFI_STATE_CONNECTED,  /*!< IP address acquired. */
     WIFI_STATE_RECONNECT,  /*!< Reconnection after an unexpected disconnect. */
