@@ -493,19 +493,19 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
 
     label = lv_label_create(today_text_column);
-    lv_label_set_text(label, "Mostly cloudy");
+    lv_label_set_text(label, "--");
     lv_obj_set_style_text_color(label, lv_color_hex(0x10213D), 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
 
     label = lv_label_create(today_text_column);
-    lv_label_set_text(label, "18 C");
+    lv_label_set_text(label, "--");
     lv_obj_set_style_text_color(label, lv_color_hex(0x1D4ED8), 0);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
 
-    (void)gui_view_forecast_create_feels_like_row(today_text_column, "Feels like 18 C");
+    (void)gui_view_forecast_create_feels_like_row(today_text_column, "--");
 
     label = lv_label_create(today_text_column);
-    lv_label_set_text(label, "Stays mild later today.");
+    lv_label_set_text(label, "--");
     lv_obj_set_width(label, LV_PCT(100));
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
@@ -536,10 +536,10 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     lv_label_set_text(label, "Details");
     lv_obj_set_style_text_color(label, lv_color_hex(0x607089), 0);
 
-    (void)gui_view_forecast_create_detail_row(details_card, "Rain chance: 20%");
-    (void)gui_view_forecast_create_detail_row(details_card, "Wind: 4 m/s NW");
-    (void)gui_view_forecast_create_detail_row(details_card, "Humidity: 61%");
-    (void)gui_view_forecast_create_detail_row(details_card, "UV index: 3");
+    (void)gui_view_forecast_create_detail_row(details_card, "--");
+    (void)gui_view_forecast_create_detail_row(details_card, "--");
+    (void)gui_view_forecast_create_detail_row(details_card, "--");
+    (void)gui_view_forecast_create_detail_row(details_card, "--");
 
     days_row = lv_obj_create(view->forecast_panel);
     lv_obj_set_size(days_row, LV_PCT(100), 0);
@@ -556,16 +556,16 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
                           LV_FLEX_ALIGN_START);
     lv_obj_set_flex_grow(days_row, 1);
 
-    (void)gui_view_create_forecast_day_card(days_row, "Mon", "May 25",
-                                            GUI_WEATHER_ICON_CLOUDY, "20 / 12 C");
-    (void)gui_view_create_forecast_day_card(days_row, "Tue", "May 26",
-                                            GUI_WEATHER_ICON_RAIN, "17 / 10 C");
-    (void)gui_view_create_forecast_day_card(days_row, "Wed", "May 27",
-                                            GUI_WEATHER_ICON_CLEAR, "22 / 11 C");
-    (void)gui_view_create_forecast_day_card(days_row, "Thu", "May 28",
-                                            GUI_WEATHER_ICON_CLOUDY, "19 / 9 C");
-    (void)gui_view_create_forecast_day_card(days_row, "Fri", "May 29",
-                                            GUI_WEATHER_ICON_PARTLY_CLOUDY, "21 / 13 C");
+    (void)gui_view_create_forecast_day_card(days_row, "--", "--",
+                                            GUI_WEATHER_ICON_CLOUDY, "--");
+    (void)gui_view_create_forecast_day_card(days_row, "--", "--",
+                                            GUI_WEATHER_ICON_RAIN, "--");
+    (void)gui_view_create_forecast_day_card(days_row, "--", "--",
+                                            GUI_WEATHER_ICON_CLEAR, "--");
+    (void)gui_view_create_forecast_day_card(days_row, "--", "--",
+                                            GUI_WEATHER_ICON_CLOUDY, "--");
+    (void)gui_view_create_forecast_day_card(days_row, "--", "--",
+                                            GUI_WEATHER_ICON_PARTLY_CLOUDY, "--");
 
     gui_view_layout_forecast_panel(view);
 }
