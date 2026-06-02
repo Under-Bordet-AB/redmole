@@ -671,22 +671,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
 void nac_connect_to_saved_wifi(const char *ssid, const char *password)
 {
-    if (!ssid || ssid[0] == '\0')
-    {
-        size_t ssid_len = WIFI_CRED_MAX_LENGTH;
-        size_t pass_len = WIFI_CRED_MAX_LENGTH;
-        rm_nvs_get_str("wifi_ssid", s_wifi_ssid, &ssid_len);
-        rm_nvs_get_str("wifi_pass", s_wifi_pass, &pass_len);
-        ssid     = s_wifi_ssid;
-        password = s_wifi_pass;
-    }
-
-    if (!ssid || ssid[0] == '\0')
-    {
-        ESP_LOGI("NAC", "No saved SSID — skipping autoconnect");
-        return;
-    }
-
+    // call sites check if strings empty before calling this
     if (wifi_bring_hw_online(&s_nac.wifi) != 0)
     {
         ESP_LOGE("NAC", "nac_connect_to_saved_wifi: hw online failed");

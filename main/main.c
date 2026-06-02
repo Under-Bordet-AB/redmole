@@ -147,11 +147,13 @@ void app_main(void) {
     /* Try connecting to saved WiFi credentials via scan and match */
     rm_nvs_get_str("wifi_ssid", s_ssid, &s_ssid_len);
     rm_nvs_get_str("wifi_pass", s_password, &s_password_len);
-    if (s_ssid[0] != '\0' && s_password[0] != '\0') {
+    if (s_ssid[0] != '\0' && s_password[0] != '\0')
+    {
         nac_connect_to_saved_wifi(s_ssid, s_password);
     }
 
-    while (1) {
+    while (1)
+    {
         // Synchronize the GUI with the backend
         app_gui_bindings_sync(&s_gui);
 
