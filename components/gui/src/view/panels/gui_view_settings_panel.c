@@ -980,7 +980,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
 
     view->password_dialog_cancel_button = gui_view_create_action_button(
-        view->password_dialog, 282, 148, 128, 48, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 282, 148, 128, 40, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     view->password_dialog_disconnect_button = gui_view_create_action_button(
         view->password_dialog, 426, 148, 128, 40, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,
