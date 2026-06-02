@@ -668,3 +668,96 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         }
     }
 }
+
+void nac_connect_to_saved_wifi(const char *ssid, const char *password)
+{
+    if (!ssid || ssid[0] == '\0')
+    {
+        size_t ssid_len = WIFI_CRED_MAX_LENGTH;
+        size_t pass_len = WIFI_CRED_MAX_LENGTH;
+        rm_nvs_get_str("wifi_ssid", s_wifi_ssid, &ssid_len);
+        rm_nvs_get_str("wifi_pass", s_wifi_pass, &pass_len);
+        ssid     = s_wifi_ssid;
+        password = s_wifi_pass;
+    }
+
+    if (!ssid || ssid[0] == '\0')
+    {
+        ESP_LOGI("NAC", "No saved SSID — skipping autoconnect");
+        return;
+    }
+
+    if (wifi_bring_hw_online(&s_nac.wifi) != 0)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: hw online failed");
+        return;
+    }
+
+    esp_err_t err = esp_wifi_start();
+    if (err != ESP_OK && err != ESP_ERR_WIFI_IF)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: esp_wifi_start failed: %s", esp_err_to_name(err));
+        s_nac.wifi.state = WIFI_STATE_IDLE;
+        wifi_bring_hw_offline(&s_nac.wifi);
+        return;
+    }
+
+    s_nac.wifi.scan_complete = 0;
+    s_nac.wifi.ap_count      = 0;
+
+    wifi_scan_config_t scan_cfg;
+    memset(&scan_cfg, 0, sizeof(scan_cfg));
+    scan_cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+
+    if (esp_wifi_scan_start(&scan_cfg, true) != ESP_OK)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: scan failed");
+        s_nac.wifi.state = WIFI_STATE_IDLE;
+        wifi_bring_hw_offline(&s_nac.wifi);
+        return;
+    }
+
+    /*
+     * esp_wifi_scan_start(block=true) returns when hardware finishes, but
+     * WIFI_EVENT_SCAN_DONE is dispatched asynchronously by the event loop task.
+     * wifi_scan_done() consumes esp_wifi_scan_get_ap_records() — if it runs
+     * first our direct call would get count=0. Poll for the event handler to
+     * populate ap_records; fall back to a direct read if it doesn't fire in time.
+     */
+    for (int i = 0; i < 50 && !s_nac.wifi.scan_complete; i++)
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    if (!s_nac.wifi.scan_complete)
+    {
+        ESP_LOGW("NAC", "SCAN_DONE event not received — reading records directly");
+        s_nac.wifi.ap_count = WIFI_SCAN_MAX_RESULT;
+        esp_wifi_scan_get_ap_records(&s_nac.wifi.ap_count, s_nac.wifi.ap_records);
+    }
+
+    uint16_t count = s_nac.wifi.ap_count;
+
+    bool found = false;
+    for (uint16_t i = 0; i < count; i++)
+    {
+        if (strcmp((const char *)s_nac.wifi.ap_records[i].ssid, ssid) == 0)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    s_nac.wifi.state = WIFI_STATE_IDLE;
+    wifi_bring_hw_offline(&s_nac.wifi);
+
+    if (found)
+    {
+        ESP_LOGI("NAC", "Found saved network '%s' — queuing connect", ssid);
+        nac_request_wifi_connect(ssid, password);
+    }
+    else
+    {
+        ESP_LOGI("NAC", "Saved network '%s' not in range — staying idle", ssid);
+    }
+}

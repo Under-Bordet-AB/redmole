@@ -44,7 +44,7 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui, EventGroupHandle_t *event_group)
     (void)app_gui_settings_load_saved_location(&s_bindings, gui);
     (void)app_gui_wifi_load_saved_metadata(&s_bindings, gui);
     app_gui_bindings_sync(gui);
-    (void)app_gui_wifi_queue_saved_autoconnect(&s_bindings, gui);
+    //(void)app_gui_wifi_queue_saved_autoconnect(&s_bindings, gui);
 
     app_gui_forecast_register_task(&s_bindings);
     app_gui_leop_register_task(&s_bindings);
