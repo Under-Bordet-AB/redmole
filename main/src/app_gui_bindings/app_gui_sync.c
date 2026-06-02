@@ -108,6 +108,11 @@ void app_gui_sync_runtime(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
         app_gui_leop_schedule_now(ctx);
     }
 
+    if (ctx->location_changed) {
+        app_gui_forecast_schedule_now(ctx);
+        ctx->location_changed = false;
+    }
+
     sync_sensor(gui);
 
     (void)sync_sd_card_state(ctx, gui);

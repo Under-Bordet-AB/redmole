@@ -30,8 +30,10 @@ typedef struct {
 
     bool has_last_appearance;
     gui_appearance_settings_t last_appearance;
+
     bool has_last_location;
     gui_location_settings_t last_location;
+    bool location_changed;
 
     bool has_last_brightness;
     int32_t last_brightness;

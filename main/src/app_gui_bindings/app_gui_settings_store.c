@@ -315,6 +315,8 @@ bool app_gui_settings_save_location_if_changed(app_gui_bindings_ctx_t *ctx, gui_
 
     ctx->last_location = location;
     ctx->has_last_location = true;
+    ctx->location_changed = true;
+
     return true;
 }
 
