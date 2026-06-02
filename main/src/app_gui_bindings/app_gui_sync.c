@@ -103,6 +103,11 @@ void app_gui_sync_runtime(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
         app_gui_wifi_sync(ctx, gui);
     }
 
+    if (wifi_state_changed && (ctx->last_wifi_state == GUI_WIFI_STATE_CONNECTED)) {
+        app_gui_forecast_schedule_now(ctx);
+        app_gui_leop_schedule_now(ctx);
+    }
+
     sync_sensor(gui);
 
     (void)sync_sd_card_state(ctx, gui);

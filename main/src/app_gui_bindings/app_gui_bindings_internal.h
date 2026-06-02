@@ -66,7 +66,9 @@ void app_gui_sync_runtime(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui);
 void app_gui_sync_register_sensor_task(app_gui_bindings_ctx_t *ctx);
 
 void app_gui_forecast_register_task(app_gui_bindings_ctx_t *ctx);
+void app_gui_forecast_schedule_now(app_gui_bindings_ctx_t *ctx);
 void app_gui_leop_register_task(app_gui_bindings_ctx_t *ctx);
+void app_gui_leop_schedule_now(app_gui_bindings_ctx_t *ctx);
 
 void app_gui_time_format_unknown_last_updated(char *text, size_t text_len);
 void app_gui_time_format_last_updated_now(char *text, size_t text_len);

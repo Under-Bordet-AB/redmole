@@ -8,6 +8,7 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "freertos/task.h"
+#include "nac.h"
 #include "http_client.h"
 #include "sdkconfig.h"
 
@@ -202,15 +203,21 @@ static bool leop_parse_response(const char *response, gui_energy_plan_t *energy_
 
 static task_status_t leop_work(task_node_t *node)
 {
+    if (node == NULL) {
+        return TASK_ERROR;
+    }
+
+    if (nac_get_wifi_status() != NAC_WIFI_CONNECTED) {
+        node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(LEOP_REFRESH_DELAY_MS);
+        ESP_LOGI(APP_GUI_BINDINGS_TAG, "Waiting for Wi-Fi before fetching LEOP...");
+        return TASK_RUN_AGAIN;
+    }
+
     app_gui_bindings_ctx_t *ctx;
     gui_energy_plan_t energy_plan;
     esp_err_t http_rc;
 
     ESP_LOGI(APP_GUI_BINDINGS_TAG, "Fetching LEOP...");
-
-    if (node == NULL) {
-        return TASK_ERROR;
-    }
 
     ctx = container_of(node, app_gui_bindings_ctx_t, leop_task);
     node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(LEOP_REFRESH_DELAY_MS);
@@ -241,6 +248,14 @@ static task_status_t leop_work(task_node_t *node)
     app_gui_time_format_last_updated_now(energy_plan.last_updated, sizeof(energy_plan.last_updated));
     gui_set_energy_plan_state(ctx->gui, &energy_plan);
     return TASK_RUN_AGAIN;
+}
+
+void app_gui_leop_schedule_now(app_gui_bindings_ctx_t *ctx) {
+    if ((ctx == NULL) || !ctx->leop_task.active) {
+        return;
+    }
+
+    ctx->leop_task.run_at_tick = xTaskGetTickCount();
 }
 
 void app_gui_leop_register_task(app_gui_bindings_ctx_t *ctx)
