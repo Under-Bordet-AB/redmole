@@ -53,6 +53,7 @@ bool app_gui_settings_save_location_if_changed(app_gui_bindings_ctx_t *ctx, gui_
 bool app_gui_settings_load_location_for_forecast(app_gui_bindings_ctx_t *ctx,
                                                 double *latitude,
                                                 double *longitude);
+void app_gui_on_reset_requested(gui_ctx_t *gui, void *user_data);
 
 void app_gui_wifi_fill_bindings(gui_module_bindings_t *bindings,
                                 app_gui_bindings_ctx_t *ctx);
