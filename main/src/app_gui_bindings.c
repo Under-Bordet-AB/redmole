@@ -37,6 +37,7 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui, EventGroupHandle_t *event_group)
     s_bindings.event_group = event_group;
 
     app_gui_wifi_fill_bindings(&bindings, &s_bindings);
+    bindings.on_reset_requested = app_gui_on_reset_requested;
     gui_set_bindings(gui, &bindings);
 
     app_gui_settings_cache_current_appearance(&s_bindings, gui);

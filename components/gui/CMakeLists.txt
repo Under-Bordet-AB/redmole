@@ -36,6 +36,13 @@ if(CONFIG_REDMOLE_GUI_THEME_SPONGEBOB)
          "src/view/assets/fonts/spongebob24.c")
 endif()
 
+if(CONFIG_REDMOLE_GUI_THEME_BONZI_BUDDY)
+    list(APPEND gui_srcs
+         "src/view/assets/bonzibuddy_bg.c"
+         "src/view/assets/fonts/bonzibuddy18.c"
+         "src/view/assets/fonts/bonzibuddy24.c")
+endif()
+
 if(CONFIG_REDMOLE_GUI_THEME_DEATH_NOTE)
     list(APPEND gui_srcs
          "src/view/assets/deathnote_bg.c"

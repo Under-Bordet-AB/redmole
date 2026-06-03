@@ -508,6 +508,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_t *bluetooth_card;
     lv_obj_t *brightness_card;
     lv_obj_t *location_card;
+    lv_obj_t *reset_card;
     lv_obj_t *theme_card;
     lv_obj_t *bluetooth_status;
     lv_obj_t *settings_text;
@@ -525,6 +526,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->location_longitude_label = NULL;
     view->location_longitude_textarea = NULL;
     view->location_keyboard = NULL;
+    view->reset_card = NULL;
 
     view->settings_panel = lv_obj_create(view->content);
     lv_obj_set_size(view->settings_panel, 734, 500);
@@ -860,6 +862,15 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     (void)gui_view_create_settings_field_row(location_card, &view->location_longitude_label,
                                              &view->location_longitude_textarea, "Longitude",
                                              "18.0686", settings_event_cb, event_user_data);
+    
+    // Reset card for the systems panel
+    reset_card = gui_view_create_setting_item_card(system_stack, "Reset", "Reset to factory defaults.", LV_SIZE_CONTENT);
+
+    view->reset_button = gui_view_create_action_button(reset_card, 0, 0, 120, 40, "Reset",
+                                                      LV_EVENT_CLICKED, settings_event_cb,
+                                                      event_user_data);
+
+    view->reset_card = reset_card;
 
     view->location_keyboard = lv_keyboard_create(view->settings_system_panel);
     lv_obj_set_size(view->location_keyboard, LV_PCT(100), 180);
@@ -969,7 +980,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_text_font(view->wifi_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
 
     view->password_dialog_cancel_button = gui_view_create_action_button(
-        view->password_dialog, 282, 148, 128, 48, "Back", LV_EVENT_CLICKED, settings_event_cb,
+        view->password_dialog, 282, 148, 128, 40, "Back", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
     view->password_dialog_disconnect_button = gui_view_create_action_button(
         view->password_dialog, 426, 148, 128, 40, "Disconnect", LV_EVENT_CLICKED, settings_event_cb,

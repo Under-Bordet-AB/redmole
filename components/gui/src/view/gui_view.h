@@ -83,6 +83,8 @@ typedef struct {
     lv_obj_t *location_longitude_label; /*!< Label for the longitude textarea. */
     lv_obj_t *location_longitude_textarea; /*!< Text area used to edit longitude. */
     lv_obj_t *location_keyboard;      /*!< On-screen keyboard dedicated to location input. */
+    lv_obj_t *reset_card;
+    lv_obj_t *reset_button;
 
     lv_obj_t *dialog_scrim;                    /*!< Shared modal scrim behind dialog content. */
     lv_obj_t *network_dialog;                  /*!< Wi-Fi network selection dialog container. */

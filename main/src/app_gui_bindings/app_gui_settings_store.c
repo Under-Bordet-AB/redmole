@@ -1,4 +1,5 @@
 #include "app_gui_bindings_internal.h"
+#include "nvs_keys.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,12 +8,7 @@
 #include "esp_log.h"
 #include "rm_nvs.h"
 
-#define GUI_NVS_KEY_THEME       "gui_theme"
-#define GUI_NVS_KEY_BG          "gui_bg"
-#define GUI_NVS_KEY_NIGHT       "gui_night"
-#define GUI_NVS_KEY_BRIGHT      "gui_bright"
-#define GUI_NVS_KEY_LAT         "gui_lat"
-#define GUI_NVS_KEY_LON         "gui_lon"
+#include "nac.h"
 
 static int32_t clamp_saved_brightness(int32_t value)
 {
@@ -164,17 +160,19 @@ bool app_gui_settings_load_saved_location(app_gui_bindings_ctx_t *ctx, gui_ctx_t
         loaded_any = true;
     } else {
         location.latitude[0] = '\0';
+        snprintf(location.latitude, sizeof(location.latitude), "%s", "59.3293");
     }
 
     if (rm_nvs_get_str(GUI_NVS_KEY_LON, location.longitude, &longitude_len) == ESP_OK) {
         loaded_any = true;
     } else {
         location.longitude[0] = '\0';
+        snprintf(location.longitude, sizeof(location.longitude), "%s", "18.0686");
     }
 
-    if (!loaded_any) {
-        return false;
-    }
+    // if (!loaded_any) {
+    //     return false;
+    // }
 
     if (!parse_coordinate_in_range(location.latitude, -90.0, 90.0)) {
         location.latitude[0] = '\0';
@@ -317,5 +315,92 @@ bool app_gui_settings_save_location_if_changed(app_gui_bindings_ctx_t *ctx, gui_
 
     ctx->last_location = location;
     ctx->has_last_location = true;
+    ctx->location_changed = true;
+
     return true;
+}
+
+void app_gui_on_reset_requested(gui_ctx_t *gui, void *user_data) {
+    app_gui_bindings_ctx_t *ctx = (app_gui_bindings_ctx_t *)user_data;
+    gui_appearance_settings_t appearance = {
+        .theme = GUI_VIEW_THEME_LIGHT,
+        .show_background_image = true,
+        .night_variant_enabled = false,
+    };
+    gui_location_settings_t location = { 0 };
+    gui_wifi_settings_t wifi = { 0 };
+
+    if ((ctx == NULL) || (gui == NULL)) {
+        return;
+    }
+
+    ESP_LOGI(APP_GUI_BINDINGS_TAG, "Resettings stored settings to factory defaults.");
+
+    bool key_exists = false;
+    rm_nvs_key_exists(GUI_NVS_KEY_THEME, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_THEME);
+    }
+
+    rm_nvs_key_exists(GUI_NVS_KEY_BG, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_BG);
+    }
+
+    rm_nvs_key_exists(GUI_NVS_KEY_NIGHT, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_NIGHT);
+    }
+
+    rm_nvs_key_exists(GUI_NVS_KEY_BRIGHT, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_BRIGHT);
+    }
+
+    rm_nvs_key_exists(GUI_NVS_KEY_LAT, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_LAT);
+    }
+
+    rm_nvs_key_exists(GUI_NVS_KEY_LON, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_LON);
+    }
+
+    rm_nvs_key_exists(GUI_NVS_KEY_WIFI_SSID, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_WIFI_SSID);
+    }
+
+    (void)nac_request_wifi_disconnect();
+
+    snprintf(location.latitude, sizeof(location.latitude), "%s", "59.3293");
+    snprintf(location.longitude, sizeof(location.longitude), "%s", "18.0686");
+
+    wifi.selected_network_index = -1;
+    wifi.selected_known_network_index = -1;
+    wifi.state = GUI_WIFI_STATE_IDLE;
+    snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Press Scan to search for Wi-Fi networks.");
+
+    gui_hide_wifi_dialogs(gui);
+    gui_set_appearance_settings(gui, &appearance);
+    gui_set_brightness(gui, 82);
+    gui_set_location_settings(gui, &location);
+    gui_set_wifi_settings(gui, &wifi);
+    gui_set_wifi_state(gui, GUI_WIFI_STATE_IDLE);
+
+    ctx->wifi_connect_requested = false;
+    ctx->wifi_scan_requested = false;
+    ctx->wifi_disconnect_requested = false;
+    ctx->requested_ssid[0] = '\0';
+    ctx->boot_autoconnect_queued = false;
+
+    ctx->last_appearance = appearance;
+    ctx->has_last_appearance = true;
+    ctx->last_location = location;
+    ctx->has_last_location = true;
+    ctx->last_brightness = 82;
+    ctx->has_last_brightness = true;
+    ctx->last_wifi_state = GUI_WIFI_STATE_IDLE;
+    ctx->has_last_wifi_state = true;
 }

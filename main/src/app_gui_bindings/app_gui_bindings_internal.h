@@ -30,8 +30,10 @@ typedef struct {
 
     bool has_last_appearance;
     gui_appearance_settings_t last_appearance;
+
     bool has_last_location;
     gui_location_settings_t last_location;
+    bool location_changed;
 
     bool has_last_brightness;
     int32_t last_brightness;
@@ -53,6 +55,7 @@ bool app_gui_settings_save_location_if_changed(app_gui_bindings_ctx_t *ctx, gui_
 bool app_gui_settings_load_location_for_forecast(app_gui_bindings_ctx_t *ctx,
                                                 double *latitude,
                                                 double *longitude);
+void app_gui_on_reset_requested(gui_ctx_t *gui, void *user_data);
 
 void app_gui_wifi_fill_bindings(gui_module_bindings_t *bindings,
                                 app_gui_bindings_ctx_t *ctx);
@@ -65,7 +68,9 @@ void app_gui_sync_runtime(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui);
 void app_gui_sync_register_sensor_task(app_gui_bindings_ctx_t *ctx);
 
 void app_gui_forecast_register_task(app_gui_bindings_ctx_t *ctx);
+void app_gui_forecast_schedule_now(app_gui_bindings_ctx_t *ctx);
 void app_gui_leop_register_task(app_gui_bindings_ctx_t *ctx);
+void app_gui_leop_schedule_now(app_gui_bindings_ctx_t *ctx);
 
 void app_gui_time_format_unknown_last_updated(char *text, size_t text_len);
 void app_gui_time_format_last_updated_now(char *text, size_t text_len);

@@ -8,6 +8,7 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "freertos/task.h"
+#include "nac.h"
 #include "http_client.h"
 
 #define FORECAST_REFRESH_DELAY_MS 60000U
@@ -552,6 +553,16 @@ static bool forecast_parse_response(const char *response, gui_forecast_state_t *
 
 static task_status_t forecast_work(task_node_t *node)
 {
+    if (node == NULL) {
+        return TASK_ERROR;
+    }
+
+    if (nac_get_wifi_status() != NAC_WIFI_CONNECTED) {
+        node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(FORECAST_REFRESH_DELAY_MS);
+        ESP_LOGI(APP_GUI_BINDINGS_TAG, "Waiting for Wi-Fi before fetching forecast...");
+        return TASK_RUN_AGAIN;
+    }
+
     app_gui_bindings_ctx_t *ctx;
     char url[1024];
     double latitude;
@@ -560,10 +571,6 @@ static task_status_t forecast_work(task_node_t *node)
     esp_err_t http_rc;
 
     ESP_LOGI(APP_GUI_BINDINGS_TAG, "Fetching forecast...");
-
-    if (node == NULL) {
-        return TASK_ERROR;
-    }
 
     ctx = container_of(node, app_gui_bindings_ctx_t, forecast_task);
     node->run_at_tick = xTaskGetTickCount() + pdMS_TO_TICKS(FORECAST_REFRESH_DELAY_MS);
@@ -609,6 +616,14 @@ static task_status_t forecast_work(task_node_t *node)
     app_gui_time_format_last_updated_now(forecast.last_updated, sizeof(forecast.last_updated));
     gui_set_forecast_state(ctx->gui, &forecast);
     return TASK_RUN_AGAIN;
+}
+
+void app_gui_forecast_schedule_now(app_gui_bindings_ctx_t *ctx) {
+    if ((ctx == NULL) || !ctx->forecast_task.active) {
+        return;
+    }
+
+    ctx->forecast_task.run_at_tick = xTaskGetTickCount();
 }
 
 void app_gui_forecast_register_task(app_gui_bindings_ctx_t *ctx)

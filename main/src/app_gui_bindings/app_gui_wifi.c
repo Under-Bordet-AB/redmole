@@ -1,4 +1,5 @@
 #include "app_gui_bindings_internal.h"
+#include "nvs_keys.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -6,8 +7,6 @@
 #include "esp_log.h"
 #include "nac.h"
 #include "rm_nvs.h"
-
-#define GUI_NVS_KEY_WIFI_SSID "wifi_ssid"
 
 static uint8_t signal_strength_pct(int8_t rssi)
 {

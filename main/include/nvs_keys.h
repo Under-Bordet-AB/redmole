@@ -1,0 +1,8 @@
+#define GUI_NVS_KEY_THEME       "gui_theme"
+#define GUI_NVS_KEY_BG          "gui_bg"
+#define GUI_NVS_KEY_NIGHT       "gui_night"
+#define GUI_NVS_KEY_BRIGHT      "gui_bright"
+#define GUI_NVS_KEY_LAT         "gui_lat"
+#define GUI_NVS_KEY_LON         "gui_lon"
+#define GUI_NVS_KEY_WIFI_SSID   "wifi_ssid"
+#define GUI_NVS_KEY_WIFI_PASS   "wifi_pass"
