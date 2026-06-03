@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Redmole Theme Editor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-shell">
+        <main class="preview-area">
+            <section class="device-wrap" aria-label="Redmole GUI preview">
+                <div class="device-screen" id="previewRoot">
+                    <aside class="mock-sidebar">
+                        <div class="mock-brand" data-preview-display-name>Redmole</div>
+                        <div class="mock-clock">14:26</div>
+                        <div class="mock-date">Wed 03 Jun</div>
+                        <nav class="mock-nav" aria-label="Panel navigation">
+                            <button class="mock-nav-button is-active" type="button">BME280</button>
+                            <button class="mock-nav-button" type="button">LEOP</button>
+                            <button class="mock-nav-button" type="button">Forecast</button>
+                            <button class="mock-nav-button" type="button">Settings</button>
+                        </nav>
+                        <div class="mock-status-row" aria-label="Connectivity status">
+                            <span class="mock-status is-connected">WiFi</span>
+                            <span class="mock-status is-idle">BT</span>
+                            <span class="mock-status is-idle">SD</span>
+                        </div>
+                    </aside>
+
+                    <section class="mock-content" aria-label="Sensor panel">
+                        <div class="sensor-panel">
+                            <article class="metric-card">
+                                <span class="metric-label">Temperature</span>
+                                <strong class="metric-value">22.4 C</strong>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Humidity</span>
+                                <strong class="metric-value">42.8 %</strong>
+                            </article>
+                            <article class="metric-card">
+                                <span class="metric-label">Pressure</span>
+                                <strong class="metric-value">1013.6 hPa</strong>
+                            </article>
+                        </div>
+                    </section>
+
+                    <div class="mock-updated">Last updated: 14:26:08</div>
+                </div>
+            </section>
+
+            <section class="sample-strip" aria-label="Theme component samples">
+                <div class="sample-card action-sample">
+                    <div class="sample-title">Actions</div>
+                    <div class="sample-row">
+                        <button class="sample-primary" type="button">Scan</button>
+                        <button class="sample-secondary" type="button">Back</button>
+                    </div>
+                </div>
+
+                <div class="sample-card control-sample">
+                    <div class="sample-title">Controls</div>
+                    <div class="sample-slider"><span></span></div>
+                    <div class="sample-dropdown">
+                        <span>Light mode</span>
+                        <b>Selected</b>
+                    </div>
+                </div>
+
+                <div class="sample-card text-sample">
+                    <div class="sample-title">Text</div>
+                    <strong>Panel title</strong>
+                    <span>Subtitle text</span>
+                    <em>Muted text</em>
+                    <b>Value text</b>
+                    <i>Soft accent</i>
+                </div>
+
+                <div class="sample-card keyboard-sample">
+                    <div class="sample-title">Keyboard</div>
+                    <div class="key-row">
+                        <span>Q</span>
+                        <span>W</span>
+                        <span>E</span>
+                        <span class="special-key">Enter</span>
+                    </div>
+                </div>
+
+                <div class="sample-card energy-sample">
+                    <div class="sample-title">Energy</div>
+                    <div class="mini-chart">
+                        <span class="grid-line"></span>
+                        <svg viewBox="0 0 220 80" aria-hidden="true">
+                            <polyline class="buy-line" points="4,62 40,40 78,44 120,22 168,36 216,18"></polyline>
+                            <polyline class="solar-line" points="4,68 44,58 82,22 120,16 170,38 216,60"></polyline>
+                            <polyline class="charge-line" points="4,70 46,66 82,54 124,34 168,28 216,44"></polyline>
+                            <polyline class="sell-line" points="4,74 46,70 84,68 126,58 170,48 216,52"></polyline>
+                        </svg>
+                    </div>
+                    <div class="chart-ticks">
+                        <span>0.0</span>
+                        <span>0.5</span>
+                        <span>1.0</span>
+                    </div>
+                    <div class="energy-legend">
+                        <span class="buy-dot"></span>
+                        <span class="solar-dot"></span>
+                        <span class="charge-dot"></span>
+                        <span class="sell-dot"></span>
+                    </div>
+                </div>
+
+                <div class="sample-card wifi-sample">
+                    <div class="sample-title">Wi-Fi Rows</div>
+                    <button class="wifi-row normal" type="button">Guest</button>
+                    <button class="wifi-row connected" type="button">Home</button>
+                    <button class="wifi-row known" type="button">Office</button>
+                    <button class="wifi-row selected" type="button">Workshop</button>
+                </div>
+            </section>
+        </main>
+
+        <aside class="editor-sidebar" aria-label="Theme editor">
+            <header class="editor-header">
+                <div>
+                    <h1>Theme Editor</h1>
+                    <p id="activeThemeLabel">Light mode</p>
+                </div>
+                <button id="resetThemeButton" type="button">Reset</button>
+            </header>
+
+            <label class="field-label" for="themeSelect">Preset</label>
+            <select id="themeSelect"></select>
+
+            <section class="editor-section">
+                <h2>Metadata</h2>
+                <div id="metadataControls" class="metadata-grid"></div>
+            </section>
+
+            <section class="editor-section">
+                <h2>Colors</h2>
+                <div id="colorControls" class="color-groups"></div>
+            </section>
+
+            <section class="editor-section">
+                <h2>Import</h2>
+                <textarea id="importText" class="code-area" spellcheck="false"></textarea>
+                <div class="editor-actions">
+                    <button id="importButton" type="button">Apply Import</button>
+                    <span id="importStatus" role="status"></span>
+                </div>
+            </section>
+
+            <section class="editor-section">
+                <h2>Export</h2>
+                <textarea id="exportText" class="code-area is-output" readonly spellcheck="false"></textarea>
+                <div class="editor-actions">
+                    <button id="copyExportButton" type="button">Copy Struct</button>
+                    <span id="copyStatus" role="status"></span>
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
