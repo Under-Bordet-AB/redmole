@@ -785,7 +785,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
 
         content_bg     = lv_color_hex(def->content_bg);
         content_shadow = lv_color_hex(def->content_shadow);
-        content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_90;
+        content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
 
         title_text    = lv_color_hex(def->title_text);
         subtitle_text = lv_color_hex(def->subtitle_text);
