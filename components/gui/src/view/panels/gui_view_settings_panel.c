@@ -285,6 +285,37 @@ static lv_obj_t *gui_view_create_settings_subpage_stack(lv_obj_t *parent)
     return stack;
 }
 
+static lv_obj_t *gui_view_create_settings_card_grid(lv_obj_t *parent)
+{
+    lv_obj_t *grid = lv_obj_create(parent);
+
+    lv_obj_set_width(grid, LV_PCT(100));
+    lv_obj_set_height(grid, 0);
+    lv_obj_set_flex_grow(grid, 1);
+    lv_obj_set_layout(grid, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START);
+    lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(grid, 0, 0);
+    lv_obj_set_style_shadow_width(grid, 0, 0);
+    lv_obj_set_style_pad_all(grid, 0, 0);
+    lv_obj_set_style_pad_column(grid, 12, 0);
+    lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+
+    return grid;
+}
+
+static void gui_view_set_settings_grid_card(lv_obj_t *card)
+{
+    if (card == NULL) {
+        return;
+    }
+
+    lv_obj_set_width(card, 0);
+    lv_obj_set_flex_grow(card, 1);
+}
+
 static lv_obj_t *gui_view_create_settings_action_row(lv_obj_t *parent)
 {
     lv_obj_t *row = lv_obj_create(parent);
@@ -335,6 +366,8 @@ static lv_obj_t *gui_view_create_settings_field_row(lv_obj_t *parent, lv_obj_t *
     *textarea_out = lv_textarea_create(row);
     lv_obj_set_size(*textarea_out, LV_PCT(100), 48);
     lv_textarea_set_one_line(*textarea_out, true);
+    lv_textarea_set_accepted_chars(*textarea_out, "+-0123456789.");
+    lv_textarea_set_max_length(*textarea_out, GUI_LOCATION_TEXT_MAX_LEN);
     lv_textarea_set_placeholder_text(*textarea_out, placeholder_text);
     lv_obj_add_event_cb(*textarea_out, settings_event_cb, LV_EVENT_ALL, event_user_data);
     lv_obj_set_style_radius(*textarea_out, 14, 0);
@@ -569,20 +602,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->settings_connectivity_panel = gui_view_create_settings_page(view->settings_panel);
     page_stack = gui_view_create_settings_subpage_stack(view->settings_connectivity_panel);
 
-    connectivity_stack = lv_obj_create(page_stack);
-    lv_obj_set_width(connectivity_stack, LV_PCT(100));
-    lv_obj_set_height(connectivity_stack, 0);
-    lv_obj_set_flex_grow(connectivity_stack, 1);
-    lv_obj_set_layout(connectivity_stack, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(connectivity_stack, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(connectivity_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
-    lv_obj_set_style_bg_opa(connectivity_stack, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(connectivity_stack, 0, 0);
-    lv_obj_set_style_shadow_width(connectivity_stack, 0, 0);
-    lv_obj_set_style_pad_all(connectivity_stack, 0, 0);
-    lv_obj_set_style_pad_row(connectivity_stack, 12, 0);
-    lv_obj_clear_flag(connectivity_stack, LV_OBJ_FLAG_SCROLLABLE);
+    connectivity_stack = gui_view_create_settings_card_grid(page_stack);
 
     page_action_row = gui_view_create_settings_action_row(page_stack);
     view->settings_connectivity_back_button = gui_view_create_action_button(
@@ -590,6 +610,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
         event_user_data);
 
     wifi_card = gui_view_create_setting_item_card_shell(connectivity_stack, LV_SIZE_CONTENT);
+    gui_view_set_settings_grid_card(wifi_card);
     view->wifi_card = wifi_card;
 
     view->wifi_header_row = lv_obj_create(wifi_card);
@@ -652,6 +673,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     bluetooth_card = gui_view_create_setting_item_card(
         connectivity_stack, "Bluetooth",
         "Connect to nearby devices.", LV_SIZE_CONTENT);
+    gui_view_set_settings_grid_card(bluetooth_card);
     view->bluetooth_card = bluetooth_card;
 
     bluetooth_status = lv_label_create(bluetooth_card);
@@ -663,20 +685,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->settings_display_panel = gui_view_create_settings_page(view->settings_panel);
     page_stack = gui_view_create_settings_subpage_stack(view->settings_display_panel);
 
-    display_stack = lv_obj_create(page_stack);
-    lv_obj_set_width(display_stack, LV_PCT(100));
-    lv_obj_set_height(display_stack, 0);
-    lv_obj_set_flex_grow(display_stack, 1);
-    lv_obj_set_layout(display_stack, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(display_stack, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(display_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
-    lv_obj_set_style_bg_opa(display_stack, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(display_stack, 0, 0);
-    lv_obj_set_style_shadow_width(display_stack, 0, 0);
-    lv_obj_set_style_pad_all(display_stack, 0, 0);
-    lv_obj_set_style_pad_row(display_stack, 12, 0);
-    lv_obj_clear_flag(display_stack, LV_OBJ_FLAG_SCROLLABLE);
+    display_stack = gui_view_create_settings_card_grid(page_stack);
 
     page_action_row = gui_view_create_settings_action_row(page_stack);
     view->settings_display_back_button = gui_view_create_action_button(
@@ -687,6 +696,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
         display_stack, "Screen brightness",
         "Adjust the backlight level.",
         LV_SIZE_CONTENT);
+    gui_view_set_settings_grid_card(brightness_card);
     view->brightness_card = brightness_card;
 
     lv_obj_t *brightness_row = lv_obj_create(brightness_card);
@@ -729,6 +739,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     theme_card = gui_view_create_setting_item_card(
         display_stack, "Theme",
         "Choose interface style.", LV_SIZE_CONTENT);
+    gui_view_set_settings_grid_card(theme_card);
     view->theme_card = theme_card;
 
     view->theme_dropdown = lv_dropdown_create(theme_card);
@@ -832,20 +843,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->settings_system_panel = gui_view_create_settings_page(view->settings_panel);
     page_stack = gui_view_create_settings_subpage_stack(view->settings_system_panel);
 
-    system_stack = lv_obj_create(page_stack);
-    lv_obj_set_width(system_stack, LV_PCT(100));
-    lv_obj_set_height(system_stack, 0);
-    lv_obj_set_flex_grow(system_stack, 1);
-    lv_obj_set_layout(system_stack, LV_LAYOUT_FLEX);
-    lv_obj_set_flex_flow(system_stack, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(system_stack, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
-                          LV_FLEX_ALIGN_START);
-    lv_obj_set_style_bg_opa(system_stack, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(system_stack, 0, 0);
-    lv_obj_set_style_shadow_width(system_stack, 0, 0);
-    lv_obj_set_style_pad_all(system_stack, 0, 0);
-    lv_obj_set_style_pad_row(system_stack, 12, 0);
-    lv_obj_clear_flag(system_stack, LV_OBJ_FLAG_SCROLLABLE);
+    system_stack = gui_view_create_settings_card_grid(page_stack);
 
     page_action_row = gui_view_create_settings_action_row(page_stack);
     view->settings_system_back_button = gui_view_create_action_button(
@@ -855,6 +853,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     location_card = gui_view_create_setting_item_card(
         system_stack, "Location", "Enter latitude and longitude in decimal degrees.",
         LV_SIZE_CONTENT);
+    gui_view_set_settings_grid_card(location_card);
     view->location_card = location_card;
     (void)gui_view_create_settings_field_row(location_card, &view->location_latitude_label,
                                              &view->location_latitude_textarea, "Latitude",
@@ -862,19 +861,21 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     (void)gui_view_create_settings_field_row(location_card, &view->location_longitude_label,
                                              &view->location_longitude_textarea, "Longitude",
                                              "18.0686", settings_event_cb, event_user_data);
-    
+
     // Reset card for the systems panel
-    reset_card = gui_view_create_setting_item_card(system_stack, "Reset", "Reset to factory defaults.", LV_SIZE_CONTENT);
+    reset_card = gui_view_create_setting_item_card(
+        system_stack, "Reset", "Reset to factory defaults.", LV_SIZE_CONTENT);
+    gui_view_set_settings_grid_card(reset_card);
 
     view->reset_button = gui_view_create_action_button(reset_card, 0, 0, 120, 40, "Reset",
-                                                      LV_EVENT_CLICKED, settings_event_cb,
-                                                      event_user_data);
+                                                       LV_EVENT_CLICKED, settings_event_cb,
+                                                       event_user_data);
 
     view->reset_card = reset_card;
 
     view->location_keyboard = lv_keyboard_create(view->settings_system_panel);
-    lv_obj_set_size(view->location_keyboard, LV_PCT(100), 180);
-    lv_obj_align(view->location_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_size(view->location_keyboard, 400, 212);
+    lv_obj_align(view->location_keyboard, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_obj_set_style_radius(view->location_keyboard, 18, 0);
     lv_obj_set_style_bg_color(view->location_keyboard, lv_color_hex(0xE7EDF5), 0);
     lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER, 0);
@@ -882,8 +883,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_border_width(view->location_keyboard, 1, 0);
     lv_obj_set_style_border_color(view->location_keyboard, lv_color_hex(0xD7E1EE), 0);
     lv_obj_set_style_text_font(view->location_keyboard, &lv_font_montserrat_24, LV_PART_ITEMS);
-    lv_keyboard_set_mode(view->location_keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
-
+    lv_keyboard_set_mode(view->location_keyboard, LV_KEYBOARD_MODE_NUMBER);
+    lv_obj_add_flag(view->location_keyboard, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
     view->dialog_scrim = NULL;
 
     view->network_dialog = gui_view_create_settings_page(view->settings_panel);
