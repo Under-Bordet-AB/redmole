@@ -214,8 +214,9 @@ static void gui_view_apply_connectivity_icon_colors(gui_view_t *view,
 }
 
 static void gui_view_style_settings_card(lv_obj_t *card, lv_color_t bg_color,
-                                         lv_color_t border_color, lv_color_t title_color,
-                                         lv_color_t subtitle_color, gui_view_theme_t theme)
+                                         lv_color_t grad_color, lv_color_t border_color,
+                                         lv_color_t title_color, lv_color_t subtitle_color,
+                                         gui_view_theme_t theme)
 {
     lv_obj_t *title;
     lv_obj_t *subtitle;
@@ -227,8 +228,7 @@ static void gui_view_style_settings_card(lv_obj_t *card, lv_color_t bg_color,
 
     body_font = gui_theme_get(theme)->body_font;
 
-    lv_obj_set_style_bg_color(card, bg_color, 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(card, bg_color, grad_color, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(card, 1, 0);
     lv_obj_set_style_border_color(card, border_color, 0);
     lv_obj_set_style_text_font(card, body_font, 0);
@@ -246,8 +246,9 @@ static void gui_view_style_settings_card(lv_obj_t *card, lv_color_t bg_color,
 }
 
 static void gui_view_style_wifi_card(gui_view_t *view, lv_color_t bg_color,
-                                     lv_color_t border_color, lv_color_t title_color,
-                                     lv_color_t subtitle_color, gui_view_theme_t theme)
+                                     lv_color_t grad_color, lv_color_t border_color,
+                                     lv_color_t title_color, lv_color_t subtitle_color,
+                                     gui_view_theme_t theme)
 {
     const lv_font_t *body_font;
 
@@ -257,8 +258,7 @@ static void gui_view_style_wifi_card(gui_view_t *view, lv_color_t bg_color,
 
     body_font = gui_theme_get(theme)->body_font;
 
-    lv_obj_set_style_bg_color(view->wifi_card, bg_color, 0);
-    lv_obj_set_style_bg_opa(view->wifi_card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->wifi_card, bg_color, grad_color, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->wifi_card, 1, 0);
     lv_obj_set_style_border_color(view->wifi_card, border_color, 0);
     lv_obj_set_style_text_font(view->wifi_card, body_font, 0);
@@ -277,8 +277,9 @@ static void gui_view_style_wifi_card(gui_view_t *view, lv_color_t bg_color,
 }
 
 static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
-                                        lv_color_t card_border, lv_color_t label_color,
-                                        lv_color_t accent_color, gui_view_theme_t theme)
+                                        lv_color_t card_grad, lv_color_t card_border,
+                                        lv_color_t label_color, lv_color_t accent_color,
+                                        gui_view_theme_t theme)
 {
     uint32_t child_count;
     const lv_font_t *body_font;
@@ -301,8 +302,7 @@ static void gui_view_style_bme280_cards(gui_view_t *view, lv_color_t card_bg,
             continue;
         }
 
-        lv_obj_set_style_bg_color(card, card_bg, 0);
-        lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+        gui_view_apply_bg_gradient(card, card_bg, card_grad, LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(card, card_border, 0);
         lv_obj_set_style_text_font(card, body_font, 0);
 
@@ -387,6 +387,7 @@ static void gui_view_style_energy_legend_labels(gui_view_t *view, lv_color_t tex
 }
 
 static void gui_view_style_energy_action_widgets(gui_view_t *view, lv_color_t card_bg,
+                                                 lv_color_t card_grad,
                                                  lv_color_t card_border,
                                                  lv_color_t title_color,
                                                  lv_color_t subtitle_color,
@@ -411,8 +412,8 @@ static void gui_view_style_energy_action_widgets(gui_view_t *view, lv_color_t ca
     emphasis_font = def->emphasis_font;
 
     if (view->energy_action_card != NULL) {
-        lv_obj_set_style_bg_color(view->energy_action_card, card_bg, 0);
-        lv_obj_set_style_bg_opa(view->energy_action_card, LV_OPA_COVER, 0);
+        gui_view_apply_bg_gradient(view->energy_action_card, card_bg, card_grad,
+                                   LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(view->energy_action_card, card_border, 0);
         //lv_obj_set_style_border_opa(view->energy_action_card, LV_OPA_TRANSP, 0);
         lv_obj_set_style_text_font(view->energy_action_card, body_font, 0);
@@ -444,6 +445,7 @@ static void gui_view_style_energy_action_widgets(gui_view_t *view, lv_color_t ca
 
         lv_obj_set_style_radius(segment, 7, 0);
         lv_obj_set_style_bg_color(segment, idle_color, 0);
+        lv_obj_set_style_bg_grad_dir(segment, LV_GRAD_DIR_NONE, 0);
         lv_obj_set_style_bg_opa(segment, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(segment, 2, 0);
         lv_obj_set_style_border_color(segment, title_color, 0);
@@ -452,8 +454,8 @@ static void gui_view_style_energy_action_widgets(gui_view_t *view, lv_color_t ca
 }
 
 static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
-                                             lv_color_t card_border, lv_color_t title_color,
-                                             lv_color_t subtitle_color,
+                                             lv_color_t card_grad, lv_color_t card_border,
+                                             lv_color_t title_color, lv_color_t subtitle_color,
                                              lv_color_t accent_color,
                                              gui_view_theme_t theme)
 {
@@ -472,8 +474,7 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
     body_font = gui_theme_get(theme)->body_font;
     emphasis_font = gui_theme_get(theme)->emphasis_font;
 
-    lv_obj_set_style_bg_color(card, card_bg, 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(card, card_bg, card_grad, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(card, card_border, 0);
     lv_obj_set_style_text_font(card, body_font, 0);
 
@@ -502,21 +503,22 @@ static void gui_view_style_forecast_day_card(lv_obj_t *card, lv_color_t card_bg,
 }
 
 static void gui_view_style_forecast_card(lv_obj_t *card, lv_color_t card_bg,
-                                         lv_color_t card_border, gui_view_theme_t theme)
+                                         lv_color_t card_grad, lv_color_t card_border,
+                                         gui_view_theme_t theme)
 {
     if (card == NULL) {
         return;
     }
 
-    lv_obj_set_style_bg_color(card, card_bg, 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(card, card_bg, card_grad, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(card, card_border, 0);
     lv_obj_set_style_text_font(card, gui_theme_get(theme)->body_font, 0);
 }
 
 static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
-                                          lv_color_t panel_border, lv_opa_t panel_bg_opa,
-                                          lv_color_t card_bg, lv_color_t card_border,
+                                          lv_color_t panel_grad, lv_color_t panel_border,
+                                          lv_opa_t panel_bg_opa, lv_color_t card_bg,
+                                          lv_color_t card_grad, lv_color_t card_border,
                                           lv_color_t title_color,
                                           lv_color_t subtitle_color,
                                           lv_color_t accent_color,
@@ -538,8 +540,7 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
     body_font = gui_theme_get(theme)->body_font;
     emphasis_font = gui_theme_get(theme)->emphasis_font;
 
-    lv_obj_set_style_bg_color(view->forecast_panel, panel_bg, 0);
-    lv_obj_set_style_bg_opa(view->forecast_panel, panel_bg_opa, 0);
+    gui_view_apply_bg_gradient(view->forecast_panel, panel_bg, panel_grad, panel_bg_opa, 0);
     lv_obj_set_style_border_color(view->forecast_panel, panel_border, 0);
     lv_obj_set_style_text_font(view->forecast_panel, body_font, 0);
 
@@ -549,8 +550,8 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
     today_card = (top_row != NULL) ? lv_obj_get_child(top_row, 0) : NULL;
     details_card = (top_row != NULL) ? lv_obj_get_child(top_row, 1) : NULL;
 
-    gui_view_style_forecast_card(today_card, card_bg, card_border, theme);
-    gui_view_style_forecast_card(details_card, card_bg, card_border, theme);
+    gui_view_style_forecast_card(today_card, card_bg, card_grad, card_border, theme);
+    gui_view_style_forecast_card(details_card, card_bg, card_grad, card_border, theme);
 
     if (today_card != NULL) {
         lv_obj_t *today_text_column = lv_obj_get_child(today_card, 0);
@@ -626,7 +627,7 @@ static void gui_view_style_forecast_panel(gui_view_t *view, lv_color_t panel_bg,
         day_card_count = lv_obj_get_child_cnt(days_row);
         for (uint32_t index = 0; index < day_card_count; index++) {
             gui_view_style_forecast_day_card(lv_obj_get_child(days_row, (int32_t)index),
-                                             card_bg, card_border, title_color,
+                                             card_bg, card_grad, card_border, title_color,
                                              subtitle_color, accent_color, theme);
         }
     }
@@ -636,6 +637,7 @@ static void gui_view_style_nav_button(lv_obj_t *button, gui_view_theme_t theme, 
 {
     const gui_theme_def_t *def = gui_theme_get(theme);
     lv_color_t bg_color;
+    lv_color_t grad_color;
     lv_color_t text_color;
     lv_color_t border_color;
 
@@ -644,11 +646,11 @@ static void gui_view_style_nav_button(lv_obj_t *button, gui_view_theme_t theme, 
     }
 
     bg_color = lv_color_hex(is_active ? def->nav_active_bg : def->nav_inactive_bg);
+    grad_color = lv_color_hex(is_active ? def->nav_active_grad : def->nav_inactive_grad);
     text_color = lv_color_hex(is_active ? def->nav_active_text : def->nav_inactive_text);
     border_color = lv_color_hex(is_active ? def->nav_active_border : def->nav_inactive_border);
 
-    lv_obj_set_style_bg_color(button, bg_color, 0);
-    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(button, bg_color, grad_color, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(button, border_color, 0);
     lv_obj_set_style_border_width(button, 1, 0);
     lv_obj_set_style_text_color(button, text_color, 0);
@@ -660,6 +662,7 @@ static void gui_view_style_action_button(lv_obj_t *button, gui_view_theme_t them
 {
     const gui_theme_def_t *def = gui_theme_get(theme);
     lv_color_t bg_color;
+    lv_color_t grad_color;
     lv_color_t text_color;
     lv_color_t border_color;
 
@@ -668,12 +671,13 @@ static void gui_view_style_action_button(lv_obj_t *button, gui_view_theme_t them
     }
 
     bg_color = lv_color_hex(is_primary ? def->action_primary_bg : def->action_secondary_bg);
+    grad_color = lv_color_hex(is_primary ? def->action_primary_grad
+                                         : def->action_secondary_grad);
     text_color = lv_color_hex(is_primary ? def->action_primary_text : def->action_secondary_text);
     border_color = lv_color_hex(is_primary ? def->action_primary_border
                                            : def->action_secondary_border);
 
-    lv_obj_set_style_bg_color(button, bg_color, 0);
-    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(button, bg_color, grad_color, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(button, border_color, 0);
     lv_obj_set_style_border_width(button, is_primary ? 0 : 1, 0);
     lv_obj_set_style_text_color(button, text_color, 0);
@@ -710,34 +714,47 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_opa_t sidebar_bg_opa;
     lv_color_t brand_text;
     lv_color_t content_bg;
+    lv_color_t content_grad;
     lv_color_t content_shadow;
     lv_opa_t content_bg_opa;
     lv_color_t title_text;
     lv_color_t subtitle_text;
     lv_color_t panel_bg;
+    lv_color_t panel_grad;
     lv_color_t panel_border;
     lv_opa_t panel_bg_opa;
     lv_color_t card_bg;
+    lv_color_t card_grad;
     lv_color_t card_border;
     lv_color_t item_bg;
+    lv_color_t item_grad;
     lv_color_t item_border;
     lv_color_t muted_text;
     lv_color_t keyboard_bg;
+    lv_color_t keyboard_bg_grad;
     lv_color_t keyboard_border;
     lv_color_t keyboard_key_bg;
+    lv_color_t keyboard_key_grad;
     lv_color_t keyboard_key_text;
     lv_color_t keyboard_special_bg;
+    lv_color_t keyboard_special_grad;
     lv_color_t keyboard_special_text;
     lv_color_t keyboard_special_border;
     lv_color_t slider_bg;
+    lv_color_t slider_grad;
     lv_color_t slider_knob_bg;
+    lv_color_t slider_knob_grad;
     lv_color_t dropdown_bg;
+    lv_color_t dropdown_grad;
     lv_color_t dropdown_border;
     lv_color_t dropdown_selected_bg;
+    lv_color_t dropdown_selected_grad;
     lv_color_t dropdown_selected_text;
     lv_color_t accent_color;
+    lv_color_t accent_grad;
     lv_color_t accent_soft_color;
     lv_color_t energy_chart_bg;
+    lv_color_t energy_chart_grad;
     lv_color_t energy_chart_grid;
     lv_color_t energy_chart_tick;
     lv_color_t energy_buy_color;
@@ -784,40 +801,53 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         brand_text     = lv_color_hex(def->accent_color);
 
         content_bg     = lv_color_hex(def->content_bg);
+        content_grad   = lv_color_hex(def->content_grad);
         content_shadow = lv_color_hex(def->content_shadow);
         content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_90;
 
         title_text    = lv_color_hex(def->title_text);
         subtitle_text = lv_color_hex(def->subtitle_text);
-        panel_bg      = lv_color_hex(def->panel_bg);
-        panel_border  = lv_color_hex(def->panel_border);
-        panel_bg_opa  = LV_OPA_COVER;
-        card_bg       = lv_color_hex(def->card_bg);
-        card_border   = lv_color_hex(def->card_border);
-        item_bg       = lv_color_hex(def->item_bg);
-        item_border   = lv_color_hex(def->item_border);
-        muted_text    = lv_color_hex(def->muted_text);
+        panel_bg     = lv_color_hex(def->panel_bg);
+        panel_grad   = lv_color_hex(def->panel_grad);
+        panel_border = lv_color_hex(def->panel_border);
+        panel_bg_opa = LV_OPA_COVER;
+        card_bg      = lv_color_hex(def->card_bg);
+        card_grad    = lv_color_hex(def->card_grad);
+        card_border  = lv_color_hex(def->card_border);
+        item_bg      = lv_color_hex(def->item_bg);
+        item_grad    = lv_color_hex(def->item_grad);
+        item_border  = lv_color_hex(def->item_border);
+        muted_text   = lv_color_hex(def->muted_text);
 
         keyboard_bg             = lv_color_hex(def->keyboard_bg);
+        keyboard_bg_grad        = lv_color_hex(def->keyboard_bg_grad);
         keyboard_border         = lv_color_hex(def->keyboard_border);
         keyboard_key_bg         = lv_color_hex(def->keyboard_key_bg);
+        keyboard_key_grad       = lv_color_hex(def->keyboard_key_grad);
         keyboard_key_text       = lv_color_hex(def->keyboard_key_text);
         keyboard_special_bg     = lv_color_hex(def->keyboard_special_bg);
+        keyboard_special_grad   = lv_color_hex(def->keyboard_special_grad);
         keyboard_special_text   = lv_color_hex(def->keyboard_special_text);
         keyboard_special_border = lv_color_hex(def->keyboard_special_border);
 
-        slider_bg      = lv_color_hex(def->slider_bg);
-        slider_knob_bg = lv_color_hex(def->slider_knob_bg);
+        slider_bg        = lv_color_hex(def->slider_bg);
+        slider_grad      = lv_color_hex(def->slider_grad);
+        slider_knob_bg   = lv_color_hex(def->slider_knob_bg);
+        slider_knob_grad = lv_color_hex(def->slider_knob_grad);
 
         dropdown_bg            = lv_color_hex(def->dropdown_bg);
+        dropdown_grad          = lv_color_hex(def->dropdown_grad);
         dropdown_border        = lv_color_hex(def->dropdown_border);
         dropdown_selected_bg   = lv_color_hex(def->dropdown_selected_bg);
+        dropdown_selected_grad = lv_color_hex(def->dropdown_selected_grad);
         dropdown_selected_text = lv_color_hex(def->dropdown_selected_text);
 
         accent_color      = lv_color_hex(def->accent_color);
+        accent_grad       = lv_color_hex(def->accent_grad);
         accent_soft_color = lv_color_hex(def->accent_soft_color);
 
         energy_chart_bg     = lv_color_hex(def->energy_chart_bg);
+        energy_chart_grad   = lv_color_hex(def->energy_chart_grad);
         energy_chart_grid   = lv_color_hex(def->energy_chart_grid);
         energy_chart_tick   = lv_color_hex(def->energy_chart_tick);
         energy_buy_color    = lv_color_hex(def->energy_buy_color);
@@ -843,15 +873,9 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_move_background(view->background_image);
     }
 
-    lv_obj_set_style_bg_color(view->screen, screen_bg, 0);
-    lv_obj_set_style_bg_grad_color(view->screen, screen_grad, 0);
-    lv_obj_set_style_bg_grad_dir(view->screen, LV_GRAD_DIR_VER, 0);
-    lv_obj_set_style_bg_opa(view->screen, screen_bg_opa, 0);
+    gui_view_apply_bg_gradient(view->screen, screen_bg, screen_grad, screen_bg_opa, 0);
 
-    lv_obj_set_style_bg_color(view->sidebar, sidebar_bg, 0);
-    lv_obj_set_style_bg_grad_color(view->sidebar, sidebar_grad, 0);
-    lv_obj_set_style_bg_grad_dir(view->sidebar, LV_GRAD_DIR_VER, 0);
-    lv_obj_set_style_bg_opa(view->sidebar, sidebar_bg_opa, 0);
+    gui_view_apply_bg_gradient(view->sidebar, sidebar_bg, sidebar_grad, sidebar_bg_opa, 0);
     lv_obj_set_style_border_opa(view->sidebar,
                                 use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
     lv_obj_set_style_shadow_width(view->sidebar, use_background_image ? 0 : 8, 0);
@@ -864,8 +888,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_font(brand, emphasis_font, 0);
     }
 
-    lv_obj_set_style_bg_color(view->content, content_bg, 0);
-    lv_obj_set_style_bg_opa(view->content, content_bg_opa, 0);
+    gui_view_apply_bg_gradient(view->content, content_bg, content_grad, content_bg_opa, 0);
     lv_obj_set_style_border_opa(view->content,
                                 use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
     lv_obj_set_style_shadow_width(view->content, use_background_image ? 0 : 10, 0);
@@ -877,17 +900,16 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     lv_obj_set_style_text_font(view->header_title, body_font, 0);
     lv_obj_set_style_text_font(view->header_subtitle, body_font, 0);
 
-    lv_obj_set_style_bg_color(view->bme280_panel, panel_bg, 0);
-    lv_obj_set_style_bg_opa(view->bme280_panel, panel_bg_opa, 0);
+    gui_view_apply_bg_gradient(view->bme280_panel, panel_bg, panel_grad, panel_bg_opa, 0);
     lv_obj_set_style_border_color(view->bme280_panel, panel_border, 0);
     lv_obj_set_style_text_font(view->bme280_panel, body_font, 0);
-    gui_view_style_bme280_cards(view, card_bg, card_border, subtitle_text, accent_color,
+    gui_view_style_bme280_cards(view, card_bg, card_grad, card_border, subtitle_text, accent_color,
                                 effective_theme);
 
-    lv_obj_set_style_bg_color(view->energy_plan_panel, panel_bg, 0);
-    lv_obj_set_style_bg_opa(view->energy_plan_panel, panel_bg_opa, 0);
+    gui_view_apply_bg_gradient(view->energy_plan_panel, panel_bg, panel_grad, panel_bg_opa, 0);
     lv_obj_set_style_border_color(view->energy_plan_panel, panel_border, 0);
-    lv_obj_set_style_bg_color(view->energy_plan_chart, energy_chart_bg, 0);
+    gui_view_apply_bg_gradient(view->energy_plan_chart, energy_chart_bg, energy_chart_grad,
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(view->energy_plan_chart, panel_border, 0);
     lv_obj_set_style_line_color(view->energy_plan_chart, energy_chart_grid, LV_PART_MAIN);
     lv_obj_set_style_line_opa(view->energy_plan_chart, LV_OPA_COVER, LV_PART_MAIN);
@@ -926,35 +948,35 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     gui_view_style_energy_labels(view->energy_plan_panel, subtitle_text, effective_theme);
     //gui_view_style_energy_legend_labels(view, accent_soft_color);
     gui_view_style_energy_legend_labels(view, subtitle_text);
-    gui_view_style_energy_action_widgets(view, card_bg, card_border, title_text,
+    gui_view_style_energy_action_widgets(view, card_bg, card_grad, card_border, title_text,
                                          subtitle_text, accent_color, panel_border,
                                          effective_theme);
 
-    gui_view_style_forecast_panel(view, panel_bg, panel_border, panel_bg_opa, card_bg,
-                                  card_border, title_text, subtitle_text, accent_color,
-                                  effective_theme);
+    gui_view_style_forecast_panel(view, panel_bg, panel_grad, panel_border, panel_bg_opa,
+                                  card_bg, card_grad, card_border, title_text, subtitle_text,
+                                  accent_color, effective_theme);
     gui_view_style_update_label(view->update_label, muted_text, body_font);
 
-    gui_view_style_settings_card(view->other_settings_card, card_bg, card_border, title_text,
-                                 subtitle_text, effective_theme);
-    gui_view_style_settings_card(view->settings_connectivity_button, card_bg, card_border,
+    gui_view_style_settings_card(view->other_settings_card, card_bg, card_grad, card_border,
                                  title_text, subtitle_text, effective_theme);
-    gui_view_style_settings_card(view->settings_display_button, card_bg, card_border,
+    gui_view_style_settings_card(view->settings_connectivity_button, card_bg, card_grad,
+                                 card_border, title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->settings_display_button, card_bg, card_grad, card_border,
                                  title_text, subtitle_text, effective_theme);
-    gui_view_style_settings_card(view->settings_system_button, card_bg, card_border,
+    gui_view_style_settings_card(view->settings_system_button, card_bg, card_grad, card_border,
                                  title_text, subtitle_text, effective_theme);
-    gui_view_style_wifi_card(view, item_bg, item_border, title_text, subtitle_text,
+    gui_view_style_wifi_card(view, item_bg, item_grad, item_border, title_text, subtitle_text,
                              effective_theme);
-    gui_view_style_settings_card(view->bluetooth_card, item_bg, item_border, title_text,
-                                 subtitle_text, effective_theme);
-    gui_view_style_settings_card(view->brightness_card, item_bg, item_border, title_text,
-                                 subtitle_text, effective_theme);
-    gui_view_style_settings_card(view->theme_card, item_bg, item_border, title_text,
-                                 subtitle_text, effective_theme);
-    gui_view_style_settings_card(view->location_card, item_bg, item_border, title_text,
-                                 subtitle_text, effective_theme);
-    gui_view_style_settings_card(view->reset_card, item_bg, item_border, title_text,
-                                 subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->bluetooth_card, item_bg, item_grad, item_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->brightness_card, item_bg, item_grad, item_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->theme_card, item_bg, item_grad, item_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->location_card, item_bg, item_grad, item_border,
+                                 title_text, subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->reset_card, item_bg, item_grad, item_border,
+                                 title_text, subtitle_text, effective_theme);
     if (view->wifi_status_label != NULL) {
         gui_wifi_state_t wifi_state = view->has_last_wifi_settings
                                       ? view->last_wifi_settings.state
@@ -975,35 +997,39 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_font(view->brightness_value_label, emphasis_font, 0);
     }
     if (view->brightness_slider != NULL) {
-        lv_obj_set_style_bg_color(view->brightness_slider, slider_bg, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(view->brightness_slider, accent_color, LV_PART_INDICATOR);
-        lv_obj_set_style_bg_color(view->brightness_slider, slider_knob_bg, LV_PART_KNOB);
+        gui_view_apply_bg_gradient(view->brightness_slider, slider_bg, slider_grad,
+                                   LV_OPA_COVER, LV_PART_MAIN);
+        gui_view_apply_bg_gradient(view->brightness_slider, accent_color, accent_grad,
+                                   LV_OPA_COVER, LV_PART_INDICATOR);
+        gui_view_apply_bg_gradient(view->brightness_slider, slider_knob_bg, slider_knob_grad,
+                                   LV_OPA_COVER, LV_PART_KNOB);
         lv_obj_set_style_border_color(view->brightness_slider, accent_color, LV_PART_KNOB);
     }
 
     if (view->theme_dropdown != NULL) {
-        lv_obj_set_style_bg_color(view->theme_dropdown, dropdown_bg, 0);
-        lv_obj_set_style_bg_opa(view->theme_dropdown, LV_OPA_COVER, 0);
+        gui_view_apply_bg_gradient(view->theme_dropdown, dropdown_bg, dropdown_grad,
+                                   LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(view->theme_dropdown, dropdown_border, 0);
         lv_obj_set_style_border_width(view->theme_dropdown, 1, 0);
         lv_obj_set_style_text_color(view->theme_dropdown, title_text, 0);
         lv_obj_set_style_text_font(view->theme_dropdown, body_font, 0);
         dropdown_list = lv_dropdown_get_list(view->theme_dropdown);
         if (dropdown_list != NULL) {
-            lv_obj_set_style_bg_color(dropdown_list, dropdown_bg, 0);
-            lv_obj_set_style_bg_opa(dropdown_list, LV_OPA_COVER, 0);
+            gui_view_apply_bg_gradient(dropdown_list, dropdown_bg, dropdown_grad,
+                                       LV_OPA_COVER, 0);
             lv_obj_set_style_border_color(dropdown_list, dropdown_border, 0);
             lv_obj_set_style_text_color(dropdown_list, title_text, 0);
             lv_obj_set_style_text_font(dropdown_list, body_font, 0);
-            lv_obj_set_style_bg_color(dropdown_list, dropdown_selected_bg,
-                                      LV_PART_SELECTED | LV_STATE_CHECKED);
-            lv_obj_set_style_bg_opa(dropdown_list, LV_OPA_COVER,
-                                    LV_PART_SELECTED | LV_STATE_CHECKED);
+            gui_view_apply_bg_gradient(dropdown_list, dropdown_selected_bg,
+                                       dropdown_selected_grad, LV_OPA_COVER,
+                                       LV_PART_SELECTED | LV_STATE_CHECKED);
             lv_obj_set_style_text_color(dropdown_list, dropdown_selected_text,
                                         LV_PART_SELECTED | LV_STATE_CHECKED);
             lv_obj_set_style_text_font(dropdown_list, body_font,
                                        LV_PART_SELECTED | LV_STATE_CHECKED);
-            lv_obj_set_style_bg_color(dropdown_list, dropdown_selected_bg, LV_PART_SELECTED);
+            gui_view_apply_bg_gradient(dropdown_list, dropdown_selected_bg,
+                                       dropdown_selected_grad, LV_OPA_COVER,
+                                       LV_PART_SELECTED);
             lv_obj_set_style_text_color(dropdown_list, dropdown_selected_text,
                                         LV_PART_SELECTED);
             lv_obj_set_style_text_font(dropdown_list, body_font, LV_PART_SELECTED);
@@ -1038,52 +1064,44 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     }
 
     if (view->theme_background_switch != NULL) {
-        lv_obj_set_style_bg_color(view->theme_background_switch, slider_bg, LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_MAIN);
+        gui_view_apply_bg_gradient(view->theme_background_switch, slider_bg, slider_grad,
+                                   LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_color(view->theme_background_switch, dropdown_border,
                                       LV_PART_MAIN);
         lv_obj_set_style_border_width(view->theme_background_switch, 1, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(view->theme_background_switch, slider_bg,
-                                  LV_PART_INDICATOR);
-        lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER,
-                                LV_PART_INDICATOR);
-        lv_obj_set_style_bg_color(view->theme_background_switch, accent_color,
-                                  LV_PART_INDICATOR | LV_STATE_CHECKED);
-        lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER,
-                                LV_PART_INDICATOR | LV_STATE_CHECKED);
+        gui_view_apply_bg_gradient(view->theme_background_switch, slider_bg, slider_grad,
+                                   LV_OPA_COVER, LV_PART_INDICATOR);
+        gui_view_apply_bg_gradient(view->theme_background_switch, accent_color, accent_grad,
+                                   LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_CHECKED);
         lv_obj_set_style_border_width(view->theme_background_switch, 0,
                                       LV_PART_INDICATOR | LV_STATE_CHECKED);
-        lv_obj_set_style_bg_color(view->theme_background_switch, slider_knob_bg, LV_PART_KNOB);
-        lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_KNOB);
+        gui_view_apply_bg_gradient(view->theme_background_switch, slider_knob_bg,
+                                   slider_knob_grad, LV_OPA_COVER, LV_PART_KNOB);
         lv_obj_set_style_border_width(view->theme_background_switch, 0, LV_PART_KNOB);
     }
 
     if (view->theme_night_switch != NULL) {
-        lv_obj_set_style_bg_color(view->theme_night_switch, slider_bg, LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_MAIN);
+        gui_view_apply_bg_gradient(view->theme_night_switch, slider_bg, slider_grad,
+                                   LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_color(view->theme_night_switch, dropdown_border, LV_PART_MAIN);
         lv_obj_set_style_border_width(view->theme_night_switch, 1, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(view->theme_night_switch, slider_bg, LV_PART_INDICATOR);
-        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_INDICATOR);
-        lv_obj_set_style_bg_color(view->theme_night_switch, accent_color,
-                                  LV_PART_INDICATOR | LV_STATE_CHECKED);
-        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
-                                LV_PART_INDICATOR | LV_STATE_CHECKED);
+        gui_view_apply_bg_gradient(view->theme_night_switch, slider_bg, slider_grad,
+                                   LV_OPA_COVER, LV_PART_INDICATOR);
+        gui_view_apply_bg_gradient(view->theme_night_switch, accent_color, accent_grad,
+                                   LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_CHECKED);
         lv_obj_set_style_border_width(view->theme_night_switch, 0,
                                       LV_PART_INDICATOR | LV_STATE_CHECKED);
-        lv_obj_set_style_bg_color(view->theme_night_switch, slider_knob_bg, LV_PART_KNOB);
-        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_KNOB);
+        gui_view_apply_bg_gradient(view->theme_night_switch, slider_knob_bg,
+                                   slider_knob_grad, LV_OPA_COVER, LV_PART_KNOB);
         lv_obj_set_style_border_width(view->theme_night_switch, 0, LV_PART_KNOB);
-        lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0x6B7280),
-                                  LV_PART_MAIN | LV_STATE_DISABLED);
-        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
-                                LV_PART_MAIN | LV_STATE_DISABLED);
+        gui_view_apply_bg_gradient(view->theme_night_switch, lv_color_hex(0x6B7280),
+                                   lv_color_hex(0x9CA3AF), LV_OPA_COVER,
+                                   LV_PART_MAIN | LV_STATE_DISABLED);
         lv_obj_set_style_border_color(view->theme_night_switch, lv_color_hex(0x6B7280),
                                       LV_PART_MAIN | LV_STATE_DISABLED);
-        lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0x9CA3AF),
-                                  LV_PART_INDICATOR | LV_STATE_DISABLED);
-        lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
-                                LV_PART_INDICATOR | LV_STATE_DISABLED);
+        gui_view_apply_bg_gradient(view->theme_night_switch, lv_color_hex(0x9CA3AF),
+                                   lv_color_hex(0xD1D5DB), LV_OPA_COVER,
+                                   LV_PART_INDICATOR | LV_STATE_DISABLED);
     }
 
     gui_view_style_action_button(view->scan_button, effective_theme, true);
@@ -1097,8 +1115,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     gui_view_style_action_button(view->password_dialog_disconnect_button, effective_theme, false);
     gui_view_style_action_button(view->reset_button, effective_theme, true);
 
-    lv_obj_set_style_bg_color(view->network_dialog, panel_bg, 0);
-    lv_obj_set_style_bg_opa(view->network_dialog, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->network_dialog, panel_bg, panel_grad, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->network_dialog,
                                   (gui_theme_get(effective_theme) != NULL &&
                                    gui_theme_get(effective_theme)->dialog_has_border) ? 1 : 0,
@@ -1122,8 +1139,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         }
     }
 
-    lv_obj_set_style_bg_color(view->password_dialog, panel_bg, 0);
-    lv_obj_set_style_bg_opa(view->password_dialog, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->password_dialog, panel_bg, panel_grad, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->password_dialog,
                                   (gui_theme_get(effective_theme) != NULL &&
                                    gui_theme_get(effective_theme)->dialog_has_border) ? 1 : 0,
@@ -1138,8 +1154,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_font(view->password_dialog_network_label, body_font, 0);
     }
 
-    lv_obj_set_style_bg_color(view->wifi_password_textarea, dropdown_bg, 0);
-    lv_obj_set_style_bg_opa(view->wifi_password_textarea, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->wifi_password_textarea, dropdown_bg, dropdown_grad,
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(view->wifi_password_textarea, dropdown_border, 0);
     lv_obj_set_style_text_color(view->wifi_password_textarea, title_text, 0);
     lv_obj_set_style_text_color(view->wifi_password_textarea, subtitle_text,
@@ -1149,8 +1165,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                 LV_PART_TEXTAREA_PLACEHOLDER);
 
     if (view->location_latitude_textarea != NULL) {
-        lv_obj_set_style_bg_color(view->location_latitude_textarea, dropdown_bg, 0);
-        lv_obj_set_style_bg_opa(view->location_latitude_textarea, LV_OPA_COVER, 0);
+        gui_view_apply_bg_gradient(view->location_latitude_textarea, dropdown_bg,
+                                   dropdown_grad, LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(view->location_latitude_textarea, dropdown_border, 0);
         lv_obj_set_style_text_color(view->location_latitude_textarea, title_text, 0);
         lv_obj_set_style_text_color(view->location_latitude_textarea, subtitle_text,
@@ -1160,8 +1176,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                    LV_PART_TEXTAREA_PLACEHOLDER);
     }
     if (view->location_longitude_textarea != NULL) {
-        lv_obj_set_style_bg_color(view->location_longitude_textarea, dropdown_bg, 0);
-        lv_obj_set_style_bg_opa(view->location_longitude_textarea, LV_OPA_COVER, 0);
+        gui_view_apply_bg_gradient(view->location_longitude_textarea, dropdown_bg,
+                                   dropdown_grad, LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(view->location_longitude_textarea, dropdown_border, 0);
         lv_obj_set_style_text_color(view->location_longitude_textarea, title_text, 0);
         lv_obj_set_style_text_color(view->location_longitude_textarea, subtitle_text,
@@ -1171,37 +1187,34 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                    LV_PART_TEXTAREA_PLACEHOLDER);
     }
 
-    lv_obj_set_style_bg_color(view->wifi_keyboard, keyboard_bg, 0);
-    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->wifi_keyboard, keyboard_bg, keyboard_bg_grad,
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(view->wifi_keyboard, keyboard_border, 0);
-    lv_obj_set_style_bg_color(view->wifi_keyboard, keyboard_key_bg, LV_PART_ITEMS);
-    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER, LV_PART_ITEMS);
+    gui_view_apply_bg_gradient(view->wifi_keyboard, keyboard_key_bg, keyboard_key_grad,
+                               LV_OPA_COVER, LV_PART_ITEMS);
     lv_obj_set_style_border_color(view->wifi_keyboard, keyboard_border, LV_PART_ITEMS);
     lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_key_text, LV_PART_ITEMS);
     lv_obj_set_style_text_font(view->wifi_keyboard, emphasis_font, LV_PART_ITEMS);
-    lv_obj_set_style_bg_color(view->wifi_keyboard,
-                              lv_color_darken(keyboard_key_bg, LV_OPA_40),
-                              LV_PART_ITEMS | LV_STATE_PRESSED);
-    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER,
-                            LV_PART_ITEMS | LV_STATE_PRESSED);
+    gui_view_apply_bg_gradient(view->wifi_keyboard, lv_color_darken(keyboard_key_bg, LV_OPA_40),
+                               lv_color_darken(keyboard_key_grad, LV_OPA_40),
+                               LV_OPA_COVER, LV_PART_ITEMS | LV_STATE_PRESSED);
     lv_obj_set_style_border_color(view->wifi_keyboard,
                                   lv_color_darken(keyboard_border, LV_OPA_40),
                                   LV_PART_ITEMS | LV_STATE_PRESSED);
     lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_key_text,
                                 LV_PART_ITEMS | LV_STATE_PRESSED);
-    lv_obj_set_style_bg_color(view->wifi_keyboard, keyboard_special_bg,
-                              LV_PART_ITEMS | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER,
-                            LV_PART_ITEMS | LV_STATE_CHECKED);
+    gui_view_apply_bg_gradient(view->wifi_keyboard, keyboard_special_bg,
+                               keyboard_special_grad, LV_OPA_COVER,
+                               LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_obj_set_style_border_color(view->wifi_keyboard, keyboard_special_border,
                                   LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_obj_set_style_text_color(view->wifi_keyboard, keyboard_special_text,
                                 LV_PART_ITEMS | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_color(view->wifi_keyboard,
-                              lv_color_darken(keyboard_special_bg, LV_OPA_40),
-                              LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER,
-                            LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+    gui_view_apply_bg_gradient(view->wifi_keyboard,
+                               lv_color_darken(keyboard_special_bg, LV_OPA_40),
+                               lv_color_darken(keyboard_special_grad, LV_OPA_40),
+                               LV_OPA_COVER,
+                               LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
     lv_obj_set_style_border_color(view->wifi_keyboard,
                                   lv_color_darken(keyboard_special_border, LV_OPA_40),
                                   LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
@@ -1209,37 +1222,35 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                 LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
 
     if (view->location_keyboard != NULL) {
-        lv_obj_set_style_bg_color(view->location_keyboard, keyboard_bg, 0);
-        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER, 0);
+        gui_view_apply_bg_gradient(view->location_keyboard, keyboard_bg, keyboard_bg_grad,
+                                   LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(view->location_keyboard, keyboard_border, 0);
-        lv_obj_set_style_bg_color(view->location_keyboard, keyboard_key_bg, LV_PART_ITEMS);
-        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER, LV_PART_ITEMS);
+        gui_view_apply_bg_gradient(view->location_keyboard, keyboard_key_bg, keyboard_key_grad,
+                                   LV_OPA_COVER, LV_PART_ITEMS);
         lv_obj_set_style_border_color(view->location_keyboard, keyboard_border, LV_PART_ITEMS);
         lv_obj_set_style_text_color(view->location_keyboard, keyboard_key_text, LV_PART_ITEMS);
         lv_obj_set_style_text_font(view->location_keyboard, emphasis_font, LV_PART_ITEMS);
-        lv_obj_set_style_bg_color(view->location_keyboard,
-                                  lv_color_darken(keyboard_key_bg, LV_OPA_40),
-                                  LV_PART_ITEMS | LV_STATE_PRESSED);
-        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER,
-                                LV_PART_ITEMS | LV_STATE_PRESSED);
+        gui_view_apply_bg_gradient(view->location_keyboard,
+                                   lv_color_darken(keyboard_key_bg, LV_OPA_40),
+                                   lv_color_darken(keyboard_key_grad, LV_OPA_40),
+                                   LV_OPA_COVER, LV_PART_ITEMS | LV_STATE_PRESSED);
         lv_obj_set_style_border_color(view->location_keyboard,
                                       lv_color_darken(keyboard_border, LV_OPA_40),
                                       LV_PART_ITEMS | LV_STATE_PRESSED);
         lv_obj_set_style_text_color(view->location_keyboard, keyboard_key_text,
                                     LV_PART_ITEMS | LV_STATE_PRESSED);
-        lv_obj_set_style_bg_color(view->location_keyboard, keyboard_special_bg,
-                                  LV_PART_ITEMS | LV_STATE_CHECKED);
-        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER,
-                                LV_PART_ITEMS | LV_STATE_CHECKED);
+        gui_view_apply_bg_gradient(view->location_keyboard, keyboard_special_bg,
+                                   keyboard_special_grad, LV_OPA_COVER,
+                                   LV_PART_ITEMS | LV_STATE_CHECKED);
         lv_obj_set_style_border_color(view->location_keyboard, keyboard_special_border,
                                       LV_PART_ITEMS | LV_STATE_CHECKED);
         lv_obj_set_style_text_color(view->location_keyboard, keyboard_special_text,
                                     LV_PART_ITEMS | LV_STATE_CHECKED);
-        lv_obj_set_style_bg_color(view->location_keyboard,
-                                  lv_color_darken(keyboard_special_bg, LV_OPA_40),
-                                  LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
-        lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER,
-                                LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
+        gui_view_apply_bg_gradient(view->location_keyboard,
+                                   lv_color_darken(keyboard_special_bg, LV_OPA_40),
+                                   lv_color_darken(keyboard_special_grad, LV_OPA_40),
+                                   LV_OPA_COVER,
+                                   LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
         lv_obj_set_style_border_color(view->location_keyboard,
                                       lv_color_darken(keyboard_special_border, LV_OPA_40),
                                       LV_PART_ITEMS | LV_STATE_PRESSED | LV_STATE_CHECKED);
@@ -1308,10 +1319,8 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     view->screen = lv_scr_act();
     lv_obj_clean(view->screen);
     lv_obj_clear_flag(view->screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(view->screen, lv_color_hex(0xDCE8F5), 0);
-    lv_obj_set_style_bg_grad_color(view->screen, lv_color_hex(0xF5F9FF), 0);
-    lv_obj_set_style_bg_grad_dir(view->screen, LV_GRAD_DIR_VER, 0);
-    lv_obj_set_style_bg_opa(view->screen, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->screen, lv_color_hex(0xDCE8F5),
+                               lv_color_hex(0xF5F9FF), LV_OPA_COVER, 0);
 
     view->background_image = lv_img_create(view->screen);
     {
@@ -1329,9 +1338,8 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_obj_set_size(sidebar, 188, 560);
     lv_obj_align(sidebar, LV_ALIGN_LEFT_MID, 18, 0);
     lv_obj_set_style_radius(sidebar, 28, 0);
-    lv_obj_set_style_bg_color(sidebar, lv_color_hex(0x111827), 0);
-    lv_obj_set_style_bg_grad_color(sidebar, lv_color_hex(0x1E293B), 0);
-    lv_obj_set_style_bg_grad_dir(sidebar, LV_GRAD_DIR_VER, 0);
+    gui_view_apply_bg_gradient(sidebar, lv_color_hex(0x111827),
+                               lv_color_hex(0x1E293B), LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(sidebar, 0, 0);
     lv_obj_set_style_shadow_width(sidebar, 8, 0);
     lv_obj_set_style_shadow_color(sidebar, lv_color_hex(0x94A3B8), 0);
@@ -1403,8 +1411,8 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
     lv_obj_set_size(content, 786, 560);
     lv_obj_align(content, LV_ALIGN_RIGHT_MID, -18, 0);
     lv_obj_set_style_radius(content, 32, 0);
-    lv_obj_set_style_bg_color(content, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(content, LV_OPA_90, 0);
+    gui_view_apply_bg_gradient(content, lv_color_hex(0xFFFFFF),
+                               lv_color_hex(0xF8FBFF), LV_OPA_90, 0);
     lv_obj_set_style_border_width(content, 0, 0);
     lv_obj_set_style_shadow_width(content, 10, 0);
     lv_obj_set_style_shadow_color(content, lv_color_hex(0xB8C7DB), 0);

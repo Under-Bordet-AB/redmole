@@ -59,6 +59,7 @@ typedef struct {
 
     /* Content area */
     uint32_t content_bg;
+    uint32_t content_grad;
     uint32_t content_shadow;
 
     /* Typography */
@@ -69,37 +70,49 @@ typedef struct {
 
     /* Panels and cards */
     uint32_t panel_bg;
+    uint32_t panel_grad;
     uint32_t panel_border;
     uint32_t card_bg;
+    uint32_t card_grad;
     uint32_t card_border;
     uint32_t item_bg;
+    uint32_t item_grad;
     uint32_t item_border;
 
     /* Accents */
     uint32_t accent_color;
+    uint32_t accent_grad;
     uint32_t accent_soft_color;
 
     /* Keyboard */
     uint32_t keyboard_bg;
+    uint32_t keyboard_bg_grad;
     uint32_t keyboard_border;
     uint32_t keyboard_key_bg;
+    uint32_t keyboard_key_grad;
     uint32_t keyboard_key_text;
     uint32_t keyboard_special_bg;
+    uint32_t keyboard_special_grad;
     uint32_t keyboard_special_text;
     uint32_t keyboard_special_border;
 
     /* Slider and toggle switches */
     uint32_t slider_bg;
+    uint32_t slider_grad;
     uint32_t slider_knob_bg;
+    uint32_t slider_knob_grad;
 
     /* Dropdowns */
     uint32_t dropdown_bg;
+    uint32_t dropdown_grad;
     uint32_t dropdown_border;
     uint32_t dropdown_selected_bg;
+    uint32_t dropdown_selected_grad;
     uint32_t dropdown_selected_text;
 
     /* Energy chart */
     uint32_t energy_chart_bg;
+    uint32_t energy_chart_grad;
     uint32_t energy_chart_grid;
     uint32_t energy_chart_tick;
     uint32_t energy_buy_color;
@@ -113,31 +126,39 @@ typedef struct {
 
     /* Navigation sidebar buttons */
     uint32_t nav_active_bg;
+    uint32_t nav_active_grad;
     uint32_t nav_active_text;
     uint32_t nav_active_border;
     uint32_t nav_inactive_bg;
+    uint32_t nav_inactive_grad;
     uint32_t nav_inactive_text;
     uint32_t nav_inactive_border;
 
     /* Primary / secondary action buttons */
     uint32_t action_primary_bg;
+    uint32_t action_primary_grad;
     uint32_t action_primary_text;
     uint32_t action_primary_border;
     uint32_t action_secondary_bg;
+    uint32_t action_secondary_grad;
     uint32_t action_secondary_text;
     uint32_t action_secondary_border;
 
     /* Scanned WiFi network list buttons */
     uint32_t wifi_btn_bg;
+    uint32_t wifi_btn_grad;
     uint32_t wifi_btn_border;
     uint32_t wifi_btn_text;
     uint32_t wifi_btn_connected_bg;
+    uint32_t wifi_btn_connected_grad;
     uint32_t wifi_btn_connected_border;
     uint32_t wifi_btn_connected_text;
     uint32_t wifi_btn_known_bg;
+    uint32_t wifi_btn_known_grad;
     uint32_t wifi_btn_known_border;
     uint32_t wifi_btn_known_text;
     uint32_t wifi_btn_selected_bg;
+    uint32_t wifi_btn_selected_grad;
     uint32_t wifi_btn_selected_border;
     uint32_t wifi_btn_selected_text;
 } gui_theme_def_t;

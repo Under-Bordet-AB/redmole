@@ -364,8 +364,8 @@ static lv_obj_t *gui_view_create_forecast_day_card(lv_obj_t *parent, const char 
 
     lv_obj_set_size(card, 130, LV_PCT(100));
     lv_obj_set_style_radius(card, 18, 0);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(card, lv_color_hex(0xFFFFFF), lv_color_hex(0xF8FBFF),
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(card, 1, 0);
     lv_obj_set_style_border_color(card, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_shadow_width(card, 0, 0);
@@ -432,8 +432,8 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_size(view->forecast_panel, 746, 432);
     lv_obj_align(view->forecast_panel, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_radius(view->forecast_panel, 26, 0);
-    lv_obj_set_style_bg_color(view->forecast_panel, lv_color_hex(0xF8FBFF), 0);
-    lv_obj_set_style_bg_opa(view->forecast_panel, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->forecast_panel, lv_color_hex(0xF8FBFF),
+                               lv_color_hex(0xFDFEFF), LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->forecast_panel, 1, 0);
     lv_obj_set_style_border_color(view->forecast_panel, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_pad_all(view->forecast_panel, 24, 0);
@@ -460,8 +460,8 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     today_card = lv_obj_create(top_row);
     lv_obj_set_size(today_card, 0, LV_PCT(100));
     lv_obj_set_style_radius(today_card, 22, 0);
-    lv_obj_set_style_bg_color(today_card, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(today_card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(today_card, lv_color_hex(0xFFFFFF), lv_color_hex(0xF8FBFF),
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(today_card, 1, 0);
     lv_obj_set_style_border_color(today_card, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_shadow_width(today_card, 0, 0);
@@ -518,8 +518,8 @@ void gui_view_init_forecast_panel(gui_view_t *view, lv_obj_t *content)
     details_card = lv_obj_create(top_row);
     lv_obj_set_size(details_card, 0, LV_PCT(100));
     lv_obj_set_style_radius(details_card, 22, 0);
-    lv_obj_set_style_bg_color(details_card, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(details_card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(details_card, lv_color_hex(0xFFFFFF), lv_color_hex(0xF8FBFF),
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(details_card, 1, 0);
     lv_obj_set_style_border_color(details_card, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_shadow_width(details_card, 0, 0);

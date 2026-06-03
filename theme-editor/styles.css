@@ -6,33 +6,46 @@
     --sidebar-shadow: #94a3b8;
     --brand-text: #f8fafc;
     --content-bg: #ffffff;
+    --content-grad: #f8fbff;
     --content-shadow: #b8c7db;
     --title-text: #10213d;
     --subtitle-text: #607089;
     --muted-text: #4a5c78;
     --value-text: #0f172a;
     --panel-bg: #f8fbff;
+    --panel-grad: #fdfeff;
     --panel-border: #d9e3f1;
     --card-bg: #ffffff;
+    --card-grad: #f8fbff;
     --card-border: #d7e1ee;
     --item-bg: #f8fbff;
+    --item-grad: #fdfeff;
     --item-border: #d9e3f1;
     --accent-color: #1d4ed8;
+    --accent-grad: #3a65dd;
     --accent-soft-color: #1d4ed8;
     --keyboard-bg: #e7edf5;
+    --keyboard-bg-grad: #e9eff6;
     --keyboard-border: #d7e1ee;
     --keyboard-key-bg: #ffffff;
+    --keyboard-key-grad: #f8fbff;
     --keyboard-key-text: #10213d;
     --keyboard-special-bg: #1d4ed8;
+    --keyboard-special-grad: #3a65dd;
     --keyboard-special-text: #ffffff;
     --keyboard-special-border: #1d4ed8;
     --slider-bg: #d9e3f1;
+    --slider-grad: #dde6f2;
     --slider-knob-bg: #ffffff;
+    --slider-knob-grad: #f8fbff;
     --dropdown-bg: #ffffff;
+    --dropdown-grad: #f8fbff;
     --dropdown-border: #d7e1ee;
     --dropdown-selected-bg: #1d4ed8;
+    --dropdown-selected-grad: #3a65dd;
     --dropdown-selected-text: #ffffff;
     --energy-chart-bg: #ffffff;
+    --energy-chart-grad: #f8fbff;
     --energy-chart-grid: #d9e3f1;
     --energy-chart-tick: #607089;
     --energy-buy-color: #1d4ed8;
@@ -42,27 +55,35 @@
     --wifi-connected-color: #1d4ed8;
     --wifi-idle-color: #4a5c78;
     --nav-active-bg: #e8f0ff;
+    --nav-active-grad: #eaf2ff;
     --nav-active-text: #10213d;
     --nav-active-border: #8fb3ff;
     --nav-inactive-bg: #1b2437;
+    --nav-inactive-grad: #3f4757;
     --nav-inactive-text: #dce6f5;
     --nav-inactive-border: #2a3954;
     --action-primary-bg: #1d4ed8;
+    --action-primary-grad: #3a65dd;
     --action-primary-text: #ffffff;
     --action-primary-border: #1d4ed8;
     --action-secondary-bg: #ffffff;
+    --action-secondary-grad: #f8fbff;
     --action-secondary-text: #10213d;
     --action-secondary-border: #d7e1ee;
     --wifi-btn-bg: #ffffff;
+    --wifi-btn-grad: #f8fbff;
     --wifi-btn-border: #d7e1ee;
     --wifi-btn-text: #334155;
     --wifi-btn-connected-bg: #dcfce7;
+    --wifi-btn-connected-grad: #e0fce9;
     --wifi-btn-connected-border: #22c55e;
     --wifi-btn-connected-text: #14532d;
     --wifi-btn-known-bg: #f0fdf4;
+    --wifi-btn-known-grad: #fbfefc;
     --wifi-btn-known-border: #86efac;
     --wifi-btn-known-text: #166534;
     --wifi-btn-selected-bg: #e6f0ff;
+    --wifi-btn-selected-grad: #e8f2ff;
     --wifi-btn-selected-border: #7ca6f8;
     --wifi-btn-selected-text: #123364;
 }
@@ -187,7 +208,7 @@ input[type="color"] {
     border: 1px solid var(--nav-inactive-border);
     border-radius: 18px;
     color: var(--nav-inactive-text);
-    background: var(--nav-inactive-bg);
+    background: linear-gradient(180deg, var(--nav-inactive-bg), var(--nav-inactive-grad));
     font-size: 18px;
     font-weight: 650;
     text-align: center;
@@ -196,7 +217,7 @@ input[type="color"] {
 .mock-nav-button.is-active {
     border-color: var(--nav-active-border);
     color: var(--nav-active-text);
-    background: var(--nav-active-bg);
+    background: linear-gradient(180deg, var(--nav-active-bg), var(--nav-active-grad));
 }
 
 .mock-status-row {
@@ -233,7 +254,7 @@ input[type="color"] {
     width: 76.758%;
     height: 93.333%;
     border-radius: 32px;
-    background: var(--content-bg);
+    background: linear-gradient(180deg, var(--content-bg), var(--content-grad));
     box-shadow: 0 0 20px var(--content-shadow);
 }
 
@@ -248,7 +269,7 @@ input[type="color"] {
     padding: 24px;
     border: 1px solid var(--panel-border);
     border-radius: 26px;
-    background: var(--panel-bg);
+    background: linear-gradient(180deg, var(--panel-bg), var(--panel-grad));
 }
 
 .metric-card {
@@ -259,7 +280,7 @@ input[type="color"] {
     padding: 18px;
     border: 1px solid var(--card-border);
     border-radius: 22px;
-    background: var(--card-bg);
+    background: linear-gradient(180deg, var(--card-bg), var(--card-grad));
 }
 
 .metric-label {
@@ -305,7 +326,7 @@ input[type="color"] {
     padding: 12px;
     border: 1px solid var(--item-border);
     border-radius: 8px;
-    background: var(--item-bg);
+    background: linear-gradient(180deg, var(--item-bg), var(--item-grad));
     box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
 }
 
@@ -372,13 +393,13 @@ input[type="color"] {
 .sample-primary {
     border: 1px solid var(--action-primary-border);
     color: var(--action-primary-text);
-    background: var(--action-primary-bg);
+    background: linear-gradient(180deg, var(--action-primary-bg), var(--action-primary-grad));
 }
 
 .sample-secondary {
     border: 1px solid var(--action-secondary-border);
     color: var(--action-secondary-text);
-    background: var(--action-secondary-bg);
+    background: linear-gradient(180deg, var(--action-secondary-bg), var(--action-secondary-grad));
 }
 
 .sample-slider {
@@ -386,7 +407,7 @@ input[type="color"] {
     height: 18px;
     margin: 6px 0 12px;
     border-radius: 999px;
-    background: var(--slider-bg);
+    background: linear-gradient(180deg, var(--slider-bg), var(--slider-grad));
 }
 
 .sample-slider::before {
@@ -396,7 +417,7 @@ input[type="color"] {
     left: 0;
     width: 68%;
     border-radius: inherit;
-    background: var(--accent-color);
+    background: linear-gradient(180deg, var(--accent-color), var(--accent-grad));
     content: "";
 }
 
@@ -408,7 +429,7 @@ input[type="color"] {
     height: 28px;
     border: 2px solid var(--accent-color);
     border-radius: 50%;
-    background: var(--slider-knob-bg);
+    background: linear-gradient(180deg, var(--slider-knob-bg), var(--slider-knob-grad));
     transform: translate(-50%, -50%);
 }
 
@@ -416,7 +437,7 @@ input[type="color"] {
     overflow: hidden;
     border: 1px solid var(--dropdown-border);
     border-radius: 8px;
-    background: var(--dropdown-bg);
+    background: linear-gradient(180deg, var(--dropdown-bg), var(--dropdown-grad));
 }
 
 .sample-dropdown span,
@@ -432,11 +453,11 @@ input[type="color"] {
 
 .sample-dropdown b {
     color: var(--dropdown-selected-text);
-    background: var(--dropdown-selected-bg);
+    background: linear-gradient(180deg, var(--dropdown-selected-bg), var(--dropdown-selected-grad));
 }
 
 .keyboard-sample {
-    background: var(--keyboard-bg);
+    background: linear-gradient(180deg, var(--keyboard-bg), var(--keyboard-bg-grad));
     border-color: var(--keyboard-border);
 }
 
@@ -453,14 +474,14 @@ input[type="color"] {
     border: 1px solid var(--keyboard-border);
     border-radius: 8px;
     color: var(--keyboard-key-text);
-    background: var(--keyboard-key-bg);
+    background: linear-gradient(180deg, var(--keyboard-key-bg), var(--keyboard-key-grad));
     font-weight: 800;
 }
 
 .key-row .special-key {
     border-color: var(--keyboard-special-border);
     color: var(--keyboard-special-text);
-    background: var(--keyboard-special-bg);
+    background: linear-gradient(180deg, var(--keyboard-special-bg), var(--keyboard-special-grad));
 }
 
 .mini-chart {
@@ -468,7 +489,7 @@ input[type="color"] {
     height: 82px;
     border: 1px solid var(--panel-border);
     border-radius: 8px;
-    background: var(--energy-chart-bg);
+    background: linear-gradient(180deg, var(--energy-chart-bg), var(--energy-chart-grad));
 }
 
 .grid-line,
@@ -570,26 +591,26 @@ input[type="color"] {
 .wifi-row {
     border: 1px solid var(--wifi-btn-border);
     color: var(--wifi-btn-text);
-    background: var(--wifi-btn-bg);
+    background: linear-gradient(180deg, var(--wifi-btn-bg), var(--wifi-btn-grad));
     text-align: left;
 }
 
 .wifi-row.connected {
     border-color: var(--wifi-btn-connected-border);
     color: var(--wifi-btn-connected-text);
-    background: var(--wifi-btn-connected-bg);
+    background: linear-gradient(180deg, var(--wifi-btn-connected-bg), var(--wifi-btn-connected-grad));
 }
 
 .wifi-row.known {
     border-color: var(--wifi-btn-known-border);
     color: var(--wifi-btn-known-text);
-    background: var(--wifi-btn-known-bg);
+    background: linear-gradient(180deg, var(--wifi-btn-known-bg), var(--wifi-btn-known-grad));
 }
 
 .wifi-row.selected {
     border-color: var(--wifi-btn-selected-border);
     color: var(--wifi-btn-selected-text);
-    background: var(--wifi-btn-selected-bg);
+    background: linear-gradient(180deg, var(--wifi-btn-selected-bg), var(--wifi-btn-selected-grad));
 }
 
 .editor-sidebar {

@@ -28,6 +28,19 @@ void gui_view_set_label_text_if_changed(lv_obj_t *label, const char *text);
 void gui_view_set_textarea_text_if_changed(lv_obj_t *textarea, const char *text);
 
 /**
+ * @brief Apply a vertical background gradient to an LVGL object or part.
+ *
+ * @param obj Target LVGL object.
+ * @param bg_color Main background color.
+ * @param grad_color Gradient endpoint color.
+ * @param opa Background opacity.
+ * @param selector LVGL style selector for the object part/state.
+ */
+void gui_view_apply_bg_gradient(lv_obj_t *obj, lv_color_t bg_color,
+                                lv_color_t grad_color, lv_opa_t opa,
+                                lv_style_selector_t selector);
+
+/**
  * @brief Apply theme-aware styling to a scanned Wi-Fi network button.
  *
  * @param button Target button object.

@@ -258,6 +258,7 @@ static void gui_view_update_energy_action_strip(gui_view_t *view,
         action_color = gui_view_energy_action_color(view, action);
 
         lv_obj_set_style_bg_color(segment, action_color, 0);
+        lv_obj_set_style_bg_grad_dir(segment, LV_GRAD_DIR_NONE, 0);
         lv_obj_set_style_bg_opa(segment, LV_OPA_COVER, 0);
         lv_obj_set_style_border_color(segment, gui_view_energy_action_border_color(view), 0);
         lv_obj_set_style_border_opa(segment, LV_OPA_TRANSP, 0);
@@ -490,8 +491,8 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_size(view->energy_plan_panel, 746, 378);
     lv_obj_align(view->energy_plan_panel, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_radius(view->energy_plan_panel, 26, 0);
-    lv_obj_set_style_bg_color(view->energy_plan_panel, lv_color_hex(0xF8FBFF), 0);
-    lv_obj_set_style_bg_opa(view->energy_plan_panel, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->energy_plan_panel, lv_color_hex(0xF8FBFF),
+                               lv_color_hex(0xFDFEFF), LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->energy_plan_panel, 1, 0);
     lv_obj_set_style_border_color(view->energy_plan_panel, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_pad_all(view->energy_plan_panel, 24, 0);
@@ -518,8 +519,8 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
     view->energy_action_card = lv_obj_create(overview_row);
     lv_obj_set_size(view->energy_action_card, 0, LV_PCT(100));
     lv_obj_set_style_radius(view->energy_action_card, 22, 0);
-    lv_obj_set_style_bg_color(view->energy_action_card, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(view->energy_action_card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->energy_action_card, lv_color_hex(0xFFFFFF),
+                               lv_color_hex(0xF8FBFF), LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->energy_action_card, 1, 0);
     lv_obj_set_style_border_color(view->energy_action_card, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_shadow_width(view->energy_action_card, 0, 0);
@@ -626,6 +627,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
         lv_obj_set_flex_grow(segment, 1);
         lv_obj_set_style_radius(segment, 7, 0);
         lv_obj_set_style_bg_color(segment, lv_color_hex(0xD9E3F1), 0);
+        lv_obj_set_style_bg_grad_dir(segment, LV_GRAD_DIR_NONE, 0);
         lv_obj_set_style_bg_opa(segment, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(segment, 2, 0);
         lv_obj_set_style_border_color(segment, lv_color_hex(0x10213D), 0);
@@ -636,8 +638,8 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content)
 
     view->energy_plan_chart = lv_chart_create(view->energy_plan_panel);
     lv_obj_set_size(view->energy_plan_chart, LV_PCT(100), 0);
-    lv_obj_set_style_bg_color(view->energy_plan_chart, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(view->energy_plan_chart, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->energy_plan_chart, lv_color_hex(0xFFFFFF),
+                               lv_color_hex(0xF8FBFF), LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->energy_plan_chart, 1, 0);
     lv_obj_set_style_border_color(view->energy_plan_chart, lv_color_hex(0xD8E4F0), 0);
     lv_obj_set_style_pad_all(view->energy_plan_chart, 12, 0);

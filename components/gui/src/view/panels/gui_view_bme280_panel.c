@@ -22,8 +22,8 @@ void gui_view_init_bme280_panel(gui_view_t *view, lv_obj_t *content)
     lv_obj_set_style_pad_column(view->bme280_panel, 14, 0);
     lv_obj_set_style_pad_row(view->bme280_panel, 14, 0);
     lv_obj_set_style_radius(view->bme280_panel, 26, 0);
-    lv_obj_set_style_bg_color(view->bme280_panel, lv_color_hex(0xF8FBFF), 0);
-    lv_obj_set_style_bg_opa(view->bme280_panel, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->bme280_panel, lv_color_hex(0xF8FBFF),
+                               lv_color_hex(0xFDFEFF), LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->bme280_panel, 1, 0);
     lv_obj_set_style_border_color(view->bme280_panel, lv_color_hex(0xD9E3F1), 0);
     lv_obj_clear_flag(view->bme280_panel, LV_OBJ_FLAG_SCROLLABLE);

@@ -41,32 +41,52 @@ void gui_view_set_textarea_text_if_changed(lv_obj_t *textarea, const char *text)
     lv_textarea_set_text(textarea, text);
 }
 
+void gui_view_apply_bg_gradient(lv_obj_t *obj, lv_color_t bg_color,
+                                lv_color_t grad_color, lv_opa_t opa,
+                                lv_style_selector_t selector)
+{
+    if (obj == NULL) {
+        return;
+    }
+
+    lv_obj_set_style_bg_color(obj, bg_color, selector);
+    lv_obj_set_style_bg_grad_color(obj, grad_color, selector);
+    lv_obj_set_style_bg_grad_dir(obj, LV_GRAD_DIR_VER, selector);
+    lv_obj_set_style_bg_dither_mode(obj, LV_DITHER_ORDERED, selector);
+    lv_obj_set_style_bg_opa(obj, opa, selector);
+}
+
 void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme,
                                         bool is_selected, bool is_known, bool is_connected)
 {
     const gui_theme_def_t *def = gui_theme_get(theme);
     lv_color_t bg_color;
+    lv_color_t grad_color;
     lv_color_t border_color;
     lv_color_t text_color;
 
-    if (def == NULL) {
+    if ((button == NULL) || (def == NULL)) {
         return;
     }
 
     bg_color     = lv_color_hex(def->wifi_btn_bg);
+    grad_color   = lv_color_hex(def->wifi_btn_grad);
     border_color = lv_color_hex(def->wifi_btn_border);
     text_color   = lv_color_hex(def->wifi_btn_text);
 
     if (is_connected) {
         bg_color     = lv_color_hex(def->wifi_btn_connected_bg);
+        grad_color   = lv_color_hex(def->wifi_btn_connected_grad);
         border_color = lv_color_hex(def->wifi_btn_connected_border);
         text_color   = lv_color_hex(def->wifi_btn_connected_text);
     } else if (is_known) {
         bg_color     = lv_color_hex(def->wifi_btn_known_bg);
+        grad_color   = lv_color_hex(def->wifi_btn_known_grad);
         border_color = lv_color_hex(def->wifi_btn_known_border);
         text_color   = lv_color_hex(def->wifi_btn_known_text);
     } else if (is_selected) {
         bg_color     = lv_color_hex(def->wifi_btn_selected_bg);
+        grad_color   = lv_color_hex(def->wifi_btn_selected_grad);
         border_color = lv_color_hex(def->wifi_btn_selected_border);
         text_color   = lv_color_hex(def->wifi_btn_selected_text);
     }
@@ -74,8 +94,7 @@ void gui_view_style_scanned_wifi_button(lv_obj_t *button, gui_view_theme_t theme
     lv_obj_set_style_radius(button, 14, 0);
     lv_obj_set_style_shadow_width(button, 0, 0);
     lv_obj_set_style_border_width(button, 1, 0);
-    lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(button, bg_color, 0);
+    gui_view_apply_bg_gradient(button, bg_color, grad_color, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(button, border_color, 0);
     lv_obj_set_style_text_color(button, text_color, 0);
 }
@@ -175,8 +194,8 @@ lv_obj_t *gui_view_create_metric_card(lv_obj_t *parent, lv_coord_t x, lv_coord_t
     lv_obj_set_style_radius(card, 22, 0);
     lv_obj_set_style_border_width(card, 1, 0);
     lv_obj_set_style_border_color(card, lv_color_hex(0xD9E3F1), 0);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0xF8FBFF), 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(card, lv_color_hex(0xF8FBFF), lv_color_hex(0xFFFFFF),
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(card, 18, 0);
     lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 

@@ -158,8 +158,8 @@ static lv_obj_t *gui_view_create_setting_item_card(lv_obj_t *parent, const char 
     lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
                           LV_FLEX_ALIGN_START);
     lv_obj_set_style_radius(card, 18, 0);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0xF8FBFF), 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(card, lv_color_hex(0xF8FBFF), lv_color_hex(0xFDFEFF),
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(card, 1, 0);
     lv_obj_set_style_border_color(card, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_shadow_width(card, 0, 0);
@@ -195,8 +195,8 @@ static lv_obj_t *gui_view_create_setting_item_card_shell(lv_obj_t *parent, lv_co
     lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
                           LV_FLEX_ALIGN_START);
     lv_obj_set_style_radius(card, 18, 0);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0xF8FBFF), 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(card, lv_color_hex(0xF8FBFF), lv_color_hex(0xFDFEFF),
+                               LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(card, 1, 0);
     lv_obj_set_style_border_color(card, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_shadow_width(card, 0, 0);
@@ -341,8 +341,8 @@ static lv_obj_t *gui_view_create_settings_field_row(lv_obj_t *parent, lv_obj_t *
     lv_obj_set_style_shadow_width(*textarea_out, 0, 0);
     lv_obj_set_style_border_width(*textarea_out, 1, 0);
     lv_obj_set_style_border_color(*textarea_out, lv_color_hex(0xD7E1EE), 0);
-    lv_obj_set_style_bg_color(*textarea_out, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(*textarea_out, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(*textarea_out, lv_color_hex(0xFFFFFF),
+                               lv_color_hex(0xF8FBFF), LV_OPA_COVER, 0);
 
     return row;
 }
@@ -709,13 +709,12 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_slider_set_range(view->brightness_slider, 5, 100);
     lv_obj_add_event_cb(view->brightness_slider, settings_event_cb, LV_EVENT_VALUE_CHANGED,
                         event_user_data);
-    lv_obj_set_style_bg_color(view->brightness_slider, lv_color_hex(0xD9E3F1), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(view->brightness_slider, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(view->brightness_slider, lv_color_hex(0x1D4ED8),
-                              LV_PART_INDICATOR);
-    lv_obj_set_style_bg_opa(view->brightness_slider, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(view->brightness_slider, lv_color_hex(0xFFFFFF), LV_PART_KNOB);
-    lv_obj_set_style_bg_opa(view->brightness_slider, LV_OPA_COVER, LV_PART_KNOB);
+    gui_view_apply_bg_gradient(view->brightness_slider, lv_color_hex(0xD9E3F1),
+                               lv_color_hex(0xDDE6F2), LV_OPA_COVER, LV_PART_MAIN);
+    gui_view_apply_bg_gradient(view->brightness_slider, lv_color_hex(0x1D4ED8),
+                               lv_color_hex(0x3A65DD), LV_OPA_COVER, LV_PART_INDICATOR);
+    gui_view_apply_bg_gradient(view->brightness_slider, lv_color_hex(0xFFFFFF),
+                               lv_color_hex(0xF8FBFF), LV_OPA_COVER, LV_PART_KNOB);
     lv_obj_set_style_border_width(view->brightness_slider, 2, LV_PART_KNOB);
     lv_obj_set_style_border_color(view->brightness_slider, lv_color_hex(0x1D4ED8), LV_PART_KNOB);
     lv_obj_set_style_pad_all(view->brightness_slider, 4, LV_PART_KNOB);
@@ -745,8 +744,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_style_shadow_width(view->theme_dropdown, 0, 0);
     lv_obj_set_style_border_width(view->theme_dropdown, 1, 0);
     lv_obj_set_style_border_color(view->theme_dropdown, lv_color_hex(0xD7E1EE), 0);
-    lv_obj_set_style_bg_color(view->theme_dropdown, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(view->theme_dropdown, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->theme_dropdown, lv_color_hex(0xFFFFFF),
+                               lv_color_hex(0xF8FBFF), LV_OPA_COVER, 0);
     lv_obj_set_style_text_color(view->theme_dropdown, lv_color_hex(0x10213D), 0);
 
     lv_obj_t *theme_background_row = lv_obj_create(theme_card);
@@ -774,21 +773,18 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_add_state(view->theme_background_switch, LV_STATE_CHECKED);
     lv_obj_add_event_cb(view->theme_background_switch, settings_event_cb, LV_EVENT_VALUE_CHANGED,
                         event_user_data);
-    lv_obj_set_style_bg_color(view->theme_background_switch, lv_color_hex(0xD9E3F1),
-                              LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_MAIN);
+    gui_view_apply_bg_gradient(view->theme_background_switch, lv_color_hex(0xD9E3F1),
+                               lv_color_hex(0xDDE6F2), LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(view->theme_background_switch, 1, LV_PART_MAIN);
     lv_obj_set_style_border_color(view->theme_background_switch, lv_color_hex(0xD7E1EE),
                                   LV_PART_MAIN);
-    lv_obj_set_style_bg_color(view->theme_background_switch, lv_color_hex(0x1D4ED8),
-                              LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER,
-                            LV_PART_INDICATOR | LV_STATE_CHECKED);
+    gui_view_apply_bg_gradient(view->theme_background_switch, lv_color_hex(0x1D4ED8),
+                               lv_color_hex(0x3A65DD), LV_OPA_COVER,
+                               LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_set_style_border_width(view->theme_background_switch, 0,
                                   LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_color(view->theme_background_switch, lv_color_hex(0xFFFFFF),
-                              LV_PART_KNOB);
-    lv_obj_set_style_bg_opa(view->theme_background_switch, LV_OPA_COVER, LV_PART_KNOB);
+    gui_view_apply_bg_gradient(view->theme_background_switch, lv_color_hex(0xFFFFFF),
+                               lv_color_hex(0xF8FBFF), LV_OPA_COVER, LV_PART_KNOB);
 
     lv_obj_t *theme_night_row = lv_obj_create(theme_card);
     lv_obj_set_width(theme_night_row, LV_PCT(100));
@@ -814,20 +810,18 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->theme_night_switch = lv_switch_create(theme_night_row);
     lv_obj_add_event_cb(view->theme_night_switch, settings_event_cb, LV_EVENT_VALUE_CHANGED,
                         event_user_data);
-    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0xD9E3F1), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_MAIN);
+    gui_view_apply_bg_gradient(view->theme_night_switch, lv_color_hex(0xD9E3F1),
+                               lv_color_hex(0xDDE6F2), LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_border_width(view->theme_night_switch, 1, LV_PART_MAIN);
     lv_obj_set_style_border_color(view->theme_night_switch, lv_color_hex(0xD7E1EE),
                                   LV_PART_MAIN);
-    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0x1D4ED8),
-                              LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER,
-                            LV_PART_INDICATOR | LV_STATE_CHECKED);
+    gui_view_apply_bg_gradient(view->theme_night_switch, lv_color_hex(0x1D4ED8),
+                               lv_color_hex(0x3A65DD), LV_OPA_COVER,
+                               LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_set_style_border_width(view->theme_night_switch, 0,
                                   LV_PART_INDICATOR | LV_STATE_CHECKED);
-    lv_obj_set_style_bg_color(view->theme_night_switch, lv_color_hex(0xFFFFFF),
-                              LV_PART_KNOB);
-    lv_obj_set_style_bg_opa(view->theme_night_switch, LV_OPA_COVER, LV_PART_KNOB);
+    gui_view_apply_bg_gradient(view->theme_night_switch, lv_color_hex(0xFFFFFF),
+                               lv_color_hex(0xF8FBFF), LV_OPA_COVER, LV_PART_KNOB);
 
     view->settings_system_panel = gui_view_create_settings_page(view->settings_panel);
     page_stack = gui_view_create_settings_subpage_stack(view->settings_system_panel);
@@ -876,8 +870,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_size(view->location_keyboard, LV_PCT(100), 180);
     lv_obj_align(view->location_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_radius(view->location_keyboard, 18, 0);
-    lv_obj_set_style_bg_color(view->location_keyboard, lv_color_hex(0xE7EDF5), 0);
-    lv_obj_set_style_bg_opa(view->location_keyboard, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->location_keyboard, lv_color_hex(0xE7EDF5),
+                               lv_color_hex(0xE9EFF6), LV_OPA_COVER, 0);
     lv_obj_set_style_shadow_width(view->location_keyboard, 0, 0);
     lv_obj_set_style_border_width(view->location_keyboard, 1, 0);
     lv_obj_set_style_border_color(view->location_keyboard, lv_color_hex(0xD7E1EE), 0);
@@ -889,8 +883,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->network_dialog = gui_view_create_settings_page(view->settings_panel);
     lv_obj_set_style_pad_top(view->network_dialog, 4, 0);
     lv_obj_set_style_radius(view->network_dialog, 26, 0);
-    lv_obj_set_style_bg_color(view->network_dialog, lv_color_hex(0xF8FBFF), 0);
-    lv_obj_set_style_bg_opa(view->network_dialog, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->network_dialog, lv_color_hex(0xF8FBFF),
+                               lv_color_hex(0xFDFEFF), LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->network_dialog, 0, 0);
 
     dialog_title = lv_label_create(view->network_dialog);
@@ -939,8 +933,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->password_dialog = gui_view_create_settings_page(view->settings_panel);
     lv_obj_set_style_pad_top(view->password_dialog, 4, 0);
     lv_obj_set_style_radius(view->password_dialog, 26, 0);
-    lv_obj_set_style_bg_color(view->password_dialog, lv_color_hex(0xF8FBFF), 0);
-    lv_obj_set_style_bg_opa(view->password_dialog, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->password_dialog, lv_color_hex(0xF8FBFF),
+                               lv_color_hex(0xFDFEFF), LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->password_dialog, 0, 0);
 
     dialog_title = lv_label_create(view->password_dialog);
@@ -972,8 +966,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_set_size(view->wifi_keyboard, LV_PCT(100), 292);
     lv_obj_align(view->wifi_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_radius(view->wifi_keyboard, 18, 0);
-    lv_obj_set_style_bg_color(view->wifi_keyboard, lv_color_hex(0xE7EDF5), 0);
-    lv_obj_set_style_bg_opa(view->wifi_keyboard, LV_OPA_COVER, 0);
+    gui_view_apply_bg_gradient(view->wifi_keyboard, lv_color_hex(0xE7EDF5),
+                               lv_color_hex(0xE9EFF6), LV_OPA_COVER, 0);
     lv_obj_set_style_shadow_width(view->wifi_keyboard, 0, 0);
     lv_obj_set_style_border_width(view->wifi_keyboard, 1, 0);
     lv_obj_set_style_border_color(view->wifi_keyboard, lv_color_hex(0xD7E1EE), 0);
@@ -989,9 +983,9 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->password_dialog_connect_button = gui_view_create_action_button(
         view->password_dialog, 570, 148, 132, 40, "Connect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
-    lv_obj_set_style_bg_color(view->password_dialog_connect_button, lv_color_hex(0x1D4ED8), 0);
+    gui_view_apply_bg_gradient(view->password_dialog_connect_button, lv_color_hex(0x1D4ED8),
+                               lv_color_hex(0x3A65DD), LV_OPA_COVER, 0);
     lv_obj_set_style_text_color(view->password_dialog_connect_button, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(view->password_dialog_connect_button, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(view->password_dialog_connect_button, 0, 0);
     gui_view_layout_password_dialog_buttons(view, false);
 
