@@ -4,6 +4,7 @@
 
 #include "uart_mole.h"
 #include "driver/uart.h"
+#include "environment_measurements.h"
 #include "esp_crc.h"
 #include "esp_err.h"
 #include "esp_heap_caps.h"
@@ -12,7 +13,6 @@
 #include "esp_timer.h"
 #include "freertos/idf_additions.h"
 #include "http_client.h"
-#include "sensor_data.h"
 #include "task_scheduler.h"
 #include <stdint.h>
 #include <string.h>
@@ -343,8 +343,8 @@ static void uart_mole_listener_task(void *pvParameters)
                 /* payload (data_len bytes): temperature_x_100 + humidity_x_100 + pressure_x_100 + timestamp_s + crc16
                  * crc16 covers:             temperature_x_100 + humidity_x_100 + pressure_x_100 + timestamp_s         */
                 /* How we will get the latest sensor data is yet to be determined, maybe from NVS, this is just a placeholder */
-                sensor_data_sample sample;
-                if (!sensor_data_get_latest_local(&sample))
+                environment_measurement_sample_t sample;
+                if (!environment_measurements_get_latest(&sample))
                 {
                     ESP_LOGW(TAG, "no sensor data available");
                     break;

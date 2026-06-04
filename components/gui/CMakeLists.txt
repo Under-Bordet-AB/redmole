@@ -53,5 +53,5 @@ endif()
 idf_component_register(
     SRCS ${gui_srcs}
     INCLUDE_DIRS "include"
-    REQUIRES lvgl_port rgb_lcd_port touch io_extension esp_lcd log sensor_data esp_timer
+    REQUIRES lvgl_port rgb_lcd_port touch io_extension esp_lcd log esp_timer
 )

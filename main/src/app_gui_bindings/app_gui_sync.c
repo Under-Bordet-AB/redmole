@@ -1,10 +1,10 @@
 #include "app_gui_bindings_internal.h"
 
 #include "esp_log.h"
+#include "environment_measurements.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "sdcard.h"
-#include "sensor_data.h"
 #include "uart_mole.h"
 
 #define SENSOR_REFRESH_DELAY_MS 60000U
@@ -12,7 +12,7 @@
 
 static void sync_sensor(gui_ctx_t *gui)
 {
-    sensor_data_sample sample = { 0 };
+    environment_measurement_sample_t sample = { 0 };
     gui_sensor_state_t sensor = { 0 };
     gui_sensor_state_t current_sensor = { 0 };
     bool has_current_sensor;
@@ -31,12 +31,12 @@ static void sync_sensor(gui_ctx_t *gui)
         app_gui_time_format_unknown_last_updated(sensor.last_updated, sizeof(sensor.last_updated));
     }
 
-    if (sensor_data_get_latest_local(&sample) && sample.valid) {
-        update_count = sensor_data_get_local_update_count();
+    if (environment_measurements_get_latest(&sample) && sample.valid) {
+        update_count = environment_measurements_get_update_count();
         sensor.temperature_deci_c = sample.temperature_deci_c;
         sensor.humidity_deci_pct = sample.humidity_deci_pct;
         sensor.pressure_deci_hpa = sample.pressure_deci_hpa;
-        sensor.is_fresh = sensor_data_is_local_fresh(3000U);
+        sensor.is_fresh = environment_measurements_is_fresh(3000U);
         sensor.update_count = update_count;
         if (!has_current_sensor || (current_sensor.update_count != update_count)) {
             app_gui_time_format_last_updated_now(sensor.last_updated, sizeof(sensor.last_updated));
