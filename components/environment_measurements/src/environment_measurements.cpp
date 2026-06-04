@@ -1,6 +1,7 @@
 #include "environment_measurements.h"
 
 #include <atomic>
+#include <array>
 #include <cstdint>
 #include <cstring>
 
@@ -35,6 +36,7 @@ using redmole::environment::kUsPerMs;
 constexpr uint32_t kTaskStackBytes = 4096U;
 constexpr UBaseType_t kTaskPriority = 5U;
 constexpr const char* kTag = "ENV_MEASURE";
+constexpr size_t kMaxPhysicalSensors = 2U;
 
 static TickType_t seconds_to_ticks(uint32_t seconds) {
     TickType_t ticks = pdMS_TO_TICKS(seconds * 1000U);
@@ -51,6 +53,10 @@ static bool tick_elapsed(TickType_t now, TickType_t last, TickType_t interval) {
 
 class EnvironmentMeasurements {
 public:
+    EnvironmentMeasurements()
+        : physical_sensors_{&real_primary_, &real_alternate_}, active_inside_(&simulator_) {
+    }
+
     esp_err_t init() {
         if (initialized_) {
             return ESP_OK;
@@ -64,8 +70,10 @@ public:
             return rv;
         }
 
-        (void)real_primary_.init();
-        (void)real_alternate_.init();
+        for (EnvironmentSensor* sensor : physical_sensors_) {
+            (void)sensor->init();
+        }
+
         rv = simulator_.init();
         if (rv != ESP_OK) {
             return rv;
@@ -264,14 +272,11 @@ private:
     }
 
     bool try_read_physical(environment_measurement_sample_t& sample, EnvironmentSensor*& out_sensor) {
-        if (real_primary_.read(sample) == ESP_OK) {
-            out_sensor = &real_primary_;
-            return true;
-        }
-
-        if (real_alternate_.read(sample) == ESP_OK) {
-            out_sensor = &real_alternate_;
-            return true;
+        for (EnvironmentSensor* sensor : physical_sensors_) {
+            if (sensor->read(sample) == ESP_OK) {
+                out_sensor = sensor;
+                return true;
+            }
         }
 
         out_sensor = nullptr;
@@ -307,7 +312,8 @@ private:
     Bme280Sensor real_primary_{0x76U};
     Bme280Sensor real_alternate_{0x77U};
     SimulatedBme280Sensor simulator_{};
-    EnvironmentSensor* active_inside_ = &simulator_;
+    std::array<EnvironmentSensor*, kMaxPhysicalSensors> physical_sensors_{};
+    EnvironmentSensor* active_inside_ = nullptr;
     TaskHandle_t task_ = nullptr;
     environment_measurement_sample_t latest_ = {};
     std::atomic_uint version_{0U};

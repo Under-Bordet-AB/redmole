@@ -19,7 +19,9 @@ environment_measurements C API
         v
 EnvironmentMeasurements controller + task
         |
-        +--> Bme280Sensor
+        +--> fixed EnvironmentSensor* array
+        |       +--> Bme280Sensor at 0x76
+        |       +--> Bme280Sensor at 0x77
         +--> SimulatedBme280Sensor
 ```
 
@@ -44,6 +46,7 @@ public:
 What this gives us:
 
 - one polling and publishing path for physical and simulated readings
+- a fixed collection of physical sensors that the controller can iterate
 - runtime discovery of the BME280 addresses that are actually connected
 - plug/unplug fallback by switching active sensor state
 - a stable public C API while internal sensor implementations change
@@ -70,6 +73,8 @@ Rules:
 
 - no runtime `new` or `delete` for sensor objects
 - no runtime growth of the sensor list
+- physical sensors are exposed to the controller through a fixed
+  `EnvironmentSensor*` array
 - startup initializes the supported physical sensors and the simulator
 - runtime plug/unplug changes active/inactive state only
 
