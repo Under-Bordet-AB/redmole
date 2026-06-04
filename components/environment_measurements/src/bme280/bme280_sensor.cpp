@@ -151,16 +151,16 @@ esp_err_t Bme280Sensor::read(environment_measurement_sample_t& out) {
         return rv;
     }
 
-    convert(raw, out);
+    convert(raw, out); // JJ: lets see if we really need to convert
     return ESP_OK;
 }
 
 SensorLocation Bme280Sensor::location() const {
-    return SensorLocation::Inside;
+    return SensorLocation::Inside; // JJ: hardcoded "inside". This is wrong.
 }
 
 bool Bme280Sensor::is_simulated() const {
-    return false;
+    return false; // JJ: why is this always returning false? Is it because simulated always return true? Why use a function and not just a fixed variable from init?
 }
 
 esp_err_t Bme280Sensor::ensure_device_handle() {
