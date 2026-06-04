@@ -41,15 +41,14 @@ Typical flow:
 
 ## Current Bring-Up State
 
-The active build is focused on local sensor-to-GUI bring-up.
+The active build is focused on local environment measurement to GUI bring-up.
 
 Current runtime behavior:
 
 - console output uses `USB Serial/JTAG`
 - PSRAM is enabled because the RGB panel frame buffers need it
-- the hardware BME280 backend is the default local sensor path
+- `environment_measurements` owns BME280 discovery, polling, latest data, and simulation fallback
 - `main.c` owns app-layer orchestration
-- `local_sensor_service` owns the BME280 polling task
 - the Wi-Fi module code is still present in the repo
 - Wi-Fi behavior is driven through the current NAC/app binding path
 
@@ -57,23 +56,22 @@ Current runtime behavior:
 
 Current active path:
 
-`selected BME280 HAL backend -> bme280_hal -> local_sensor_service -> sensor_data -> gui`
+`environment_measurements -> app_gui_bindings -> gui`
 
 Startup flow:
 
 1. `main.c` initializes single-instance modules:
-   `rm_nvs`, `task_scheduler`, `nac`, `http_client`, `sensor_data`
+   `rm_nvs`, `task_scheduler`, `nac`, `http_client`, `environment_measurements`
 2. `main.c` initializes runtime modules:
-   `local_sensor_service`, `gui`
-3. `main.c` starts `local_sensor_service`
+   `gui`
+3. `main.c` starts `environment_measurements`
 4. `main.c` runs the GUI bindings and task scheduler from the app loop
 
 ## Module Notes
 
 - `rm_nvs` is a single-instance NVS wrapper with a fixed default namespace.
 - `board_i2c` owns the shared ESP32-S3 I2C master bus configuration.
-- `sensor_data` owns the latest published local sample.
-- `bme280_hal` is the public sensor-facing API above the selected backend.
+- `environment_measurements` owns board-local environment readings and fallback simulation.
 - `gui` is currently a single-instance module that owns its own internal runtime state.
 - `wifi_module` matches the main branch implementation, but its startup path is not active in this build.
 

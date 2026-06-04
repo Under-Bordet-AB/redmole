@@ -1,23 +1,72 @@
 menu "RedMole Sensor Configuration"
 
-    choice REDMOLE_BME280_BACKEND
-        prompt "BME280 HAL backend"
-        default REDMOLE_BME280_BACKEND_SIM
+    config REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC
+        int "Environment reading interval in seconds"
+        default 1
+        range 1 3600
         help
-            Select which backend the public BME280 HAL uses.
+            Period used by the environment measurement task. The task uses
+            vTaskDelayUntil(), so sensor execution time is included in this
+            cadence.
 
-        config REDMOLE_BME280_BACKEND_SIM
-            bool "Simulator backend"
-            help
-                Use the fake BME280 backend for bring-up and GUI work.
+    config REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC
+        int "Environment hardware detection interval in seconds"
+        default 2
+        range 1 300
+        help
+            Period used to check whether the physical environment sensor has
+            been unplugged or reconnected. This is intentionally separate from
+            the slower reading interval so demos can show fallback and recovery
+            without publishing environment readings too often.
 
-        config REDMOLE_BME280_BACKEND_HW
-            bool "Hardware backend"
-            help
-                Use the hardware backend inside the public BME280 HAL. The
-                current hardware backend is still stubbed, so reads will fail
-                until hardware support is implemented.
-    endchoice
+    config REDMOLE_BME280_MODE
+        int "BME280 mode"
+        default 1
+        range 0 3
+        help
+            BME280 mode register value: 0=sleep, 1=forced, 2=forced,
+            3=normal. Forced mode is the default because the FreeRTOS task owns
+            the sampling cadence.
+
+    config REDMOLE_BME280_OVERSAMPLING_TEMPERATURE
+        int "BME280 temperature oversampling"
+        default 1
+        range 0 5
+        help
+            BME280 osrs_t setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
+            5=x16.
+
+    config REDMOLE_BME280_OVERSAMPLING_PRESSURE
+        int "BME280 pressure oversampling"
+        default 1
+        range 0 5
+        help
+            BME280 osrs_p setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
+            5=x16.
+
+    config REDMOLE_BME280_OVERSAMPLING_HUMIDITY
+        int "BME280 humidity oversampling"
+        default 1
+        range 0 5
+        help
+            BME280 osrs_h setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
+            5=x16.
+
+    config REDMOLE_BME280_IIR_FILTER
+        int "BME280 IIR filter coefficient"
+        default 0
+        range 0 4
+        help
+            BME280 filter setting: 0=off, 1=2, 2=4, 3=8, 4=16.
+
+    config REDMOLE_BME280_STANDBY_TIME
+        int "BME280 normal-mode standby time"
+        default 5
+        range 0 7
+        help
+            BME280 t_sb setting: 0=0.5ms, 1=62.5ms, 2=125ms, 3=250ms,
+            4=500ms, 5=1000ms, 6=10ms, 7=20ms. In forced mode this is
+            configured but not used as the task controls the cadence.
 
 endmenu
 

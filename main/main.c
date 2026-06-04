@@ -4,12 +4,12 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "app_gui_bindings.h"
+#include "board_i2c.h"
+#include "environment_measurements.h"
 #include "task_scheduler.h"
 #include "gui_module.h"
-#include "local_sensor_service.h"
 #include "nac.h"
 #include "rm_nvs.h"
-#include "sensor_data.h"
 #include "http_client.h"
 #include "sdcard.h"
 #include "sdcard_log.h"
@@ -45,9 +45,15 @@ static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
         return rv;
     }
 
-    rv = sensor_data_init();
+    rv = board_i2c_init();
     if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "sensor_data_init failed: %s", esp_err_to_name(rv));
+        ESP_LOGE(TAG, "board_i2c_init failed: %s", esp_err_to_name(rv));
+        return rv;
+    }
+
+    rv = environment_measurements_init();
+    if (rv != ESP_OK) {
+        ESP_LOGE(TAG, "environment_measurements_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
@@ -67,12 +73,6 @@ static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
 }
 
 static esp_err_t init_runtime_modules(void) {
-    esp_err_t rv = local_sensor_service_init();
-    if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "local_sensor_service_init failed: %s", esp_err_to_name(rv));
-        return rv;
-    }
-
     // Load previously saved GUI settings
     gui_init_config_t gui_init_config = {0};
     (void)app_gui_bindings_load_saved_appearance(&gui_init_config);
@@ -81,7 +81,7 @@ static esp_err_t init_runtime_modules(void) {
     gui_init(&s_gui, &gui_init_config);
 
     // Initialize the GUI bindings
-    rv = app_gui_bindings_init(&s_gui, &s_event_group);
+    esp_err_t rv = app_gui_bindings_init(&s_gui, &s_event_group);
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "app_gui_bindings_init failed: %s", esp_err_to_name(rv));
         return rv;
@@ -96,9 +96,9 @@ static esp_err_t init_runtime_modules(void) {
 }
 
 static esp_err_t start_runtime_modules() {
-    esp_err_t rv = local_sensor_service_start();
+    esp_err_t rv = environment_measurements_start();
     if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "local_sensor_service_start failed: %s", esp_err_to_name(rv));
+        ESP_LOGE(TAG, "environment_measurements_start failed: %s", esp_err_to_name(rv));
         return rv;
     }
 

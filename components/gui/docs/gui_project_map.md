@@ -41,7 +41,7 @@ flowchart TD
     themes --> assets[Optional Assets\nbackgrounds and fonts]
 
     platform --> hw[Display and Input Stack\nlvgl_port\nrgb_lcd_port\ntouch\nio_extension]
-    bindings --> services[App Services\nsensor_data\nnac\nrm_nvs]
+    bindings --> services[App Services\nenvironment_measurements\nnac\nrm_nvs]
     coordinator --> lvgl[LVGL Runtime]
     view --> lvgl
 ```
@@ -68,15 +68,15 @@ The runtime flow crosses the app and GUI components. The most important boundary
 ```mermaid
 flowchart TD
     boot[app_main] --> init1[init_single_instance_modules]
-    init1 --> services[rm_nvs + nac + sensor_data]
+    init1 --> services[rm_nvs + nac + environment_measurements]
     services --> init2[init_runtime_modules]
     init2 --> preload[Load saved appearance into gui_init config]
     preload --> guiinit[gui_init & app_gui_bindings_init]
     guiinit --> start[start_runtime_modules]
-    start --> sensorTask[local_sensor_service]
+    start --> sensorTask[environment_measurements task]
     start --> loop[main loop]
 
-    sensorTask --> sensorData[sensor_data_submit_local]
+    sensorTask --> sensorData[latest environment snapshot]
     loop --> sync[app_gui_bindings_sync]
     sync --> push[Push app state into GUI\nsensor Wi-Fi SD]
     push --> setters[gui_set_* APIs]
@@ -97,7 +97,7 @@ flowchart TD
 
 - `main/main.c` owns system startup and the outer polling loop.
 - `main/main.c` loads persisted appearance before `gui_init()` so the first render already uses saved theme and brightness values.
-- `app_gui_bindings_sync()` keeps GUI-visible runtime state aligned with app services such as `sensor_data` and `nac`, while persisting appearance changes back through `rm_nvs`.
+- `app_gui_bindings_sync()` keeps GUI-visible runtime state aligned with app services such as `environment_measurements` and `nac`, while persisting appearance changes back through `rm_nvs`.
 - `gui.c` handles UI events, mutates state through `gui_state_*`, and triggers rendering.
 - callback bindings let the GUI request actions such as Wi-Fi scan/connect/disconnect without directly owning those services.
 
@@ -111,18 +111,18 @@ The GUI component registers these direct component dependencies in `components/g
 - `io_extension`
 - `esp_lcd`
 - `log`
-- `sensor_data`
+- `environment_measurements`
 - `esp_timer`
 
 The app-level integration adds additional dependencies around the GUI rather than inside it:
 
 - `nac` for Wi-Fi status and requests
 - `rm_nvs` for persisted appearance preload and Wi-Fi metadata
-- `bme280_hal` and `sensor_data` for sensor acquisition and publication
+- `environment_measurements` for sensor acquisition, fallback, and latest-snapshot publication
 
 The result is a deliberate split:
 
-- the GUI component depends on display/input plumbing and the shared sensor data surface
+- the GUI component depends on display/input plumbing; the app adapter reads environment data and pushes GUI state
 - the app adapter handles service orchestration and persistence
 
 ## 5. Theme and Asset Surface
