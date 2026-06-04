@@ -4,21 +4,50 @@
 #include <cstdint>
 #include <cstring>
 
+#include "bme280/bme280_sensor.hpp"
+#include "environment_sensor.hpp"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "sdkconfig.h"
+#include "sim/simulated_bme280_sensor.hpp"
 
 extern "C" {
-#include "bme280_hal.h"
 #include "board_i2c.h"
 }
 
+#ifndef CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC
+#define CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC 1
+#endif
+
+#ifndef CONFIG_REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC
+#define CONFIG_REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC 2
+#endif
+
 namespace {
+
+using redmole::environment::Bme280Sensor;
+using redmole::environment::EnvironmentSensor;
+using redmole::environment::SimulatedBme280Sensor;
+using redmole::environment::kUsPerMs;
 
 constexpr uint32_t kTaskStackBytes = 4096U;
 constexpr UBaseType_t kTaskPriority = 5U;
 constexpr const char* kTag = "ENV_MEASURE";
+
+static TickType_t seconds_to_ticks(uint32_t seconds) {
+    TickType_t ticks = pdMS_TO_TICKS(seconds * 1000U);
+    if (ticks == 0U) {
+        ticks = 1U;
+    }
+
+    return ticks;
+}
+
+static bool tick_elapsed(TickType_t now, TickType_t last, TickType_t interval) {
+    return (now - last) >= interval;
+}
 
 class EnvironmentMeasurements {
 public:
@@ -28,13 +57,28 @@ public:
         }
 
         reset_store();
-        std::memset(&sensor_hal_, 0, sizeof(sensor_hal_));
 
-        esp_err_t rv = bme280_hal_init(&sensor_hal_);
+        esp_err_t rv = board_i2c_init();
         if (rv != ESP_OK) {
-            ESP_LOGE(kTag, "bme280_hal_init failed: %s", esp_err_to_name(rv));
+            ESP_LOGE(kTag, "board_i2c_init failed: %s", esp_err_to_name(rv));
             return rv;
         }
+
+        (void)real_primary_.init();
+        (void)real_alternate_.init();
+        rv = simulator_.init();
+        if (rv != ESP_OK) {
+            return rv;
+        }
+
+        environment_measurement_sample_t unused = {};
+        EnvironmentSensor* discovered_sensor = nullptr;
+        if (try_read_physical(unused, discovered_sensor)) {
+            active_inside_ = discovered_sensor;
+        } else {
+            active_inside_ = &simulator_;
+        }
+        log_active_sensor();
 
         initialized_ = true;
         return ESP_OK;
@@ -68,12 +112,8 @@ public:
             task_ = nullptr;
         }
 
-        if (initialized_) {
-            bme280_hal_deinit(&sensor_hal_);
-        }
-
+        active_inside_ = &simulator_;
         reset_store();
-        std::memset(&sensor_hal_, 0, sizeof(sensor_hal_));
         initialized_ = false;
     }
 
@@ -100,7 +140,7 @@ public:
 
     bool is_fresh(uint32_t max_age_ms) const {
         environment_measurement_sample_t sample = {};
-        const int64_t now_ms = esp_timer_get_time() / 1000LL;
+        const int64_t now_ms = esp_timer_get_time() / kUsPerMs;
 
         if (!get_latest(&sample)) {
             return false;
@@ -129,40 +169,120 @@ private:
     }
 
     void task_loop() {
-        bme280_measurement measurement = {};
-        environment_measurement_sample_t sample = {};
-        uint32_t period_ms = bme280_hal_get_period_ms(&sensor_hal_);
-        if (period_ms == 0U) {
-            period_ms = BME280_HAL_DEFAULT_PERIOD_MS;
-        }
-
-        bool last_hardware_present = board_i2c_bme280_present();
-        log_hardware_presence(last_hardware_present);
+        const TickType_t reading_ticks =
+            seconds_to_ticks(CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC);
+        const TickType_t detect_ticks =
+            seconds_to_ticks(CONFIG_REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC);
+        TickType_t last_wake = xTaskGetTickCount();
+        TickType_t last_publish = last_wake - reading_ticks;
 
         while (true) {
-            const bool hardware_present = board_i2c_bme280_present();
-            if (hardware_present != last_hardware_present) {
-                log_hardware_presence(hardware_present);
-                last_hardware_present = hardware_present;
-            }
+            const TickType_t now = xTaskGetTickCount();
+            const bool published_on_detection = update_sensor_presence(now, last_publish);
 
-            esp_err_t rv = bme280_hal_read(&sensor_hal_, &measurement);
-            if (rv == ESP_OK) {
-                sample.timestamp_ms = measurement.timestamp_ms;
-                sample.temperature_deci_c = measurement.temperature_deci_c;
-                sample.humidity_deci_pct = measurement.humidity_deci_pct;
-                sample.pressure_deci_hpa = measurement.pressure_deci_hpa;
-                sample.valid = true;
-
-                rv = publish(sample);
-                if (rv != ESP_OK) {
-                    ESP_LOGE(kTag, "publish failed: %s", esp_err_to_name(rv));
+            if (!published_on_detection && tick_elapsed(now, last_publish, reading_ticks)) {
+                if (read_and_publish()) {
+                    last_publish = xTaskGetTickCount();
                 }
-            } else if (hardware_present) {
-                ESP_LOGW(kTag, "bme280_hal_read failed: %s", esp_err_to_name(rv));
             }
 
-            vTaskDelay(pdMS_TO_TICKS(period_ms));
+            vTaskDelayUntil(&last_wake, detect_ticks);
+        }
+    }
+
+    bool update_sensor_presence(TickType_t now, TickType_t& last_publish) {
+        environment_measurement_sample_t sample = {};
+        EnvironmentSensor* sensor = nullptr;
+
+        if (active_inside_->is_simulated()) {
+            if (!try_read_physical(sample, sensor)) {
+                return false;
+            }
+
+            active_inside_ = sensor;
+            ESP_LOGI(kTag, "physical environment sensor detected; using hardware readings");
+            if (publish(sample) == ESP_OK) {
+                last_publish = now;
+                return true;
+            }
+
+            return false;
+        }
+
+        if (active_inside_->probe()) {
+            return false;
+        }
+
+        if (try_read_physical(sample, sensor)) {
+            active_inside_ = sensor;
+            if (publish(sample) == ESP_OK) {
+                last_publish = now;
+                return true;
+            }
+
+            return false;
+        }
+
+        active_inside_ = &simulator_;
+        ESP_LOGW(kTag, "physical environment sensor unplugged; falling back to simulation");
+        esp_err_t rv = active_inside_->read(sample);
+        if (rv != ESP_OK) {
+            ESP_LOGW(kTag, "simulated environment sensor read failed: %s", esp_err_to_name(rv));
+            return false;
+        }
+
+        if (publish(sample) == ESP_OK) {
+            last_publish = now;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool read_and_publish() {
+        environment_measurement_sample_t sample = {};
+
+        esp_err_t rv = active_inside_->read(sample);
+        if ((rv != ESP_OK) && !active_inside_->is_simulated()) {
+            active_inside_ = &simulator_;
+            ESP_LOGW(kTag, "physical environment sensor unplugged; falling back to simulation");
+            rv = active_inside_->read(sample);
+        }
+
+        if (rv != ESP_OK) {
+            ESP_LOGW(kTag, "environment sensor read failed: %s", esp_err_to_name(rv));
+            return false;
+        }
+
+        rv = publish(sample);
+        if (rv != ESP_OK) {
+            ESP_LOGE(kTag, "publish failed: %s", esp_err_to_name(rv));
+            return false;
+        }
+
+        return true;
+    }
+
+    bool try_read_physical(environment_measurement_sample_t& sample, EnvironmentSensor*& out_sensor) {
+        if (real_primary_.read(sample) == ESP_OK) {
+            out_sensor = &real_primary_;
+            return true;
+        }
+
+        if (real_alternate_.read(sample) == ESP_OK) {
+            out_sensor = &real_alternate_;
+            return true;
+        }
+
+        out_sensor = nullptr;
+        return false;
+    }
+
+    void log_active_sensor() const {
+        if (active_inside_->is_simulated()) {
+            ESP_LOGW(kTag, "BME280 not detected; using simulated inside environment sensor");
+        } else {
+            ESP_LOGI(kTag, "BME280 detected; using physical inside environment sensor");
         }
     }
 
@@ -184,15 +304,10 @@ private:
         update_count_.store(0U, std::memory_order_relaxed);
     }
 
-    static void log_hardware_presence(bool present) {
-        if (present) {
-            ESP_LOGI(kTag, "BME280 detected on board I2C");
-        } else {
-            ESP_LOGW(kTag, "BME280 not detected on board I2C");
-        }
-    }
-
-    bme280_hal sensor_hal_ = {};
+    Bme280Sensor real_primary_{0x76U};
+    Bme280Sensor real_alternate_{0x77U};
+    SimulatedBme280Sensor simulator_{};
+    EnvironmentSensor* active_inside_ = &simulator_;
     TaskHandle_t task_ = nullptr;
     environment_measurement_sample_t latest_ = {};
     std::atomic_uint version_{0U};

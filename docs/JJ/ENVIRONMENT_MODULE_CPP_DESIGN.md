@@ -80,17 +80,8 @@ Relevant components today:
 
 - `components/environment_measurements`
   - C++ wrapper with the public `environment_measurements_*` C API
-  - currently owns one `bme280_hal` context
+  - owns BME280 hardware access, simulator fallback, polling task, and latest sample snapshot
   - currently owns one polling task and latest-sample snapshot
-- `components/bme280`
-  - C HAL for BME280 hardware or compile-time simulator backend
-  - currently selects simulator vs hardware through build configuration
-- `components/sensor_data`
-  - separate C latest-sample store
-  - still used by GUI bindings and UART paths
-- `components/local_sensor_service`
-  - older C task that bridges `bme280_hal` into `sensor_data`
-  - overlaps with `environment_measurements`
 - `components/board_i2c`
   - shared board I2C bus owner
   - used by touch, IO extension, and sensors
@@ -187,6 +178,48 @@ public boundary:
 That matters because the UI should not talk directly to a FreeRTOS task or a
 sensor driver. It should ask the `environment_measurements` module for the
 latest environment data.
+
+## File And Folder Structure
+
+The BME280 implementation should be private to the environment module unless
+another product feature needs to use BME280 directly.
+
+Recommended structure:
+
+```text
+components/environment_measurements/
+    include/
+        environment_measurements.h        public C API for the rest of the app
+    src/
+        environment_measurements.cpp      C API bridge, controller, task
+        environment_sensor.hpp            private C++ sensor interface
+        bme280_sensor.hpp
+        bme280_sensor.cpp                 private Bosch BME280 implementation
+        simulated_bme280_sensor.hpp
+        simulated_bme280_sensor.cpp       private fallback sensor
+        bme280_registers.hpp              private register/constants helpers
+```
+
+First implementation may keep these classes in `environment_measurements.cpp`
+while the design is settling. Once the file becomes hard to navigate, split it
+using the structure above.
+
+What does not move into `environment_measurements`:
+
+- `board_i2c`
+
+`board_i2c` owns the shared bus because touch, IO extension, and sensors all use
+that hardware. Environment sensors depend on `board_i2c`; they do not own the
+bus.
+
+Removed legacy components after this migration:
+
+- `components/bme280`
+- `components/local_sensor_service`
+
+`components/sensor_data` is also removed for environment measurements. The
+environment API keeps the same basic sample shape so migration is a small call
+change for GUI, UART, or other consumers.
 
 ### Sensor Classes Own
 
@@ -682,8 +715,7 @@ This call starts the environment sensing task owned by the module.
 
 ### UI Data Read
 
-The GUI binding should stop reading local temperatures from `sensor_data` once
-the migration is done. It should call the environment module instead:
+The GUI binding reads local environment values from the environment module:
 
 ```c
 environment_measurement_sample_t sample = {0};
@@ -701,7 +733,7 @@ environment_measurements_get_latest_for_location(
 ```
 
 That keeps the GUI dependent on the environment responsibility area instead of
-the old data store or a concrete BME280 implementation.
+a separate data store or a concrete BME280 implementation.
 
 The UI should prefer one snapshot call over separate value calls.
 
@@ -787,17 +819,14 @@ Keep the public C header stable at first.
 
 ### Step 3: Move BME280 Hardware Logic Behind `Bme280Sensor`
 
-Either:
-
-- wrap the existing `bme280_hal` from the new C++ object first, or
-- move the BME280 hardware implementation directly into the new C++ class
-
-Wrapping first is lower risk. Moving later is cleaner.
+The first implementation moves BME280 hardware access directly into the
+environment module as private C++ code. The old standalone `bme280_hal`
+component is removed.
 
 ### Step 4: Add Discovery
 
-Replace the single `bme280_hal_init()` path in `EnvironmentMeasurements::init()`
-with targeted discovery:
+Replace the old single-sensor initialization path in
+`EnvironmentMeasurements::init()` with targeted discovery:
 
 - probe `0x76` and `0x77`
 - read chip ID
@@ -822,15 +851,10 @@ Later additions, not required for the first implementation:
 
 ### Step 6: Retire Overlap
 
-Once `environment_measurements` is feeding the UI and UART paths, decide what to
-do with old components:
-
-- remove `local_sensor_service` if unused
-- either remove `sensor_data` or redefine it as a broader application data store
-- either remove `bme280` as a separate component or keep it as a low-level driver
-  used only by `environment_measurements`
-
-Do this only after callers have moved.
+The old `bme280`, `local_sensor_service`, and `sensor_data` components are
+removed once `environment_measurements` owns the environment path. Consumers
+such as GUI and UART migrate by calling `environment_measurements_get_latest()`
+and reading the same measurement fields.
 
 ### Step 7: Board I2C Follow-Up
 
@@ -1082,18 +1106,17 @@ First implementation should touch only:
 - `components/environment_measurements/CMakeLists.txt` if sources are split
 - `main/Kconfig.projbuild` or a component Kconfig file for the reading interval
   and BME280 hardware configuration
-- the GUI binding file that currently reads `sensor_data`
+- the GUI and UART files that currently read old sensor data
 - `main.c` only if the init/start calls or includes need adjustment
-
-Do not delete `bme280`, `sensor_data`, or `local_sensor_service` in the first
-implementation unless they become truly unused and the build proves it.
 
 Decision:
 
 - keep implementation inside `environment_measurements.cpp` first
 - split into additional `.cpp`/`.hpp` files only if the file becomes difficult
   to navigate
-- keep old components in the tree for this branch
+- remove `bme280` and `local_sensor_service` after the environment path builds
+  without them
+- remove `sensor_data` after UART also reads from `environment_measurements`
 
 ### Build Verification
 
@@ -1106,7 +1129,7 @@ idf.py build
 If C API structs change, also search for all users:
 
 ```bash
-rg "environment_measurements_|sensor_data_get_latest_local|sensor_data_sample"
+rg "environment_measurements_"
 ```
 
 Decision:
@@ -1211,8 +1234,8 @@ access going through `board_i2c`.
 
 ## Open Questions
 
-- Should `sensor_data` remain as the application data owner, or should
-  `environment_measurements` fully replace it for local environment readings?
+- Should any future non-environment data store exist separately, or should
+  `environment_measurements` remain the only local environment reading owner?
 - Does the current ESP-IDF I2C master bus usage need explicit locking between
   touch and sensor transactions, or is the driver already serializing enough for
   this configuration?
