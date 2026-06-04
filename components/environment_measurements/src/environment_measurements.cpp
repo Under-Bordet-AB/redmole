@@ -57,6 +57,11 @@ public:
         : physical_sensors_{&real_primary_, &real_alternate_}, active_inside_(&simulator_) {
     }
 
+    EnvironmentMeasurements(const EnvironmentMeasurements&) = delete;
+    EnvironmentMeasurements& operator=(const EnvironmentMeasurements&) = delete;
+    EnvironmentMeasurements(EnvironmentMeasurements&&) = delete;
+    EnvironmentMeasurements& operator=(EnvironmentMeasurements&&) = delete;
+
     esp_err_t init() {
         if (initialized_) {
             return ESP_OK;
@@ -184,6 +189,10 @@ private:
         TickType_t last_wake = xTaskGetTickCount();
         TickType_t last_publish = last_wake - reading_ticks;
 
+        ESP_LOGI(kTag, "environment task cadence: reading=%ds detect=%ds active=%s",
+                 CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC,
+                 CONFIG_REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC, sensor_name(active_inside_));
+
         while (true) {
             const TickType_t now = xTaskGetTickCount();
             const bool published_on_detection = update_sensor_presence(now, last_publish);
@@ -208,7 +217,8 @@ private:
             }
 
             active_inside_ = sensor;
-            ESP_LOGI(kTag, "physical environment sensor detected; using hardware readings");
+            ESP_LOGI(kTag, "physical environment sensor detected: %s; using hardware readings",
+                     sensor_name(active_inside_));
             if (publish(sample) == ESP_OK) {
                 last_publish = now;
                 return true;
@@ -221,8 +231,12 @@ private:
             return false;
         }
 
+        ESP_LOGW(kTag, "active physical environment sensor lost: %s", sensor_name(active_inside_));
+
         if (try_read_physical(sample, sensor)) {
             active_inside_ = sensor;
+            ESP_LOGI(kTag, "switched to alternate physical environment sensor: %s",
+                     sensor_name(active_inside_));
             if (publish(sample) == ESP_OK) {
                 last_publish = now;
                 return true;
@@ -232,7 +246,8 @@ private:
         }
 
         active_inside_ = &simulator_;
-        ESP_LOGW(kTag, "physical environment sensor unplugged; falling back to simulation");
+        ESP_LOGW(kTag, "physical environment sensor unplugged; falling back to simulation: %s",
+                 sensor_name(active_inside_));
         esp_err_t rv = active_inside_->read(sample);
         if (rv != ESP_OK) {
             ESP_LOGW(kTag, "simulated environment sensor read failed: %s", esp_err_to_name(rv));
@@ -252,8 +267,11 @@ private:
 
         esp_err_t rv = active_inside_->read(sample);
         if ((rv != ESP_OK) && !active_inside_->is_simulated()) {
+            ESP_LOGW(kTag, "physical environment sensor read failed for %s: %s",
+                     sensor_name(active_inside_), esp_err_to_name(rv));
             active_inside_ = &simulator_;
-            ESP_LOGW(kTag, "physical environment sensor unplugged; falling back to simulation");
+            ESP_LOGW(kTag, "physical environment sensor unplugged; falling back to simulation: %s",
+                     sensor_name(active_inside_));
             rv = active_inside_->read(sample);
         }
 
@@ -285,10 +303,28 @@ private:
 
     void log_active_sensor() const {
         if (active_inside_->is_simulated()) {
-            ESP_LOGW(kTag, "BME280 not detected; using simulated inside environment sensor");
+            ESP_LOGW(kTag, "BME280 not detected; using simulated inside environment sensor: %s",
+                     sensor_name(active_inside_));
         } else {
-            ESP_LOGI(kTag, "BME280 detected; using physical inside environment sensor");
+            ESP_LOGI(kTag, "BME280 detected; using physical inside environment sensor: %s",
+                     sensor_name(active_inside_));
         }
+    }
+
+    const char* sensor_name(const EnvironmentSensor* sensor) const {
+        if (sensor == &real_primary_) {
+            return "BME280@0x76";
+        }
+
+        if (sensor == &real_alternate_) {
+            return "BME280@0x77";
+        }
+
+        if (sensor == &simulator_) {
+            return "simulated BME280";
+        }
+
+        return "unknown sensor";
     }
 
     esp_err_t publish(const environment_measurement_sample_t& sample) {

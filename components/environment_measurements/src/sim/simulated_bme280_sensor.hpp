@@ -8,6 +8,12 @@ namespace redmole::environment {
 
 class SimulatedBme280Sensor final : public EnvironmentSensor {
 public:
+    SimulatedBme280Sensor() = default;
+    SimulatedBme280Sensor(const SimulatedBme280Sensor&) = delete;
+    SimulatedBme280Sensor& operator=(const SimulatedBme280Sensor&) = delete;
+    SimulatedBme280Sensor(SimulatedBme280Sensor&&) = delete;
+    SimulatedBme280Sensor& operator=(SimulatedBme280Sensor&&) = delete;
+
     esp_err_t init() override;
     bool probe() override;
     esp_err_t read(environment_measurement_sample_t& out) override;

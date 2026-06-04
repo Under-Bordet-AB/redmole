@@ -37,6 +37,10 @@ struct Bme280Calibration {
 class Bme280Sensor final : public EnvironmentSensor {
 public:
     explicit Bme280Sensor(uint8_t address);
+    Bme280Sensor(const Bme280Sensor&) = delete;
+    Bme280Sensor& operator=(const Bme280Sensor&) = delete;
+    Bme280Sensor(Bme280Sensor&&) = delete;
+    Bme280Sensor& operator=(Bme280Sensor&&) = delete;
 
     esp_err_t init() override;
     bool probe() override;
