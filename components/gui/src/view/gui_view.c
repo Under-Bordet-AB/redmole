@@ -780,8 +780,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         sidebar_grad   = lv_color_hex(def->sidebar_grad);
         sidebar_shadow = lv_color_hex(def->sidebar_shadow);
         sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        //brand_text     = lv_color_hex(def->brand_text);
-        brand_text     = lv_color_hex(def->accent_color);
+        brand_text     = lv_color_hex(def->brand_text);
 
         content_bg     = lv_color_hex(def->content_bg);
         content_shadow = lv_color_hex(def->content_shadow);
