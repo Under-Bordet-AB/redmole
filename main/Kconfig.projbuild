@@ -5,9 +5,8 @@ menu "RedMole Sensor Configuration"
         default 1
         range 1 3600
         help
-            Period used by the environment measurement task. The task uses
-            vTaskDelayUntil(), so sensor execution time is included in this
-            cadence.
+            Period used to read and publish environment measurements. Reading
+            and hardware detection use independent schedules.
 
     config REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC
         int "Environment hardware detection interval in seconds"

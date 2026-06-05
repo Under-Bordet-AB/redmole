@@ -1,5 +1,7 @@
 #include "bme280/bme280_sensor.hpp"
 
+#include <cmath>
+
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -85,20 +87,14 @@ static int16_t s12(int16_t value) {
 
 } // namespace
 
-Bme280Sensor::Bme280Sensor(uint8_t address) : address_(address) {
+Bme280Source::Bme280Source(uint8_t address) : address_(address) {
 }
 
-esp_err_t Bme280Sensor::init() {
-    esp_err_t rv = ensure_device_handle();
-    if (rv != ESP_OK) {
-        mark_disconnected();
-        return rv;
-    }
-
-    return connect();
+esp_err_t Bme280Source::init() {
+    return ensure_device_handle();
 }
 
-bool Bme280Sensor::probe() {
+bool Bme280Source::probe() {
     uint8_t chip_id = 0;
 
     if (!board_i2c_probe_address(address_)) {
@@ -125,18 +121,22 @@ bool Bme280Sensor::probe() {
     return true;
 }
 
-esp_err_t Bme280Sensor::read(environment_measurement_sample_t& out) {
+esp_err_t Bme280Source::activate() {
+    return connect();
+}
+
+esp_err_t Bme280Source::poll(MeasurementBatch& batch) {
     Bme280RawSample raw = {};
+    Bme280Reading reading = {};
+    EnvironmentMeasurement temperature{};
+    EnvironmentMeasurement humidity{};
+    EnvironmentMeasurement pressure{};
 
-    esp_err_t rv = connect();
-    if (rv != ESP_OK) {
-        return rv;
-    }
-
-    if (mode_ == 0U) {
+    if (!configured_ || (mode_ == 0U)) {
         return ESP_ERR_INVALID_STATE;
     }
 
+    esp_err_t rv = ESP_OK;
     if ((mode_ == 1U) || (mode_ == 2U)) {
         rv = write_ctrl_meas();
         if (rv != ESP_OK) {
@@ -151,19 +151,18 @@ esp_err_t Bme280Sensor::read(environment_measurement_sample_t& out) {
         return rv;
     }
 
-    convert(raw, out); // JJ: lets see if we really need to convert
+    convert(raw, reading);
+    if (!make_temperature(reading.temperature_deci_c, reading.timestamp_ms, temperature) ||
+        !make_humidity(reading.humidity_deci_pct, reading.timestamp_ms, humidity) ||
+        !make_pressure(reading.pressure_deci_hpa, reading.timestamp_ms, pressure) ||
+        !batch.report(temperature) || !batch.report(humidity) || !batch.report(pressure)) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
     return ESP_OK;
 }
 
-SensorLocation Bme280Sensor::location() const {
-    return SensorLocation::Inside; // JJ: hardcoded "inside". This is wrong.
-}
-
-bool Bme280Sensor::is_simulated() const {
-    return false; // JJ: why is this always returning false? Is it because simulated always return true? Why use a function and not just a fixed variable from init?
-}
-
-esp_err_t Bme280Sensor::ensure_device_handle() {
+esp_err_t Bme280Source::ensure_device_handle() {
     if (dev_ != nullptr) {
         return ESP_OK;
     }
@@ -171,7 +170,7 @@ esp_err_t Bme280Sensor::ensure_device_handle() {
     return board_i2c_add_device(address_, BOARD_I2C_DEFAULT_SPEED_HZ, &dev_);
 }
 
-esp_err_t Bme280Sensor::connect() {
+esp_err_t Bme280Source::connect() {
     uint8_t chip_id = 0;
 
     if (!probe()) {
@@ -203,12 +202,12 @@ esp_err_t Bme280Sensor::connect() {
     return ESP_OK;
 }
 
-void Bme280Sensor::mark_disconnected() {
+void Bme280Source::mark_disconnected() {
     present_ = false;
     configured_ = false;
 }
 
-esp_err_t Bme280Sensor::configure() {
+esp_err_t Bme280Source::configure() {
     esp_err_t rv = board_i2c_write_reg(dev_, BME280_REG_RESET, kBme280ResetCommand);
     if (rv != ESP_OK) {
         return rv;
@@ -253,17 +252,16 @@ esp_err_t Bme280Sensor::configure() {
     return ESP_OK;
 }
 
-esp_err_t Bme280Sensor::write_ctrl_meas() {
-    const uint8_t ctrl_meas =
-        static_cast<uint8_t>((osrs_t_ << 5U) | (osrs_p_ << 2U) | mode_);
+esp_err_t Bme280Source::write_ctrl_meas() {
+    const uint8_t ctrl_meas = static_cast<uint8_t>((osrs_t_ << 5U) | (osrs_p_ << 2U) | mode_);
     return board_i2c_write_reg(dev_, BME280_REG_CTRL_MEAS, ctrl_meas);
 }
 
-esp_err_t Bme280Sensor::read_u8(uint8_t reg, uint8_t& out) {
+esp_err_t Bme280Source::read_u8(uint8_t reg, uint8_t& out) {
     return board_i2c_read_reg(dev_, reg, &out, 1U);
 }
 
-esp_err_t Bme280Sensor::wait_until_ready() {
+esp_err_t Bme280Source::wait_until_ready() {
     for (uint8_t attempt = 0; attempt < kBme280ReadyWaitAttempts; attempt++) {
         uint8_t status = 0;
         esp_err_t rv = read_u8(BME280_REG_STATUS, status);
@@ -281,7 +279,7 @@ esp_err_t Bme280Sensor::wait_until_ready() {
     return ESP_ERR_TIMEOUT;
 }
 
-esp_err_t Bme280Sensor::load_calibration() {
+esp_err_t Bme280Source::load_calibration() {
     uint8_t calib0[26] = {};
     uint8_t calib1[7] = {};
 
@@ -311,16 +309,14 @@ esp_err_t Bme280Sensor::load_calibration() {
     calibration_.dig_H2 = s16_le(&calib1[0]);
     calibration_.dig_H3 = calib1[2];
     calibration_.dig_H4 =
-        s12(static_cast<int16_t>((static_cast<int16_t>(calib1[3]) << 4U) |
-                                 (calib1[4] & 0x0FU)));
+        s12(static_cast<int16_t>((static_cast<int16_t>(calib1[3]) << 4U) | (calib1[4] & 0x0FU)));
     calibration_.dig_H5 =
-        s12(static_cast<int16_t>((static_cast<int16_t>(calib1[5]) << 4U) |
-                                 (calib1[4] >> 4U)));
+        s12(static_cast<int16_t>((static_cast<int16_t>(calib1[5]) << 4U) | (calib1[4] >> 4U)));
     calibration_.dig_H6 = static_cast<int8_t>(calib1[6]);
     return ESP_OK;
 }
 
-esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
+esp_err_t Bme280Source::read_raw(Bme280RawSample& out_raw) {
     uint8_t data[8] = {};
 
     esp_err_t rv = wait_until_ready();
@@ -333,28 +329,23 @@ esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
         return rv;
     }
 
-    out_raw.adc_pressure =
-        (static_cast<int32_t>(data[0]) << 12U) | (static_cast<int32_t>(data[1]) << 4U) |
-        (data[2] >> 4U);
-    out_raw.adc_temperature =
-        (static_cast<int32_t>(data[3]) << 12U) | (static_cast<int32_t>(data[4]) << 4U) |
-        (data[5] >> 4U);
+    out_raw.adc_pressure = (static_cast<int32_t>(data[0]) << 12U) |
+                           (static_cast<int32_t>(data[1]) << 4U) | (data[2] >> 4U);
+    out_raw.adc_temperature = (static_cast<int32_t>(data[3]) << 12U) |
+                              (static_cast<int32_t>(data[4]) << 4U) | (data[5] >> 4U);
     out_raw.adc_humidity = (static_cast<int32_t>(data[6]) << 8U) | data[7];
     return ESP_OK;
 }
 
-void Bme280Sensor::convert(const Bme280RawSample& raw,
-                           environment_measurement_sample_t& out) const {
-    double var1 =
-        ((static_cast<double>(raw.adc_temperature) / 16384.0) -
-         (static_cast<double>(calibration_.dig_T1) / 1024.0)) *
-        static_cast<double>(calibration_.dig_T2);
-    double var2 =
-        (((static_cast<double>(raw.adc_temperature) / 131072.0) -
-          (static_cast<double>(calibration_.dig_T1) / 8192.0)) *
-         ((static_cast<double>(raw.adc_temperature) / 131072.0) -
-          (static_cast<double>(calibration_.dig_T1) / 8192.0))) *
-        static_cast<double>(calibration_.dig_T3);
+void Bme280Source::convert(const Bme280RawSample& raw, Bme280Reading& out) const {
+    double var1 = ((static_cast<double>(raw.adc_temperature) / 16384.0) -
+                   (static_cast<double>(calibration_.dig_T1) / 1024.0)) *
+                  static_cast<double>(calibration_.dig_T2);
+    double var2 = (((static_cast<double>(raw.adc_temperature) / 131072.0) -
+                    (static_cast<double>(calibration_.dig_T1) / 8192.0)) *
+                   ((static_cast<double>(raw.adc_temperature) / 131072.0) -
+                    (static_cast<double>(calibration_.dig_T1) / 8192.0))) *
+                  static_cast<double>(calibration_.dig_T3);
     const double t_fine = var1 + var2;
     const double temperature_c = t_fine / 5120.0;
 
@@ -371,24 +362,20 @@ void Bme280Sensor::convert(const Bme280RawSample& raw,
     if (var1 != 0.0) {
         pressure_pa = 1048576.0 - static_cast<double>(raw.adc_pressure);
         pressure_pa = (pressure_pa - (var2 / 4096.0)) * 6250.0 / var1;
-        var1 = static_cast<double>(calibration_.dig_P9) * pressure_pa * pressure_pa /
-               2147483648.0;
+        var1 = static_cast<double>(calibration_.dig_P9) * pressure_pa * pressure_pa / 2147483648.0;
         var2 = pressure_pa * static_cast<double>(calibration_.dig_P8) / 32768.0;
-        pressure_pa =
-            pressure_pa + (var1 + var2 + static_cast<double>(calibration_.dig_P7)) / 16.0;
+        pressure_pa = pressure_pa + (var1 + var2 + static_cast<double>(calibration_.dig_P7)) / 16.0;
     }
 
     double humidity_pct = t_fine - 76800.0;
     humidity_pct =
-        (raw.adc_humidity -
-         ((static_cast<double>(calibration_.dig_H4) * 64.0) +
-          (static_cast<double>(calibration_.dig_H5) / 16384.0 * humidity_pct))) *
+        (raw.adc_humidity - ((static_cast<double>(calibration_.dig_H4) * 64.0) +
+                             (static_cast<double>(calibration_.dig_H5) / 16384.0 * humidity_pct))) *
         (static_cast<double>(calibration_.dig_H2) / 65536.0 *
          (1.0 + (static_cast<double>(calibration_.dig_H6) / 67108864.0 * humidity_pct *
-                 (1.0 + (static_cast<double>(calibration_.dig_H3) / 67108864.0 *
-                         humidity_pct)))));
-    humidity_pct = humidity_pct *
-                   (1.0 - (static_cast<double>(calibration_.dig_H1) * humidity_pct / 524288.0));
+                 (1.0 + (static_cast<double>(calibration_.dig_H3) / 67108864.0 * humidity_pct)))));
+    humidity_pct =
+        humidity_pct * (1.0 - (static_cast<double>(calibration_.dig_H1) * humidity_pct / 524288.0));
     if (humidity_pct > 100.0) {
         humidity_pct = 100.0;
     } else if (humidity_pct < 0.0) {
@@ -396,10 +383,9 @@ void Bme280Sensor::convert(const Bme280RawSample& raw,
     }
 
     out.timestamp_ms = esp_timer_get_time() / kUsPerMs;
-    out.temperature_deci_c = static_cast<int32_t>((temperature_c * 10.0) + 0.5);
-    out.humidity_deci_pct = static_cast<int32_t>((humidity_pct * 10.0) + 0.5);
-    out.pressure_deci_hpa = static_cast<int32_t>((pressure_pa / 10.0) + 0.5);
-    out.valid = true;
+    out.temperature_deci_c = static_cast<int32_t>(std::lround(temperature_c * 10.0));
+    out.humidity_deci_pct = static_cast<int32_t>(std::lround(humidity_pct * 10.0));
+    out.pressure_deci_hpa = static_cast<int32_t>(std::lround(pressure_pa / 10.0));
 }
 
 } // namespace redmole::environment

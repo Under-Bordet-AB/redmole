@@ -5,7 +5,7 @@
 namespace redmole::environment {
 namespace {
 
-static int32_t triangle_wave(uint32_t phase, int32_t midpoint, int32_t amplitude) {
+int32_t triangle_wave(uint32_t phase, int32_t midpoint, int32_t amplitude) {
     const uint32_t segment = phase % 40U;
     int32_t offset = 0;
 
@@ -24,31 +24,34 @@ static int32_t triangle_wave(uint32_t phase, int32_t midpoint, int32_t amplitude
 
 } // namespace
 
-esp_err_t SimulatedBme280Sensor::init() {
+esp_err_t SimulatedEnvironmentSource::init() {
     sample_index_ = 0U;
     return ESP_OK;
 }
 
-bool SimulatedBme280Sensor::probe() {
+bool SimulatedEnvironmentSource::probe() {
     return true;
 }
 
-esp_err_t SimulatedBme280Sensor::read(environment_measurement_sample_t& out) {
-    out.timestamp_ms = esp_timer_get_time() / kUsPerMs;
-    out.temperature_deci_c = triangle_wave(sample_index_, 225, 22);
-    out.humidity_deci_pct = triangle_wave(sample_index_ + 11U, 470, 80);
-    out.pressure_deci_hpa = triangle_wave(sample_index_ + 23U, 10120, 65);
-    out.valid = true;
-    sample_index_++;
+esp_err_t SimulatedEnvironmentSource::activate() {
     return ESP_OK;
 }
 
-SensorLocation SimulatedBme280Sensor::location() const {
-    return SensorLocation::Inside;
-}
+esp_err_t SimulatedEnvironmentSource::poll(MeasurementBatch& batch) {
+    const int64_t timestamp_ms = esp_timer_get_time() / kUsPerMs;
+    EnvironmentMeasurement temperature{};
+    EnvironmentMeasurement humidity{};
+    EnvironmentMeasurement pressure{};
 
-bool SimulatedBme280Sensor::is_simulated() const {
-    return true;
+    if (!make_temperature(triangle_wave(sample_index_, 225, 22), timestamp_ms, temperature) ||
+        !make_humidity(triangle_wave(sample_index_ + 11U, 470, 80), timestamp_ms, humidity) ||
+        !make_pressure(triangle_wave(sample_index_ + 23U, 10120, 65), timestamp_ms, pressure) ||
+        !batch.report(temperature) || !batch.report(humidity) || !batch.report(pressure)) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    sample_index_++;
+    return ESP_OK;
 }
 
 } // namespace redmole::environment

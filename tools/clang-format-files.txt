@@ -2,4 +2,6 @@ components/nvs/include/rm_nvs.h
 components/nvs/src/rm_nvs.c
 components/board_i2c/include/board_i2c.h
 components/board_i2c/src/board_i2c.c
+components/environment_measurements/src/environment_measurements.cpp
+components/environment_measurements/src/bme280/bme280_sensor.cpp
 main/main.c

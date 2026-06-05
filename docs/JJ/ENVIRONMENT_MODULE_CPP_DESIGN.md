@@ -783,7 +783,8 @@ private:
 
     EnvironmentReading latest_by_location_[kLocationCount];
     environment_measurement_sample_t compatibility_latest_;
-    std::atomic_uint version_;
+    StaticSemaphore_t latest_mutex_storage_;
+    SemaphoreHandle_t latest_mutex_;
     std::atomic_uint update_count_;
     TaskHandle_t task_;
     bool initialized_;
@@ -1031,24 +1032,22 @@ Decision:
 - if Kconfig is set to `60`, the task should publish roughly once per minute
 - revisit per-sensor polling periods only when a second real sensor type needs it
 
-Use a non-drifting task cadence:
+Track reading and hardware-detection deadlines independently:
 
 ```cpp
-const TickType_t interval_ticks =
-    pdMS_TO_TICKS(CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC * 1000U);
-TickType_t last_wake = xTaskGetTickCount();
+TickType_t last_read_attempt = xTaskGetTickCount() - reading_ticks;
+TickType_t last_detection = xTaskGetTickCount() - detect_ticks;
 
 while (true) {
-    read_and_publish_environment();
-    vTaskDelayUntil(&last_wake, interval_ticks);
+    run_due_detection();
+    run_due_read();
+    vTaskDelay(ticks_until_nearest_deadline());
 }
 ```
 
-`vTaskDelayUntil()` is the right FreeRTOS primitive here because it schedules the
-next wake relative to the previous wake time. That means sensor execution time is
-included in the period. If the interval is 60 seconds and the sensor read takes
-200 ms, the task sleeps for about 59.8 seconds instead of drifting to 60.2
-seconds per cycle.
+This prevents a slower detection interval from accidentally controlling the
+reading cadence. Failed reads count as attempts and wait until the next reading
+deadline instead of retrying in a tight loop.
 
 Kconfig should clamp the interval to a reasonable range, for example:
 
@@ -1078,9 +1077,9 @@ Decision:
 
 The polling task writes samples. GUI/main reads samples.
 
-Decision: keep the existing versioned snapshot pattern already used in
-`environment_measurements.cpp`. Extend it to per-location latest samples instead
-of introducing a new mutex in the first implementation.
+Decision: protect latest-sample storage with a statically allocated FreeRTOS
+mutex. Writers hold the mutex while replacing a sample, and readers hold it only
+while copying a sample out.
 
 Do not hold an I2C/bus lock while publishing to the data store.
 
@@ -1088,14 +1087,14 @@ Why this is reasonable here:
 
 - there is one writer, the environment polling task
 - readers only need small copy-out snapshots
-- reads should not block the sensor polling task
-- the existing code already uses this pattern, so extending it is lower risk
-- the version counter prevents readers from accepting a half-written sample
+- the protected copy is small, so lock duration is short
+- static allocation keeps ownership deterministic and avoids heap allocation
+- ordinary non-atomic sample storage cannot legally be read while another task
+  writes it, even when an atomic version counter detects overlapping access
 
-This pattern is not a universal replacement for a mutex. If later data grows
-into larger history buffers, multi-sample iteration, or complex mutation across
-several structures, use a mutex or owner-task message queue for those parts.
-For the first latest-sample API, the versioned snapshot pattern is a good fit.
+If later data grows into larger history buffers, multi-sample iteration, or
+complex mutation across several structures, consider an owner-task message
+queue or a different synchronization design.
 
 ### First Code Change Boundaries
 
