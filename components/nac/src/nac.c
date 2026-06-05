@@ -27,10 +27,11 @@
 #include "sdkconfig.h"
 #include "task_scheduler.h"
 
-#define REDMOLE_WIFI_SSID   CONFIG_REDMOLE_WIFI_SSID
-#define REDMOLE_WIFI_PASS   CONFIG_REDMOLE_WIFI_PASSWORD
-#define REDMOLE_MAX_RETRY   CONFIG_REDMOLE_MAXIMUM_RETRY
+#define REDMOLE_WIFI_SSID   CONFIG_REDMOLE_WIFI_SSID        // Set fallback SSID using menuconfig
+#define REDMOLE_WIFI_PASS   CONFIG_REDMOLE_WIFI_PASSWORD    // Set fallback password using menuconfig
+#define REDMOLE_MAX_RETRY   CONFIG_REDMOLE_MAXIMUM_RETRY    // Set maximum retry count using menuconfig
 
+/*
 #if CONFIG_REDMOLE_WPA3_SAE_PWE_HUNT_AND_PECK
     #define REDMOLE_WPA3_SAE_MODE  WPA3_SAE_PWE_HUNT_AND_PECK
     #define REDMOLE_H2E_IDENTIFIER ""
@@ -64,6 +65,7 @@
 #else
     #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA2_PSK
 #endif
+*/
 
 typedef struct
 {
@@ -92,9 +94,6 @@ task_status_t wifi_connect(task_node_t *node);
 
 esp_err_t nac_init(EventGroupHandle_t *event_group)
 {
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
     memset(&s_nac, 0, sizeof(s_nac));
     s_nac.event_group = event_group;
 
@@ -147,7 +146,6 @@ esp_err_t nac_request_wifi_connect(const char *ssid, const char *password)
         strncpy(s_wifi_pass, password, WIFI_CRED_MAX_LENGTH - 1);
         s_wifi_pass[WIFI_CRED_MAX_LENGTH - 1] = '\0';
     }
-    ESP_LOGI("NAC", "Got ssid=%s, password=%s", ssid ? ssid : "(null)", password ? password : "(null)");
 
     s_nac.wifi.retry_count    = 0;
     s_nac.wifi.saved_to_nvs   = 0;
