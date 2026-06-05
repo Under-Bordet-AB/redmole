@@ -60,7 +60,7 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
     /* [0] GUI_VIEW_THEME_LIGHT                                            */
     /* ------------------------------------------------------------------ */
     {
-        .display_name               = "Light mode",
+        .display_name               = "Light",
         .is_user_selectable         = true,
         .has_night_variant          = false,
         .night_variant              = GUI_VIEW_THEME_LIGHT,
@@ -140,7 +140,7 @@ static const gui_theme_def_t gui_themes[GUI_THEME_COUNT] = {
     /* [1] GUI_VIEW_THEME_DARK                                             */
     /* ------------------------------------------------------------------ */
     {
-        .display_name               = "Dark mode",
+        .display_name               = "Dark",
         .is_user_selectable         = true,
         .has_night_variant          = false,
         .night_variant              = GUI_VIEW_THEME_DARK,
