@@ -44,10 +44,17 @@ void test_wifi_request_connect_returns_ESP_OK_when_connected(void)
     TEST_ASSERT_EQUAL(ESP_OK, nac_request_wifi_connect(s_wifi_ssid, s_wifi_pass));
 }
 
+void test_get_scan_result(void)
+{
+    uint16_t sp_out;
+    TEST_ASSERT_EQUAL(NULL, nac_get_scan_results(&sp_out));
+}
+
 void app_main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_wifi_state_after_init);
     RUN_TEST(test_wifi_request_connect_returns_ESP_OK_when_connected);
+    RUN_TEST(test_get_scan_result);
     UNITY_END();
 }
