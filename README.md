@@ -47,7 +47,7 @@ Current runtime behavior:
 
 - console output uses `USB Serial/JTAG`
 - PSRAM is enabled because the RGB panel frame buffers need it
-- `environment_measurements` owns BME280 discovery, polling, latest data, and simulation fallback
+- `environment_measurements` owns the configured environment sensor, polling task, and latest data
 - `main.c` owns app-layer orchestration
 - the Wi-Fi module code is still present in the repo
 - Wi-Fi behavior is driven through the current NAC/app binding path

@@ -24,32 +24,17 @@ int32_t triangle_wave(uint32_t phase, int32_t midpoint, int32_t amplitude) {
 
 } // namespace
 
-esp_err_t SimulatedEnvironmentSource::init() {
+esp_err_t SimulatedEnvironmentSensor::init() {
     sample_index_ = 0U;
     return ESP_OK;
 }
 
-bool SimulatedEnvironmentSource::probe() {
-    return true;
-}
-
-esp_err_t SimulatedEnvironmentSource::activate() {
-    return ESP_OK;
-}
-
-esp_err_t SimulatedEnvironmentSource::poll(MeasurementBatch& batch) {
-    const int64_t timestamp_ms = esp_timer_get_time() / kUsPerMs;
-    EnvironmentMeasurement temperature{};
-    EnvironmentMeasurement humidity{};
-    EnvironmentMeasurement pressure{};
-
-    if (!make_temperature(triangle_wave(sample_index_, 225, 22), timestamp_ms, temperature) ||
-        !make_humidity(triangle_wave(sample_index_ + 11U, 470, 80), timestamp_ms, humidity) ||
-        !make_pressure(triangle_wave(sample_index_ + 23U, 10120, 65), timestamp_ms, pressure) ||
-        !batch.report(temperature) || !batch.report(humidity) || !batch.report(pressure)) {
-        return ESP_ERR_INVALID_RESPONSE;
-    }
-
+esp_err_t SimulatedEnvironmentSensor::read(environment_measurement_sample_t& sample) {
+    sample.timestamp_ms = esp_timer_get_time() / kMicrosecondsPerMillisecond;
+    sample.temperature_deci_c = triangle_wave(sample_index_, 225, 22);
+    sample.humidity_deci_pct = triangle_wave(sample_index_ + 11U, 470, 80);
+    sample.pressure_deci_hpa = triangle_wave(sample_index_ + 23U, 10120, 65);
+    sample.valid = true;
     sample_index_++;
     return ESP_OK;
 }

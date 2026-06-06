@@ -5,18 +5,33 @@ menu "RedMole Sensor Configuration"
         default 1
         range 1 3600
         help
-            Period used to read and publish environment measurements. Reading
-            and hardware detection use independent schedules.
+            Period used to read and publish environment measurements.
 
-    config REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC
-        int "Environment hardware detection interval in seconds"
-        default 2
-        range 1 300
+    choice REDMOLE_ENVIRONMENT_SOURCE
+        prompt "Environment measurement source"
+        default REDMOLE_ENVIRONMENT_SOURCE_BME280
         help
-            Period used to check whether the physical environment sensor has
-            been unplugged or reconnected. This is intentionally separate from
-            the slower reading interval so demos can show fallback and recovery
-            without publishing environment readings too often.
+            Select the one environment source used by this firmware build.
+            The simulator is explicit and is never used as a hardware fallback.
+
+        config REDMOLE_ENVIRONMENT_SOURCE_BME280
+            bool "BME280 at address 0x76"
+
+        config REDMOLE_ENVIRONMENT_SOURCE_SIMULATOR
+            bool "Simulator"
+    endchoice
+
+    choice REDMOLE_BME280_ADDRESS
+        prompt "BME280 I2C address"
+        default REDMOLE_BME280_ADDRESS_0X77
+        depends on REDMOLE_ENVIRONMENT_SOURCE_BME280
+
+        config REDMOLE_BME280_ADDRESS_0X76
+            bool "0x76"
+
+        config REDMOLE_BME280_ADDRESS_0X77
+            bool "0x77"
+    endchoice
 
     config REDMOLE_BME280_MODE
         int "BME280 mode"

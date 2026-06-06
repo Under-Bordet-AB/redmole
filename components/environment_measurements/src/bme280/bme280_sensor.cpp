@@ -87,82 +87,69 @@ static int16_t s12(int16_t value) {
 
 } // namespace
 
-Bme280Source::Bme280Source(uint8_t address) : address_(address) {
+Bme280Sensor::Bme280Sensor(uint8_t address) : address_(address) {
 }
 
-esp_err_t Bme280Source::init() {
-    return ensure_device_handle();
-}
+esp_err_t Bme280Sensor::init() {
+    esp_err_t result;
 
-bool Bme280Source::probe() {
-    uint8_t chip_id = 0;
+    configured_ = false;
 
-    if (!board_i2c_probe_address(address_)) {
-        mark_disconnected();
-        return false;
+    result = ensure_device_handle();
+    if (result != ESP_OK) {
+        return result;
     }
 
-    if (ensure_device_handle() != ESP_OK) {
-        mark_disconnected();
-        return false;
+    result = check_chip_id();
+    if (result != ESP_OK) {
+        return result;
     }
 
-    if (read_u8(BME280_REG_CHIP_ID, chip_id) != ESP_OK) {
-        mark_disconnected();
-        return false;
+    result = configure();
+    if (result != ESP_OK) {
+        return result;
     }
 
-    if (chip_id != kBme280ChipId) {
-        mark_disconnected();
-        return false;
-    }
-
-    present_ = true;
-    return true;
-}
-
-esp_err_t Bme280Source::activate() {
-    return connect();
-}
-
-esp_err_t Bme280Source::poll(MeasurementBatch& batch) {
-    Bme280RawSample raw = {};
-    Bme280Reading reading = {};
-    EnvironmentMeasurement temperature{};
-    EnvironmentMeasurement humidity{};
-    EnvironmentMeasurement pressure{};
-
-    if (!configured_ || (mode_ == 0U)) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    esp_err_t rv = ESP_OK;
-    if ((mode_ == 1U) || (mode_ == 2U)) {
-        rv = write_ctrl_meas();
-        if (rv != ESP_OK) {
-            mark_disconnected();
-            return rv;
-        }
-    }
-
-    rv = read_raw(raw);
-    if (rv != ESP_OK) {
-        mark_disconnected();
-        return rv;
-    }
-
-    convert(raw, reading);
-    if (!make_temperature(reading.temperature_deci_c, reading.timestamp_ms, temperature) ||
-        !make_humidity(reading.humidity_deci_pct, reading.timestamp_ms, humidity) ||
-        !make_pressure(reading.pressure_deci_hpa, reading.timestamp_ms, pressure) ||
-        !batch.report(temperature) || !batch.report(humidity) || !batch.report(pressure)) {
-        return ESP_ERR_INVALID_RESPONSE;
-    }
-
+    configured_ = true;
+    ESP_LOGI(kTag, "BME280 initialized at 0x%02x", address_);
     return ESP_OK;
 }
 
-esp_err_t Bme280Source::ensure_device_handle() {
+esp_err_t Bme280Sensor::read(environment_measurement_sample_t& sample) {
+    Bme280RawSample raw = {};
+    esp_err_t result;
+
+    if (!configured_) {
+        result = init();
+        if (result != ESP_OK) {
+            return result;
+        }
+    }
+
+    if (mode_ == 0U) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if ((mode_ == 1U) || (mode_ == 2U)) {
+        result = write_ctrl_meas();
+        if (result != ESP_OK) {
+            configured_ = false;
+            return result;
+        }
+    }
+
+    result = read_raw(raw);
+    if (result != ESP_OK) {
+        configured_ = false;
+        return result;
+    }
+
+    convert(raw, sample);
+    sample.valid = true;
+    return ESP_OK;
+}
+
+esp_err_t Bme280Sensor::ensure_device_handle() {
     if (dev_ != nullptr) {
         return ESP_OK;
     }
@@ -170,59 +157,46 @@ esp_err_t Bme280Source::ensure_device_handle() {
     return board_i2c_add_device(address_, BOARD_I2C_DEFAULT_SPEED_HZ, &dev_);
 }
 
-esp_err_t Bme280Source::connect() {
+esp_err_t Bme280Sensor::check_chip_id() {
     uint8_t chip_id = 0;
+    esp_err_t result;
 
-    if (!probe()) {
+    if (!board_i2c_probe_address(address_)) {
         return ESP_ERR_NOT_FOUND;
     }
 
-    esp_err_t rv = read_u8(BME280_REG_CHIP_ID, chip_id);
-    if (rv != ESP_OK) {
-        mark_disconnected();
-        return rv;
+    result = read_u8(BME280_REG_CHIP_ID, chip_id);
+    if (result != ESP_OK) {
+        return result;
     }
 
     if (chip_id != kBme280ChipId) {
         ESP_LOGW(kTag, "Unexpected BME280 chip id at 0x%02x: 0x%02x", address_, chip_id);
-        mark_disconnected();
         return ESP_ERR_NOT_FOUND;
     }
 
-    if (!configured_) {
-        rv = configure();
-        if (rv != ESP_OK) {
-            mark_disconnected();
-            return rv;
-        }
-        ESP_LOGI(kTag, "BME280 hardware initialized at 0x%02x", address_);
-    }
-
-    present_ = true;
     return ESP_OK;
 }
 
-void Bme280Source::mark_disconnected() {
-    present_ = false;
-    configured_ = false;
-}
+esp_err_t Bme280Sensor::configure() {
+    esp_err_t result;
+    uint8_t config;
 
-esp_err_t Bme280Source::configure() {
-    esp_err_t rv = board_i2c_write_reg(dev_, BME280_REG_RESET, kBme280ResetCommand);
-    if (rv != ESP_OK) {
-        return rv;
+    result = board_i2c_write_reg(dev_, BME280_REG_RESET, kBme280ResetCommand);
+    if (result != ESP_OK) {
+        return result;
     }
 
     vTaskDelay(pdMS_TO_TICKS(kBme280ResetDelayMs));
 
-    rv = wait_until_ready();
-    if (rv != ESP_OK) {
-        return rv;
+    result = wait_until_ready();
+    if (result != ESP_OK) {
+        return result;
     }
 
-    rv = load_calibration();
-    if (rv != ESP_OK) {
-        return rv;
+    result = load_calibration();
+    if (result != ESP_OK) {
+        return result;
     }
 
     mode_ = clamp_bme280_setting(CONFIG_REDMOLE_BME280_MODE, 3U);
@@ -232,41 +206,44 @@ esp_err_t Bme280Source::configure() {
     filter_ = clamp_bme280_setting(CONFIG_REDMOLE_BME280_IIR_FILTER, 4U);
     standby_ = clamp_bme280_setting(CONFIG_REDMOLE_BME280_STANDBY_TIME, 7U);
 
-    rv = board_i2c_write_reg(dev_, BME280_REG_CTRL_HUM, osrs_h_);
-    if (rv != ESP_OK) {
-        return rv;
+    result = board_i2c_write_reg(dev_, BME280_REG_CTRL_HUM, osrs_h_);
+    if (result != ESP_OK) {
+        return result;
     }
 
-    const uint8_t config = static_cast<uint8_t>((standby_ << 5U) | (filter_ << 2U));
-    rv = board_i2c_write_reg(dev_, BME280_REG_CONFIG, config);
-    if (rv != ESP_OK) {
-        return rv;
+    config = static_cast<uint8_t>((standby_ << 5U) | (filter_ << 2U));
+    result = board_i2c_write_reg(dev_, BME280_REG_CONFIG, config);
+    if (result != ESP_OK) {
+        return result;
     }
 
-    rv = write_ctrl_meas();
-    if (rv != ESP_OK) {
-        return rv;
+    result = write_ctrl_meas();
+    if (result != ESP_OK) {
+        return result;
     }
 
-    configured_ = true;
     return ESP_OK;
 }
 
-esp_err_t Bme280Source::write_ctrl_meas() {
+esp_err_t Bme280Sensor::write_ctrl_meas() {
     const uint8_t ctrl_meas = static_cast<uint8_t>((osrs_t_ << 5U) | (osrs_p_ << 2U) | mode_);
     return board_i2c_write_reg(dev_, BME280_REG_CTRL_MEAS, ctrl_meas);
 }
 
-esp_err_t Bme280Source::read_u8(uint8_t reg, uint8_t& out) {
+esp_err_t Bme280Sensor::read_u8(uint8_t reg, uint8_t& out) {
     return board_i2c_read_reg(dev_, reg, &out, 1U);
 }
 
-esp_err_t Bme280Source::wait_until_ready() {
-    for (uint8_t attempt = 0; attempt < kBme280ReadyWaitAttempts; attempt++) {
-        uint8_t status = 0;
-        esp_err_t rv = read_u8(BME280_REG_STATUS, status);
-        if (rv != ESP_OK) {
-            return rv;
+esp_err_t Bme280Sensor::wait_until_ready() {
+    uint8_t attempt;
+    uint8_t status;
+    esp_err_t result;
+
+    for (attempt = 0; attempt < kBme280ReadyWaitAttempts; attempt++) {
+        status = 0;
+        result = read_u8(BME280_REG_STATUS, status);
+        if (result != ESP_OK) {
+            return result;
         }
 
         if ((status & kBme280StatusBusyMask) == 0U) {
@@ -279,18 +256,19 @@ esp_err_t Bme280Source::wait_until_ready() {
     return ESP_ERR_TIMEOUT;
 }
 
-esp_err_t Bme280Source::load_calibration() {
+esp_err_t Bme280Sensor::load_calibration() {
     uint8_t calib0[26] = {};
     uint8_t calib1[7] = {};
+    esp_err_t result;
 
-    esp_err_t rv = board_i2c_read_reg(dev_, BME280_REG_CALIB_00, calib0, sizeof(calib0));
-    if (rv != ESP_OK) {
-        return rv;
+    result = board_i2c_read_reg(dev_, BME280_REG_CALIB_00, calib0, sizeof(calib0));
+    if (result != ESP_OK) {
+        return result;
     }
 
-    rv = board_i2c_read_reg(dev_, BME280_REG_CALIB_26, calib1, sizeof(calib1));
-    if (rv != ESP_OK) {
-        return rv;
+    result = board_i2c_read_reg(dev_, BME280_REG_CALIB_26, calib1, sizeof(calib1));
+    if (result != ESP_OK) {
+        return result;
     }
 
     calibration_.dig_T1 = u16_le(&calib0[0]);
@@ -316,17 +294,18 @@ esp_err_t Bme280Source::load_calibration() {
     return ESP_OK;
 }
 
-esp_err_t Bme280Source::read_raw(Bme280RawSample& out_raw) {
+esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
     uint8_t data[8] = {};
+    esp_err_t result;
 
-    esp_err_t rv = wait_until_ready();
-    if (rv != ESP_OK) {
-        return rv;
+    result = wait_until_ready();
+    if (result != ESP_OK) {
+        return result;
     }
 
-    rv = board_i2c_read_reg(dev_, BME280_REG_DATA, data, sizeof(data));
-    if (rv != ESP_OK) {
-        return rv;
+    result = board_i2c_read_reg(dev_, BME280_REG_DATA, data, sizeof(data));
+    if (result != ESP_OK) {
+        return result;
     }
 
     out_raw.adc_pressure = (static_cast<int32_t>(data[0]) << 12U) |
@@ -337,17 +316,25 @@ esp_err_t Bme280Source::read_raw(Bme280RawSample& out_raw) {
     return ESP_OK;
 }
 
-void Bme280Source::convert(const Bme280RawSample& raw, Bme280Reading& out) const {
-    double var1 = ((static_cast<double>(raw.adc_temperature) / 16384.0) -
-                   (static_cast<double>(calibration_.dig_T1) / 1024.0)) *
-                  static_cast<double>(calibration_.dig_T2);
-    double var2 = (((static_cast<double>(raw.adc_temperature) / 131072.0) -
-                    (static_cast<double>(calibration_.dig_T1) / 8192.0)) *
-                   ((static_cast<double>(raw.adc_temperature) / 131072.0) -
-                    (static_cast<double>(calibration_.dig_T1) / 8192.0))) *
-                  static_cast<double>(calibration_.dig_T3);
-    const double t_fine = var1 + var2;
-    const double temperature_c = t_fine / 5120.0;
+void Bme280Sensor::convert(const Bme280RawSample& raw,
+                           environment_measurement_sample_t& out) const {
+    double var1;
+    double var2;
+    double t_fine;
+    double temperature_c;
+    double pressure_pa;
+    double humidity_pct;
+
+    var1 = ((static_cast<double>(raw.adc_temperature) / 16384.0) -
+            (static_cast<double>(calibration_.dig_T1) / 1024.0)) *
+           static_cast<double>(calibration_.dig_T2);
+    var2 = (((static_cast<double>(raw.adc_temperature) / 131072.0) -
+             (static_cast<double>(calibration_.dig_T1) / 8192.0)) *
+            ((static_cast<double>(raw.adc_temperature) / 131072.0) -
+             (static_cast<double>(calibration_.dig_T1) / 8192.0))) *
+           static_cast<double>(calibration_.dig_T3);
+    t_fine = var1 + var2;
+    temperature_c = t_fine / 5120.0;
 
     var1 = (t_fine / 2.0) - 64000.0;
     var2 = var1 * var1 * static_cast<double>(calibration_.dig_P6) / 32768.0;
@@ -358,7 +345,7 @@ void Bme280Source::convert(const Bme280RawSample& raw, Bme280Reading& out) const
            524288.0;
     var1 = (1.0 + (var1 / 32768.0)) * static_cast<double>(calibration_.dig_P1);
 
-    double pressure_pa = 0.0;
+    pressure_pa = 0.0;
     if (var1 != 0.0) {
         pressure_pa = 1048576.0 - static_cast<double>(raw.adc_pressure);
         pressure_pa = (pressure_pa - (var2 / 4096.0)) * 6250.0 / var1;
@@ -367,7 +354,7 @@ void Bme280Source::convert(const Bme280RawSample& raw, Bme280Reading& out) const
         pressure_pa = pressure_pa + (var1 + var2 + static_cast<double>(calibration_.dig_P7)) / 16.0;
     }
 
-    double humidity_pct = t_fine - 76800.0;
+    humidity_pct = t_fine - 76800.0;
     humidity_pct =
         (raw.adc_humidity - ((static_cast<double>(calibration_.dig_H4) * 64.0) +
                              (static_cast<double>(calibration_.dig_H5) / 16384.0 * humidity_pct))) *
@@ -382,7 +369,7 @@ void Bme280Source::convert(const Bme280RawSample& raw, Bme280Reading& out) const
         humidity_pct = 0.0;
     }
 
-    out.timestamp_ms = esp_timer_get_time() / kUsPerMs;
+    out.timestamp_ms = esp_timer_get_time() / kMicrosecondsPerMillisecond;
     out.temperature_deci_c = static_cast<int32_t>(std::lround(temperature_c * 10.0));
     out.humidity_deci_pct = static_cast<int32_t>(std::lround(humidity_pct * 10.0));
     out.pressure_deci_hpa = static_cast<int32_t>(std::lround(pressure_pa / 10.0));
