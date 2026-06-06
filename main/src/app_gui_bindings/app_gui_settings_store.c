@@ -150,21 +150,21 @@ bool app_gui_settings_load_saved_location(app_gui_bindings_ctx_t *ctx, gui_ctx_t
     gui_location_settings_t location = { 0 };
     size_t latitude_len = sizeof(location.latitude);
     size_t longitude_len = sizeof(location.longitude);
-    bool loaded_any = false;
+    // bool loaded_any = false;
 
     if ((ctx == NULL) || (gui == NULL)) {
         return false;
     }
 
     if (rm_nvs_get_str(GUI_NVS_KEY_LAT, location.latitude, &latitude_len) == ESP_OK) {
-        loaded_any = true;
+        // loaded_any = true;
     } else {
         location.latitude[0] = '\0';
         snprintf(location.latitude, sizeof(location.latitude), "%s", "59.3293");
     }
 
     if (rm_nvs_get_str(GUI_NVS_KEY_LON, location.longitude, &longitude_len) == ESP_OK) {
-        loaded_any = true;
+        // loaded_any = true;
     } else {
         location.longitude[0] = '\0';
         snprintf(location.longitude, sizeof(location.longitude), "%s", "18.0686");
