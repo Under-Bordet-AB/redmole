@@ -97,10 +97,13 @@ typedef struct {
     lv_obj_t *password_dialog;                 /*!< Wi-Fi password entry dialog container. */
     lv_obj_t *password_dialog_title;           /*!< Password dialog title label. */
     lv_obj_t *password_dialog_network_label;   /*!< Label showing the selected SSID. */
+    lv_obj_t *password_dialog_spinner;         /*!< Spinner shown while a Wi-Fi connect attempt is active. */
+    lv_obj_t *password_dialog_status_label;    /*!< Inline Wi-Fi connect result/status message. */
     lv_obj_t *wifi_password_textarea;          /*!< Text area used to enter the Wi-Fi password. */
     lv_obj_t *wifi_keyboard;                   /*!< On-screen keyboard bound to the password text area. */
     lv_obj_t *password_dialog_cancel_button;   /*!< Cancel button for the password dialog. */
     lv_obj_t *password_dialog_connect_button;  /*!< Connect button for the password dialog. */
+    lv_obj_t *password_dialog_connect_button_label; /*!< Label inside password_dialog_connect_button. */
     lv_obj_t *password_dialog_disconnect_button; /*!< Disconnect button shown when a network can be disconnected. */
 
     lv_obj_t *temperature_value;   /*!< BME280 temperature value label. */

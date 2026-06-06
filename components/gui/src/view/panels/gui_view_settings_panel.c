@@ -145,6 +145,72 @@ static const char *gui_view_wifi_card_status_text(const gui_wifi_settings_t *wif
     }
 }
 
+static const char *gui_view_wifi_dialog_status_text(const gui_wifi_settings_t *wifi)
+{
+    if (wifi == NULL) {
+        return "";
+    }
+
+    if (wifi->status_text[0] != '\0') {
+        return wifi->status_text;
+    }
+
+    if (wifi->state == GUI_WIFI_STATE_CONNECTING) {
+        return "Connecting to Wi-Fi...";
+    }
+
+    if (wifi->state == GUI_WIFI_STATE_FAILED) {
+        return "Wi-Fi connection failed. Check the password and try again.";
+    }
+
+    return "";
+}
+
+static void gui_view_update_password_dialog_feedback(gui_view_t *view,
+                                                     const gui_wifi_settings_t *wifi)
+{
+    bool is_connecting;
+    bool is_failed;
+    bool show_status;
+    const char *connect_text;
+    const char *status_text;
+    lv_color_t status_color;
+
+    if ((view == NULL) || (wifi == NULL)) {
+        return;
+    }
+
+    is_connecting = wifi->state == GUI_WIFI_STATE_CONNECTING;
+    is_failed = wifi->state == GUI_WIFI_STATE_FAILED;
+    show_status = is_connecting || is_failed;
+    connect_text = is_connecting ? "Connecting" : (is_failed ? "Retry" : "Connect");
+    status_text = gui_view_wifi_dialog_status_text(wifi);
+    status_color = gui_view_wifi_status_color(view->current_theme, wifi->state);
+
+    gui_view_set_label_text_if_changed(view->password_dialog_connect_button_label,
+                                       connect_text);
+
+    if (view->password_dialog_status_label != NULL) {
+        gui_view_set_label_text_if_changed(view->password_dialog_status_label, status_text);
+        lv_obj_set_style_text_color(view->password_dialog_status_label, status_color, 0);
+        if (show_status) {
+            lv_obj_clear_flag(view->password_dialog_status_label, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->password_dialog_status_label, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (view->password_dialog_spinner != NULL) {
+        lv_obj_set_style_arc_color(view->password_dialog_spinner, status_color,
+                                   LV_PART_INDICATOR);
+        if (is_connecting) {
+            lv_obj_clear_flag(view->password_dialog_spinner, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(view->password_dialog_spinner, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
 static lv_obj_t *gui_view_create_setting_item_card(lv_obj_t *parent, const char *title_text,
                                                    const char *subtitle_text,
                                                    lv_coord_t height)
@@ -560,6 +626,9 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->location_longitude_textarea = NULL;
     view->location_keyboard = NULL;
     view->reset_card = NULL;
+    view->password_dialog_spinner = NULL;
+    view->password_dialog_status_label = NULL;
+    view->password_dialog_connect_button_label = NULL;
 
     view->settings_panel = lv_obj_create(view->content);
     lv_obj_set_size(view->settings_panel, 734, 500);
@@ -969,6 +1038,27 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_add_event_cb(view->wifi_password_textarea, settings_event_cb, LV_EVENT_ALL,
                         event_user_data);
 
+    view->password_dialog_spinner = lv_spinner_create(view->password_dialog, 900, 60);
+    lv_obj_set_size(view->password_dialog_spinner, 22, 22);
+    lv_obj_align(view->password_dialog_spinner, LV_ALIGN_TOP_LEFT, 34, 138);
+    lv_obj_set_style_arc_width(view->password_dialog_spinner, 3, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(view->password_dialog_spinner, 3, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(view->password_dialog_spinner, lv_color_hex(0xD7E1EE),
+                               LV_PART_MAIN);
+    lv_obj_set_style_arc_color(view->password_dialog_spinner, lv_color_hex(0xF59E0B),
+                               LV_PART_INDICATOR);
+    lv_obj_add_flag(view->password_dialog_spinner, LV_OBJ_FLAG_HIDDEN);
+
+    view->password_dialog_status_label = lv_label_create(view->password_dialog);
+    lv_obj_set_width(view->password_dialog_status_label, 480);
+    lv_label_set_long_mode(view->password_dialog_status_label, LV_LABEL_LONG_DOT);
+    lv_label_set_text(view->password_dialog_status_label, "");
+    lv_obj_set_style_text_color(view->password_dialog_status_label, lv_color_hex(0x607089), 0);
+    lv_obj_set_style_text_font(view->password_dialog_status_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_align(view->password_dialog_status_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_align(view->password_dialog_status_label, LV_ALIGN_TOP_LEFT, 64, 138);
+    lv_obj_add_flag(view->password_dialog_status_label, LV_OBJ_FLAG_HIDDEN);
+
     view->wifi_keyboard = lv_keyboard_create(view->password_dialog);
     lv_obj_set_size(view->wifi_keyboard, LV_PCT(100), 292);
     lv_obj_align(view->wifi_keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
@@ -990,6 +1080,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->password_dialog_connect_button = gui_view_create_action_button(
         view->password_dialog, 570, 148, 132, 40, "Connect", LV_EVENT_CLICKED, settings_event_cb,
         event_user_data);
+    view->password_dialog_connect_button_label =
+        lv_obj_get_child(view->password_dialog_connect_button, 0);
     lv_obj_set_style_bg_color(view->password_dialog_connect_button, lv_color_hex(0x1D4ED8), 0);
     lv_obj_set_style_text_color(view->password_dialog_connect_button, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_opa(view->password_dialog_connect_button, LV_OPA_COVER, 0);
@@ -1127,6 +1219,7 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
         gui_view_set_label_text_if_changed(view->password_dialog_network_label,
                                            "No network selected yet.");
     }
+    gui_view_update_password_dialog_feedback(view, &model->wifi);
     if (!lv_obj_has_state(view->wifi_password_textarea, LV_STATE_FOCUSED)) {
         gui_view_set_textarea_text_if_changed(view->wifi_password_textarea, model->wifi.password);
     }
