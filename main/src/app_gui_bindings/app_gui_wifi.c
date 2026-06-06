@@ -158,9 +158,12 @@ void app_gui_wifi_sync(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
         wifi.connect_requested = false;
         wifi.can_disconnect = false;
         if (wifi.selected_ssid[0] != '\0') {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "Failed to connect to %s.", wifi.selected_ssid);
+            snprintf(wifi.status_text, sizeof(wifi.status_text),
+                     "Failed to connect to %s. Check the password and try again.",
+                     wifi.selected_ssid);
         } else {
-            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi connection failed.");
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s",
+                     "Wi-Fi connection failed. Check the password and try again.");
         }
     } else if (ctx->wifi_connect_requested &&
                nac_status == NAC_WIFI_DISCONNECTED) {
