@@ -18,7 +18,7 @@ constexpr UBaseType_t kTaskPriority = 5U;
 
 MeasurementsManager::MeasurementsManager(const ProducerRegistration* registrations,
                                          size_t registration_count, MeasurementStore& store,
-                                         NowMilliseconds now_ms)
+                                         NowMillisecondsFunction now_ms)
     : registrations_(registrations), registration_count_(registration_count), store_(store),
       now_ms_(now_ms) {
 }
@@ -93,11 +93,11 @@ esp_err_t MeasurementsManager::poll_once() {
 
     esp_err_t first_error = ESP_OK;
     for (size_t index = 0; index < registration_count_; index++) {
-        const ProducerRegistration& registration = registrations_[index];
         MeasurementBatch batch = {};
-        esp_err_t result = registration.producer.read(batch);
+        esp_err_t result = registrations_[index].producer.read(batch);
 
-        if (result == ESP_OK && !batch_belongs_to(batch, registration)) {
+        if (result == ESP_OK &&
+            !batch_is_valid_for_registration(batch, registrations_[index])) {
             result = ESP_ERR_INVALID_RESPONSE;
         }
         if (result == ESP_OK) {
@@ -105,7 +105,8 @@ esp_err_t MeasurementsManager::poll_once() {
         }
 
         if (result != ESP_OK) {
-            store_.invalidate_channels(registration.channels, registration.channel_count);
+            store_.invalidate_channels(registrations_[index].channels,
+                                       registrations_[index].channel_count);
             mark_failed(index, result);
             if (first_error == ESP_OK) {
                 first_error = result;
@@ -144,16 +145,19 @@ bool MeasurementsManager::registrations_are_valid() const {
 
     std::array<bool, measurement_channel_index(MeasurementChannel::Count)> owned = {};
     for (size_t producer_index = 0; producer_index < registration_count_; producer_index++) {
-        const ProducerRegistration& registration = registrations_[producer_index];
-        if (registration.diagnostic_name == nullptr || registration.channels == nullptr ||
-            registration.channel_count == 0U) {
+        if (registrations_[producer_index].diagnostic_name == nullptr ||
+            registrations_[producer_index].channels == nullptr ||
+            registrations_[producer_index].channel_count == 0U) {
             return false;
         }
 
-        for (size_t channel_index = 0; channel_index < registration.channel_count;
+        for (size_t channel_index = 0;
+             channel_index < registrations_[producer_index].channel_count;
              channel_index++) {
-            const MeasurementChannel channel = registration.channels[channel_index];
-            if (!measurement_channel_is_valid(channel) || owned[measurement_channel_index(channel)]) {
+            const MeasurementChannel channel =
+                registrations_[producer_index].channels[channel_index];
+            if (!measurement_channel_is_valid(channel) ||
+                owned[measurement_channel_index(channel)]) {
                 return false;
             }
             owned[measurement_channel_index(channel)] = true;
@@ -162,8 +166,8 @@ bool MeasurementsManager::registrations_are_valid() const {
     return true;
 }
 
-bool MeasurementsManager::batch_belongs_to(const MeasurementBatch& batch,
-                                           const ProducerRegistration& registration) const {
+bool MeasurementsManager::batch_is_valid_for_registration(
+    const MeasurementBatch& batch, const ProducerRegistration& registration) const {
     if (batch.count == 0U || batch.count > batch.measurements.size()) {
         return false;
     }
@@ -171,7 +175,8 @@ bool MeasurementsManager::batch_belongs_to(const MeasurementBatch& batch,
     for (size_t measurement_index = 0; measurement_index < batch.count; measurement_index++) {
         const MeasurementChannel channel = batch.measurements[measurement_index].channel;
         bool registered = false;
-        for (size_t channel_index = 0; channel_index < registration.channel_count; channel_index++) {
+        for (size_t channel_index = 0; channel_index < registration.channel_count;
+             channel_index++) {
             if (registration.channels[channel_index] == channel) {
                 registered = true;
                 break;

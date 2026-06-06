@@ -17,7 +17,7 @@ class MeasurementStore {
     esp_err_t publish_batch(const MeasurementBatch& batch, int64_t timestamp_ms);
     esp_err_t invalidate_channels(const MeasurementChannel* channels, size_t count);
     bool copy_channels(const MeasurementChannel* channels, size_t count,
-                       StoredMeasurement* out) const;
+                       MeasurementRecord* out) const;
 
   private:
     static bool batch_is_valid(const MeasurementBatch& batch);
@@ -25,7 +25,7 @@ class MeasurementStore {
 
     mutable StaticSemaphore_t mutex_storage_ = {};
     mutable SemaphoreHandle_t mutex_ = nullptr;
-    std::array<StoredMeasurement, measurement_channel_index(MeasurementChannel::Count)> latest_ =
+    std::array<MeasurementRecord, measurement_channel_index(MeasurementChannel::Count)> latest_ =
         {};
     uint64_t next_publication_version_ = 1U;
 };

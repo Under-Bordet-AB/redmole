@@ -13,7 +13,8 @@
 
 namespace redmole::environment {
 
-using NowMilliseconds = int64_t (*)();
+// Inject the clock so the manager stays independent of ESP timer APIs and tests can use a fake.
+using NowMillisecondsFunction = int64_t (*)();
 
 struct ProducerRegistration {
     const char* diagnostic_name;
@@ -25,7 +26,7 @@ struct ProducerRegistration {
 class MeasurementsManager {
   public:
     MeasurementsManager(const ProducerRegistration* registrations, size_t registration_count,
-                        MeasurementStore& store, NowMilliseconds now_ms);
+                        MeasurementStore& store, NowMillisecondsFunction now_ms);
 
     esp_err_t init();
     esp_err_t start();
@@ -39,15 +40,15 @@ class MeasurementsManager {
     static void task_entry(void* context);
     void task_loop();
     bool registrations_are_valid() const;
-    bool batch_belongs_to(const MeasurementBatch& batch,
-                          const ProducerRegistration& registration) const;
+    bool batch_is_valid_for_registration(const MeasurementBatch& batch,
+                                         const ProducerRegistration& registration) const;
     void mark_failed(size_t producer_index, esp_err_t error);
     void mark_recovered(size_t producer_index);
 
     const ProducerRegistration* registrations_;
     size_t registration_count_;
     MeasurementStore& store_;
-    NowMilliseconds now_ms_;
+    NowMillisecondsFunction now_ms_;
     std::array<bool, kMaxProducerCount> producer_failed_ = {};
     StaticSemaphore_t stopped_storage_ = {};
     SemaphoreHandle_t stopped_ = nullptr;

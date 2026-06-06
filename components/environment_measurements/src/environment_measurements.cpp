@@ -40,10 +40,10 @@
 namespace {
 
 using redmole::environment::MeasurementChannel;
+using redmole::environment::MeasurementRecord;
 using redmole::environment::MeasurementStore;
 using redmole::environment::MeasurementsManager;
 using redmole::environment::ProducerRegistration;
-using redmole::environment::StoredMeasurement;
 using redmole::environment::kMicrosecondsPerMillisecond;
 using redmole::environment::bme280::Bme280Filter;
 using redmole::environment::bme280::Bme280Mode;
@@ -82,7 +82,7 @@ int64_t now_ms() {
     return esp_timer_get_time() / kMicrosecondsPerMillisecond;
 }
 
-bool sample_is_fresh(const StoredMeasurement& sample, int64_t current_ms, int64_t max_age_ms) {
+bool sample_is_fresh(const MeasurementRecord& sample, int64_t current_ms, int64_t max_age_ms) {
     return sample.valid && sample.timestamp_ms <= current_ms &&
            current_ms - sample.timestamp_ms <= max_age_ms;
 }
@@ -121,7 +121,7 @@ const std::array<ProducerRegistration, 1> s_producers = {{
 MeasurementsManager s_measurements_manager(s_producers.data(), s_producers.size(),
                                            s_measurement_store, now_ms);
 
-bool copy_indoor_measurements(std::array<StoredMeasurement, 3>& out) {
+bool copy_indoor_measurements(std::array<MeasurementRecord, 3>& out) {
     return s_measurement_store.copy_channels(kIndoorBme280Channels.data(),
                                              kIndoorBme280Channels.size(), out.data());
 }
@@ -149,13 +149,13 @@ extern "C" bool environment_measurements_get_latest(environment_measurement_samp
         return false;
     }
 
-    std::array<StoredMeasurement, 3> stored = {};
+    std::array<MeasurementRecord, 3> stored = {};
     if (!copy_indoor_measurements(stored)) {
         return false;
     }
 
     const int64_t current_ms = now_ms();
-    for (const StoredMeasurement& sample : stored) {
+    for (const MeasurementRecord& sample : stored) {
         if (!sample_is_fresh(sample, current_ms, kStaleTimeoutMs)) {
             out->valid = false;
             return false;
@@ -163,7 +163,7 @@ extern "C" bool environment_measurements_get_latest(environment_measurement_samp
     }
 
     out->timestamp_ms = stored[0].timestamp_ms;
-    for (const StoredMeasurement& sample : stored) {
+    for (const MeasurementRecord& sample : stored) {
         if (sample.timestamp_ms < out->timestamp_ms) {
             out->timestamp_ms = sample.timestamp_ms;
         }
@@ -182,13 +182,13 @@ extern "C" bool environment_measurements_get_latest(environment_measurement_samp
 }
 
 extern "C" bool environment_measurements_is_fresh(uint32_t max_age_ms) {
-    std::array<StoredMeasurement, 3> stored = {};
+    std::array<MeasurementRecord, 3> stored = {};
     if (!copy_indoor_measurements(stored)) {
         return false;
     }
 
     const int64_t current_ms = now_ms();
-    for (const StoredMeasurement& sample : stored) {
+    for (const MeasurementRecord& sample : stored) {
         if (!sample_is_fresh(sample, current_ms, static_cast<int64_t>(max_age_ms))) {
             return false;
         }
@@ -197,13 +197,13 @@ extern "C" bool environment_measurements_is_fresh(uint32_t max_age_ms) {
 }
 
 extern "C" uint32_t environment_measurements_get_update_count(void) {
-    std::array<StoredMeasurement, 3> stored = {};
+    std::array<MeasurementRecord, 3> stored = {};
     if (!copy_indoor_measurements(stored)) {
         return 0U;
     }
 
     uint64_t publication_version = 0U;
-    for (const StoredMeasurement& sample : stored) {
+    for (const MeasurementRecord& sample : stored) {
         if (sample.publication_version > publication_version) {
             publication_version = sample.publication_version;
         }

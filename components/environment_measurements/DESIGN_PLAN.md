@@ -230,7 +230,7 @@ concrete hardware requirement makes that timestamp more meaningful.
 Runtime validity belongs in the store, not in successful producer output:
 
 ```cpp
-struct StoredMeasurement {
+struct MeasurementRecord {
     int64_t timestamp_ms;
     int64_t value;
     uint64_t publication_version;
@@ -241,7 +241,7 @@ struct StoredMeasurement {
 The store can use a fixed array indexed by `MeasurementChannel`:
 
 ```cpp
-std::array<StoredMeasurement,
+std::array<MeasurementRecord,
            static_cast<size_t>(MeasurementChannel::Count)> latest;
 ```
 
@@ -251,7 +251,7 @@ The store operations must support:
 publish_batch(const MeasurementBatch& batch, int64_t timestamp_ms);
 invalidate_channels(const MeasurementChannel* channels, size_t count);
 copy_channels(const MeasurementChannel* channels, size_t count,
-              StoredMeasurement* out);
+              MeasurementRecord* out);
 ```
 
 Each operation is atomic across all supplied channels and holds the store mutex
@@ -459,7 +459,7 @@ location, hardware behavior, scheduling, storage, and public reporting.
 ### Phase 1: Introduce The Generic Middle
 
 1. Add `MeasurementChannel`, `Measurement`, `MeasurementBatch`, and
-   `StoredMeasurement`.
+   `MeasurementRecord`.
 2. Finalize canonical unit and scale for each initial channel.
 3. Add the narrow `MeasurementProducer` interface.
 4. Add a fixed-size `MeasurementStore` with synchronized publish, invalidate,

@@ -541,7 +541,6 @@ esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Reading& out) 
     }
 
     // These steps follow the BME280 datasheet compensation formulas.
-    // TODO should we use the bosch provided code for this?
     compensation_value_1 = ((static_cast<double>(raw.adc_temperature) / 16384.0) -
                             (static_cast<double>(calibration_.dig_T1) / 1024.0)) *
                            static_cast<double>(calibration_.dig_T2);

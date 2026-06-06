@@ -6,6 +6,8 @@
 
 namespace redmole::environment {
 
+constexpr size_t kMaxMeasurementsPerBatch = 4U;
+
 enum class MeasurementChannel : uint8_t {
     IndoorAmbientTemperature,
     IndoorRelativeHumidity,
@@ -18,14 +20,12 @@ struct Measurement {
     int64_t value;
 };
 
-constexpr size_t kMaxMeasurementsPerBatch = 4U;
-
 struct MeasurementBatch {
     std::array<Measurement, kMaxMeasurementsPerBatch> measurements = {};
     size_t count = 0U;
 };
 
-struct StoredMeasurement {
+struct MeasurementRecord {
     int64_t timestamp_ms = 0;
     int64_t value = 0;
     uint64_t publication_version = 0U;

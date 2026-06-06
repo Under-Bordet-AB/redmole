@@ -20,14 +20,17 @@ esp_err_t MeasurementStore::publish_batch(const MeasurementBatch& batch, int64_t
     }
 
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    const uint64_t publication_version = next_publication_version_++;
+    const uint64_t publication_version = next_publication_version_;
+    next_publication_version_++;
+
     for (size_t index = 0; index < batch.count; index++) {
-        const Measurement& measurement = batch.measurements[index];
-        StoredMeasurement& stored = latest_[measurement_channel_index(measurement.channel)];
-        stored.timestamp_ms = timestamp_ms;
-        stored.value = measurement.value;
-        stored.publication_version = publication_version;
-        stored.valid = true;
+        latest_[measurement_channel_index(batch.measurements[index].channel)].timestamp_ms =
+            timestamp_ms;
+        latest_[measurement_channel_index(batch.measurements[index].channel)].value =
+            batch.measurements[index].value;
+        latest_[measurement_channel_index(batch.measurements[index].channel)]
+            .publication_version = publication_version;
+        latest_[measurement_channel_index(batch.measurements[index].channel)].valid = true;
     }
     xSemaphoreGive(mutex_);
     return ESP_OK;
@@ -50,7 +53,7 @@ esp_err_t MeasurementStore::invalidate_channels(const MeasurementChannel* channe
 }
 
 bool MeasurementStore::copy_channels(const MeasurementChannel* channels, size_t count,
-                                     StoredMeasurement* out) const {
+                                     MeasurementRecord* out) const {
     if (mutex_ == nullptr || out == nullptr || !channels_are_valid(channels, count)) {
         return false;
     }
