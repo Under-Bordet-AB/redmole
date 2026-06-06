@@ -1,8 +1,9 @@
 # Environment Measurements
 
-`environment_measurements` owns the board's indoor BME280, polls it from a
-FreeRTOS task, and exposes the latest complete temperature, humidity, and
-pressure sample through a thread-safe C API.
+`environment_measurements` owns the board's configured measurement producers,
+polls them from one FreeRTOS task, stores their latest logical measurement
+channels, and exposes the current indoor environment sample through a
+thread-safe C API.
 
 The component stores only the latest sample. It does not keep measurement
 history or expose the BME280 driver directly to application code.
@@ -11,11 +12,12 @@ history or expose the BME280 driver directly to application code.
 
 The component:
 
-- configures and owns one BME280 at address `0x76` or `0x77`
+- configures and owns the current BME280 producer at address `0x76` or `0x77`
 - uses the shared bus provided by `board_i2c`
 - reads and compensates the BME280's temperature, humidity, and pressure data
-- publishes complete readings in fixed-point units
-- invalidates the latest sample after a read failure
+- converts each coherent BME280 read into three logical measurement channels
+- atomically publishes producer batches into a latest-value store
+- invalidates the producer's channels after a read failure
 - retries full sensor initialization on later reads after a failure
 - provides freshness checks and a monotonic publication count
 
@@ -24,10 +26,16 @@ The component:
 ## Runtime Flow
 
 ```text
-BME280 -> board_i2c -> Bme280Sensor -> EnvironmentMeasurements -> public C API
-                                                                    |
-                                                                    +-> GUI
-                                                                    +-> UART
+BME280 -> board_i2c -> Bme280Sensor -> Bme280Producer
+                                             |
+                                             v
+                                  MeasurementsManager
+                                             |
+                                             v
+                                   MeasurementStore -> public C API
+                                                               |
+                                                               +-> GUI
+                                                               +-> UART
 ```
 
 `environment_measurements_init()` creates the synchronization objects and
@@ -39,8 +47,10 @@ polling attempts recover when the sensor becomes available.
 on its first call. The task reads the sensor immediately, then waits for the
 configured interval before each later read.
 
-A successful read replaces the complete latest sample while holding a mutex and
-increments the update count. A failed read marks the stored sample invalid.
+A successful read produces one batch containing temperature, humidity, and
+pressure. The manager timestamps and atomically publishes that batch while the
+store mutex is held. A failed read atomically invalidates the channels owned by
+that producer.
 
 ## Public API
 
@@ -150,10 +160,13 @@ cadence. Sleep mode deliberately produces no successful samples.
 | Path | Responsibility |
 |---|---|
 | `include/environment_measurements.h` | Stable application-facing C API and sample type. |
-| `src/environment_measurements.cpp` | Production BME280 composition and C API forwarding. |
-| `src/environment_measurements_internal.hpp/.cpp` | Polling task, synchronization, publication, freshness, and injectable controller. |
-| `src/temperature_humidity_pressure_source.hpp` | Private interface for a complete sensor source. |
-| `src/reading_types.hpp` | Private strongly typed fixed-point values. |
+| `src/environment_measurements.cpp` | Production composition and public C API adapters. |
+| `src/measurement_types.hpp` | Logical channels, producer batches, and stored values. |
+| `src/measurement_producer.hpp` | Private interface for one physical measurement producer. |
+| `src/measurement_store.hpp/.cpp` | Atomic latest-channel publication, invalidation, and copy-out. |
+| `src/measurements_manager.hpp/.cpp` | One polling task, producer validation, and failure handling. |
+| `src/bme280/bme280_producer.hpp/.cpp` | Adapts one coherent BME280 read into logical channels. |
+| `src/reading_types.hpp` | Private strongly typed BME280 compensated values. |
 | `src/bme280/bme280_sensor.hpp/.cpp` | BME280 protocol, settings, calibration, compensation, and recovery. |
 
 The controller uses:
@@ -164,8 +177,10 @@ The controller uses:
 - atomics for the stop request and update count
 - no dynamic measurement history
 
-The internal `TemperatureHumidityPressureSource` keeps sensor acquisition
-separate from polling, publication, and freshness behavior.
+The internal `MeasurementProducer` interface keeps physical acquisition
+separate from polling and storage. Producers return fixed-capacity batches, so
+a combined sensor is read once while its logical values are stored and consumed
+independently.
 
 ## Logs
 

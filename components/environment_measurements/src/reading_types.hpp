@@ -11,19 +11,19 @@ namespace redmole::environment {
 
 constexpr int64_t kMicrosecondsPerMillisecond = 1000LL;
 
-/** @brief Temperature in tenths of a degree Celsius. */
+/** @brief Temperature in thousandths of a degree Celsius. */
 struct Temperature {
-    int32_t deci_c;
+    int64_t milli_c;
 };
 
-/** @brief Relative humidity in tenths of a percent. */
+/** @brief Relative humidity in thousandths of a percent. */
 struct Humidity {
-    int32_t deci_pct;
+    int64_t milli_pct;
 };
 
-/** @brief Pressure in tenths of a hectopascal. */
+/** @brief Pressure in pascals. */
 struct Pressure {
-    int32_t deci_hpa;
+    int64_t pa;
 };
 
 } // namespace redmole::environment

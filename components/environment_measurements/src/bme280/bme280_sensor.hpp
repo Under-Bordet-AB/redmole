@@ -13,7 +13,7 @@
 
 #include "driver/i2c_master.h"
 #include "esp_err.h"
-#include "temperature_humidity_pressure_source.hpp"
+#include "reading_types.hpp"
 
 namespace redmole::environment::bme280 {
 
@@ -85,6 +85,13 @@ struct Bme280RawSample {
     int32_t adc_humidity;    /*!< Uncompensated 16-bit humidity ADC value. */
 };
 
+/** @brief One complete compensated BME280 acquisition. */
+struct Bme280Reading {
+    Temperature temperature;
+    Humidity humidity;
+    Pressure pressure;
+};
+
 /** @brief Factory calibration coefficients read from one BME280. */
 struct Bme280Calibration {
     uint16_t dig_T1;
@@ -114,7 +121,7 @@ struct Bme280Calibration {
  * complete initialization sequence again, which allows recovery after a sensor
  * is disconnected and reconnected.
  */
-class Bme280Sensor final : public TemperatureHumidityPressureSource {
+class Bme280Sensor final {
   public:
     /**
      * @brief Construct a BME280 source for one seven-bit I2C address and settings.
@@ -127,14 +134,14 @@ class Bme280Sensor final : public TemperatureHumidityPressureSource {
      * @brief Verify, reset, calibrate, and configure the sensor.
      * @return ESP_OK when reads can begin, otherwise an ESP-IDF error code.
      */
-    esp_err_t init() override;
+    esp_err_t init();
 
     /**
      * @brief Acquire one complete strongly typed BME280 reading.
      * @param out Cleared output populated only when all three channels are valid.
      * @return ESP_OK on complete success, otherwise an ESP-IDF error code.
      */
-    esp_err_t read(TemperatureHumidityPressureReading& out) override;
+    esp_err_t read(Bme280Reading& out);
 
     /**
      * @brief Perform the BME280 software reset command.
@@ -220,7 +227,7 @@ class Bme280Sensor final : public TemperatureHumidityPressureSource {
      * @param out Output populated only when every channel can be compensated.
      * @return ESP_OK on complete success, otherwise ESP_ERR_INVALID_RESPONSE.
      */
-    esp_err_t convert(const Bme280RawSample& raw, TemperatureHumidityPressureReading& out) const;
+    esp_err_t convert(const Bme280RawSample& raw, Bme280Reading& out) const;
 
     uint8_t address_;                          /*!< Address fixed by the product circuit. */
     Bme280Settings settings_;                  /*!< Controls reapplied after every recovery. */

@@ -214,7 +214,7 @@ esp_err_t Bme280Sensor::init() {
     return ESP_OK;
 }
 
-esp_err_t Bme280Sensor::read(TemperatureHumidityPressureReading& out) {
+esp_err_t Bme280Sensor::read(Bme280Reading& out) {
     Bme280RawSample raw = {};
     esp_err_t result;
 
@@ -520,8 +520,7 @@ esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
     return ESP_OK;
 }
 
-esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw,
-                                TemperatureHumidityPressureReading& out) const {
+esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Reading& out) const {
     double compensation_value_1;
     double compensation_value_2;
     double t_fine;
@@ -603,9 +602,9 @@ esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw,
         return ESP_ERR_INVALID_RESPONSE;
     }
 
-    out.temperature.deci_c = static_cast<int32_t>(std::lround(temperature_c * 10.0));
-    out.humidity.deci_pct = static_cast<int32_t>(std::lround(humidity_pct * 10.0));
-    out.pressure.deci_hpa = static_cast<int32_t>(std::lround(pressure_pa / 10.0));
+    out.temperature.milli_c = std::llround(temperature_c * 1000.0);
+    out.humidity.milli_pct = std::llround(humidity_pct * 1000.0);
+    out.pressure.pa = std::llround(pressure_pa);
     return ESP_OK;
 }
 
