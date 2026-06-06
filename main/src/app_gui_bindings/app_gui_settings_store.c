@@ -1,3 +1,11 @@
+/**
+ * @file app_gui_settings_store.c
+ * @brief Persist GUI settings and restore user-editable GUI state from NVS.
+ *
+ * Handles appearance, brightness, location, and reset-to-default side effects
+ * for the application GUI binding layer.
+ */
+
 #include "app_gui_bindings_internal.h"
 #include "nvs_keys.h"
 

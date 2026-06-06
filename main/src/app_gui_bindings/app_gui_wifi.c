@@ -1,3 +1,11 @@
+/**
+ * @file app_gui_wifi.c
+ * @brief Bind GUI Wi-Fi interactions to NAC state and persisted Wi-Fi metadata.
+ *
+ * Owns GUI callback handlers for scan, connect, known-network connect, and
+ * disconnect requests.
+ */
+
 #include "app_gui_bindings_internal.h"
 #include "nvs_keys.h"
 

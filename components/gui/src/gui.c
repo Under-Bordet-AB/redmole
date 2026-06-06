@@ -1,3 +1,11 @@
+/**
+ * @file gui.c
+ * @brief Public GUI lifecycle, event handling, and model rendering.
+ *
+ * Owns the module runtime, translates LVGL events into GUI state changes, and
+ * renders changed model state while holding the LVGL port lock.
+ */
+
 #include "gui_module.h"
 
 #include <stdio.h>

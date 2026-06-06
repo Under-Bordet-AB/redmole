@@ -1,3 +1,11 @@
+/**
+ * @file app_gui_forecast.c
+ * @brief Fetch, parse, and publish weather forecast data to the GUI.
+ *
+ * Owns the scheduled Open-Meteo HTTP request and converts forecast JSON into
+ * gui_forecast_state_t.
+ */
+
 #include "app_gui_bindings_internal.h"
 
 #include <limits.h>

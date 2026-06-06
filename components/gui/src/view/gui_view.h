@@ -1,20 +1,26 @@
+#ifndef GUI_VIEW_H
+#define GUI_VIEW_H
+
 /**
  * @file gui_view.h
  * @brief Internal LVGL view tree and rendering helpers for the GUI screen.
+ *
+ * The view owns persistent LVGL object pointers and cached model fragments
+ * used to keep screen updates incremental.
  */
-
-#ifndef GUI_VIEW_H
-#define GUI_VIEW_H
 
 #include "lvgl.h"
 
 #include "../gui_defs.h"
 
+/**
+ * @brief Internal settings panel pages shown within the settings view.
+ */
 typedef enum {
-    GUI_SETTINGS_SUBPAGE_HOME = 0,
-    GUI_SETTINGS_SUBPAGE_CONNECTIVITY,
-    GUI_SETTINGS_SUBPAGE_DISPLAY,
-    GUI_SETTINGS_SUBPAGE_SYSTEM,
+    GUI_SETTINGS_SUBPAGE_HOME = 0,    /*!< Settings category chooser. */
+    GUI_SETTINGS_SUBPAGE_CONNECTIVITY, /*!< Wi-Fi and Bluetooth settings page. */
+    GUI_SETTINGS_SUBPAGE_DISPLAY,     /*!< Theme and brightness settings page. */
+    GUI_SETTINGS_SUBPAGE_SYSTEM,      /*!< Location and reset settings page. */
 } gui_settings_subpage_t;
 
 /**
@@ -83,8 +89,8 @@ typedef struct {
     lv_obj_t *location_longitude_label; /*!< Label for the longitude textarea. */
     lv_obj_t *location_longitude_textarea; /*!< Text area used to edit longitude. */
     lv_obj_t *location_keyboard;      /*!< On-screen keyboard dedicated to location input. */
-    lv_obj_t *reset_card;
-    lv_obj_t *reset_button;
+    lv_obj_t *reset_card;              /*!< Settings subsection containing reset controls. */
+    lv_obj_t *reset_button;            /*!< Button that requests a settings reset. */
 
     lv_obj_t *dialog_scrim;                    /*!< Shared modal scrim behind dialog content. */
     lv_obj_t *network_dialog;                  /*!< Wi-Fi network selection dialog container. */
@@ -144,11 +150,11 @@ typedef struct {
 /**
  * @brief Create the LVGL object tree for the GUI view.
  *
- * @param view View object to initialize.
- * @param model Initial model applied during creation.
- * @param nav_event_cb Callback for navigation interactions.
- * @param settings_event_cb Callback for settings interactions.
- * @param event_user_data User data forwarded to both callbacks.
+ * @param view View object to initialize, must not be NULL.
+ * @param model Initial model applied during creation, must not be NULL.
+ * @param nav_event_cb Callback for navigation interactions, may be NULL.
+ * @param settings_event_cb Callback for settings interactions, may be NULL.
+ * @param event_user_data Caller-owned user data forwarded to both callbacks.
  */
 void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_t nav_event_cb,
                    lv_event_cb_t settings_event_cb, void *event_user_data);
@@ -156,15 +162,15 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 /**
  * @brief Apply a new model snapshot to an existing GUI view.
  *
- * @param view Initialized view object.
- * @param model Model snapshot to render.
+ * @param view Initialized view object, must not be NULL.
+ * @param model Model snapshot to render, must not be NULL.
  */
 void gui_view_apply(gui_view_t *view, const gui_view_model_t *model);
 
 /**
  * @brief Apply the effective theme configuration to the current view tree.
  *
- * @param view Initialized view object.
+ * @param view Initialized view object, must not be NULL.
  * @param theme Base theme to apply.
  * @param show_background_image True to show the theme background image.
  * @param night_variant_enabled True to use the theme night variant when available.
@@ -201,35 +207,35 @@ lv_color_t gui_view_sd_card_status_color(gui_view_theme_t theme, gui_sd_card_sta
 /**
  * @brief Refresh the sidebar clock and date labels from the current time.
  *
- * @param view Initialized view object.
+ * @param view Initialized view object, must not be NULL.
  */
 void gui_view_update_sidebar_clock_labels(gui_view_t *view);
 
 /**
  * @brief Hide any active Wi-Fi modal dialogs in the view.
  *
- * @param view Initialized view object.
+ * @param view Initialized view object, must not be NULL.
  */
 void gui_view_hide_wifi_dialogs(gui_view_t *view);
 
 /**
  * @brief Show the Wi-Fi network selection dialog.
  *
- * @param view Initialized view object.
+ * @param view Initialized view object, must not be NULL.
  */
 void gui_view_show_network_dialog(gui_view_t *view);
 
 /**
  * @brief Show the Wi-Fi password entry dialog.
  *
- * @param view Initialized view object.
+ * @param view Initialized view object, must not be NULL.
  */
 void gui_view_show_password_dialog(gui_view_t *view);
 
 /**
  * @brief Switch the settings panel to a specific internal subpage.
  *
- * @param view Initialized view object.
+ * @param view Initialized view object, must not be NULL.
  * @param subpage Settings subpage to show.
  */
 void gui_view_show_settings_subpage(gui_view_t *view, gui_settings_subpage_t subpage);
@@ -237,7 +243,7 @@ void gui_view_show_settings_subpage(gui_view_t *view, gui_settings_subpage_t sub
 /**
  * @brief Reset the settings panel to the category chooser home page.
  *
- * @param view Initialized view object.
+ * @param view Initialized view object, must not be NULL.
  */
 void gui_view_reset_settings_navigation(gui_view_t *view);
 

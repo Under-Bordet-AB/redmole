@@ -1,10 +1,13 @@
+#ifndef GUI_TYPES_H
+#define GUI_TYPES_H
+
 /**
  * @file gui_types.h
  * @brief Shared GUI data types and configuration limits.
+ *
+ * These types form the copy-by-value model passed between the application,
+ * GUI state container, and LVGL view layer.
  */
-
-#ifndef GUI_TYPES_H
-#define GUI_TYPES_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,39 +16,39 @@
  * @brief Identifiers for the top-level panels shown in the GUI.
  */
 typedef enum {
-    GUI_PANEL_BME280 = 0,
-    GUI_PANEL_ENERGY_PLAN,
-    GUI_PANEL_FORECAST,
-    GUI_PANEL_SETTINGS,
+    GUI_PANEL_BME280 = 0,    /*!< Local BME280 environmental measurements panel. */
+    GUI_PANEL_ENERGY_PLAN,   /*!< Hourly energy plan chart panel. */
+    GUI_PANEL_FORECAST,      /*!< Weather forecast panel. */
+    GUI_PANEL_SETTINGS,      /*!< User settings and connectivity panel. */
 } gui_panel_id_t;
 
 /**
  * @brief Available visual themes for the GUI.
  */
 typedef enum {
-    GUI_VIEW_THEME_LIGHT = 0,
-    GUI_VIEW_THEME_DARK,
-    GUI_VIEW_THEME_HELLO_KITTY,
-    GUI_VIEW_THEME_TERMINAL,
-    GUI_VIEW_THEME_HELLO_KITTY_NIGHT,
-    GUI_VIEW_THEME_DEATH_NOTE,
-    GUI_VIEW_THEME_SPONGEBOB,
-    GUI_VIEW_THEME_BONZI_BUDDY,
+    GUI_VIEW_THEME_LIGHT = 0,        /*!< Default light theme. */
+    GUI_VIEW_THEME_DARK,             /*!< Default dark theme. */
+    GUI_VIEW_THEME_HELLO_KITTY,      /*!< Hello Kitty themed appearance. */
+    GUI_VIEW_THEME_TERMINAL,         /*!< Terminal themed appearance. */
+    GUI_VIEW_THEME_HELLO_KITTY_NIGHT, /*!< Internal Hello Kitty night variant. */
+    GUI_VIEW_THEME_DEATH_NOTE,       /*!< Death Note themed appearance. */
+    GUI_VIEW_THEME_SPONGEBOB,        /*!< SpongeBob themed appearance. */
+    GUI_VIEW_THEME_BONZI_BUDDY,      /*!< Bonzi Buddy themed appearance. */
 } gui_view_theme_t;
 
 /**
  * @brief Weather icon identifiers rendered by the forecast panel.
  */
 typedef enum {
-    GUI_WEATHER_ICON_CLEAR = 0,
-    GUI_WEATHER_ICON_PARTLY_CLOUDY,
-    GUI_WEATHER_ICON_CLOUDY,
-    GUI_WEATHER_ICON_FOG,
-    GUI_WEATHER_ICON_DRIZZLE,
-    GUI_WEATHER_ICON_RAIN,
-    GUI_WEATHER_ICON_SNOW,
-    GUI_WEATHER_ICON_THUNDERSTORM,
-    GUI_WEATHER_ICON_COUNT,
+    GUI_WEATHER_ICON_CLEAR = 0,       /*!< Clear sky or sunny conditions. */
+    GUI_WEATHER_ICON_PARTLY_CLOUDY,   /*!< Partly cloudy conditions. */
+    GUI_WEATHER_ICON_CLOUDY,          /*!< Cloudy or unknown fallback conditions. */
+    GUI_WEATHER_ICON_FOG,             /*!< Fog or low-visibility conditions. */
+    GUI_WEATHER_ICON_DRIZZLE,         /*!< Drizzle or freezing drizzle conditions. */
+    GUI_WEATHER_ICON_RAIN,            /*!< Rain or rain shower conditions. */
+    GUI_WEATHER_ICON_SNOW,            /*!< Snow or snow shower conditions. */
+    GUI_WEATHER_ICON_THUNDERSTORM,    /*!< Thunderstorm conditions. */
+    GUI_WEATHER_ICON_COUNT,           /*!< Number of weather icon identifiers. */
 } gui_weather_icon_t;
 
 /** Hourly points stored in an energy plan day profile. */
@@ -60,7 +63,7 @@ typedef enum {
 #define GUI_WIFI_NETWORK_COUNT 4
 /** Maximum number of saved Wi-Fi networks surfaced as known networks. */
 #define GUI_WIFI_KNOWN_NETWORK_COUNT 3
-/** Maximum SSID length stored in GUI buffers, excluding the trailing null byte. */
+/** Fixed size of SSID buffers stored in GUI models. */
 #define GUI_WIFI_SSID_MAX_LEN 32
 /** Maximum Wi-Fi password length accepted from the password dialog. */
 #define GUI_WIFI_PASSWORD_MAX_LEN 64
@@ -100,19 +103,19 @@ typedef struct {
     int32_t pressure_deci_hpa; /*!< Pressure in deci-hectopascals. */
     bool is_fresh;             /*!< True when the readings reflect a recent sensor update. */
     uint32_t update_count;     /*!< Monotonic counter of applied sensor updates. */
-    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Null-terminated last successful update timestamp. */
 } gui_sensor_state_t;
 
 /**
  * @brief Hour-by-hour energy plan values rendered by the energy chart.
  */
 typedef struct {
-    uint16_t buy_electricity[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Grid purchase values per hour. */
-    uint16_t use_solar_directly[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Direct solar consumption per hour. */
-    uint16_t charge_battery[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Battery charging values per hour. */
-    uint16_t sell_excess[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Excess energy sold back per hour. */
+    uint16_t buy_electricity[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Grid purchase values per hour, scaled by 1000. */
+    uint16_t use_solar_directly[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Direct solar consumption per hour, scaled by 1000. */
+    uint16_t charge_battery[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Battery charging values per hour, scaled by 1000. */
+    uint16_t sell_excess[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< Excess energy sold back per hour, scaled by 1000. */
     uint8_t start_hour; /*!< Hour represented by the first chart point, 0-23. */
-    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Last successful update timestamp. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Null-terminated last successful update timestamp. */
 } gui_energy_plan_t;
 
 /**
@@ -156,37 +159,37 @@ typedef struct {
  * @brief Wi-Fi connection states surfaced by the GUI.
  */
 typedef enum {
-    GUI_WIFI_STATE_IDLE = 0,
-    GUI_WIFI_STATE_SCANNED,
-    GUI_WIFI_STATE_CONNECTING,
-    GUI_WIFI_STATE_CONNECTED,
-    GUI_WIFI_STATE_FAILED,
+    GUI_WIFI_STATE_IDLE = 0,  /*!< No active scan or connection attempt is visible. */
+    GUI_WIFI_STATE_SCANNED,   /*!< Scan results are available for user selection. */
+    GUI_WIFI_STATE_CONNECTING, /*!< A connection attempt is in progress. */
+    GUI_WIFI_STATE_CONNECTED, /*!< Wi-Fi is connected. */
+    GUI_WIFI_STATE_FAILED,    /*!< Last visible Wi-Fi operation failed. */
 } gui_wifi_state_t;
 
 /**
  * @brief Bluetooth availability states shown in the sidebar and settings.
  */
 typedef enum {
-    GUI_BLUETOOTH_STATE_IDLE = 0,
-    GUI_BLUETOOTH_STATE_CONNECTING,
-    GUI_BLUETOOTH_STATE_CONNECTED,
-    GUI_BLUETOOTH_STATE_UNAVAILABLE,
+    GUI_BLUETOOTH_STATE_IDLE = 0,   /*!< Bluetooth is idle or not configured. */
+    GUI_BLUETOOTH_STATE_CONNECTING, /*!< Bluetooth connection is in progress. */
+    GUI_BLUETOOTH_STATE_CONNECTED,  /*!< Bluetooth is connected. */
+    GUI_BLUETOOTH_STATE_UNAVAILABLE, /*!< Bluetooth is unavailable on this device. */
 } gui_bluetooth_state_t;
 
 /**
  * @brief SD card availability states shown in the sidebar.
  */
 typedef enum {
-    GUI_SD_CARD_STATE_IDLE = 0,
-    GUI_SD_CARD_STATE_CONNECTED,
-    GUI_SD_CARD_STATE_UNAVAILABLE,
+    GUI_SD_CARD_STATE_IDLE = 0,    /*!< SD card state has not been reported yet. */
+    GUI_SD_CARD_STATE_CONNECTED,   /*!< SD card storage is initialized. */
+    GUI_SD_CARD_STATE_UNAVAILABLE, /*!< SD card storage is not initialized. */
 } gui_sd_card_state_t;
 
 /**
  * @brief Summary of a Wi-Fi network shown in the GUI.
  */
 typedef struct {
-    char ssid[GUI_WIFI_SSID_MAX_LEN]; /*!< Null-terminated SSID string. */
+    char ssid[GUI_WIFI_SSID_MAX_LEN]; /*!< Null-terminated SSID string in a fixed GUI buffer. */
     uint8_t signal_strength_pct;      /*!< Signal quality expressed as a percentage. */
     bool secured;                     /*!< True when the network requires authentication. */
 } gui_wifi_network_t;
@@ -196,9 +199,9 @@ typedef struct {
  */
 typedef struct {
     gui_wifi_network_t networks[GUI_WIFI_NETWORK_COUNT]; /*!< Scanned networks available for selection. */
-    uint8_t network_count; /*!< Number of valid entries in networks. */
+    uint8_t network_count; /*!< Number of valid entries in networks, 0-GUI_WIFI_NETWORK_COUNT. */
     gui_wifi_network_t known_networks[GUI_WIFI_KNOWN_NETWORK_COUNT]; /*!< Saved networks offered as quick-connect targets. */
-    uint8_t known_network_count; /*!< Number of valid entries in known_networks. */
+    uint8_t known_network_count; /*!< Number of valid entries in known_networks, 0-GUI_WIFI_KNOWN_NETWORK_COUNT. */
     int8_t selected_network_index; /*!< Selected scanned network index, or -1 when none is selected. */
     int8_t selected_known_network_index; /*!< Selected known network index, or -1 when not applicable. */
     char selected_ssid[GUI_WIFI_SSID_MAX_LEN]; /*!< SSID currently targeted by the password dialog. */

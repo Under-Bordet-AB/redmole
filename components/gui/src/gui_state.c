@@ -1,3 +1,8 @@
+/**
+ * @file gui_state.c
+ * @brief Internal GUI model defaults, change detection, and state transitions.
+ */
+
 #include "gui_state.h"
 
 #include <stdio.h>

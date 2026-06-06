@@ -1,3 +1,8 @@
+/**
+ * @file gui_view_settings_panel.c
+ * @brief LVGL widgets, dialogs, and cached updates for GUI settings.
+ */
+
 #include "gui_view_settings_panel.h"
 
 #include <stdio.h>

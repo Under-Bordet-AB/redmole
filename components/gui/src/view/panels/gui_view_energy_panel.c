@@ -1,3 +1,8 @@
+/**
+ * @file gui_view_energy_panel.c
+ * @brief LVGL widgets and chart updates for the energy plan panel.
+ */
+
 #include "gui_view_energy_panel.h"
 
 #include <string.h>

@@ -1,3 +1,8 @@
+/**
+ * @file gui_view.c
+ * @brief Top-level LVGL view creation, theming, navigation, and modal control.
+ */
+
 #include "gui_view.h"
 
 #include <stdio.h>
