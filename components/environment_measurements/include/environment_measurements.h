@@ -5,8 +5,8 @@
  * @file
  * @brief Public API for board-local environment measurements.
  *
- * The module owns one configured sensor, its polling task, and the latest
- * coherent sample.
+ * The module owns the product's fixed sensor list, polls it from one task, and
+ * exposes the latest complete indoor sample.
  */
 
 #include <stdbool.h>
@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 /**
- * @brief Latest preferred indoor temperature, humidity, and pressure values.
+ * @brief Complete indoor environment sample returned to application code.
  *
  * Values use scaled integers:
  * - temperature_deci_c: 231 means 23.1 C
@@ -31,16 +31,16 @@ typedef struct {
     int32_t temperature_deci_c; /*!< Temperature in deci-degrees Celsius. */
     int32_t humidity_deci_pct;  /*!< Relative humidity in deci-percent. */
     int32_t pressure_deci_hpa;  /*!< Local pressure in deci-hectopascals. */
-    bool valid;                 /*!< True only when all three values are present and fresh. */
+    bool valid;                 /*!< False when the sensor failed or the copied sample is stale. */
 } environment_measurement_sample_t;
 
 /**
  * @brief Initialize the environment measurements module.
  *
- * Initializes fixed internal storage and attempts to initialize the configured
- * sensor. Sensor initialization errors are logged and retried by the polling
- * task. This function is idempotent; polling does not start until
- * environment_measurements_start().
+ * Creates the synchronization objects and attempts to initialize every sensor
+ * installed in the fixed product composition. A missing sensor does not prevent
+ * startup; its first successful polling read completes recovery. Polling does
+ * not begin until environment_measurements_start().
  *
  * @return ESP_OK on success, otherwise an ESP-IDF error code.
  */
@@ -57,9 +57,10 @@ esp_err_t environment_measurements_init(void);
 esp_err_t environment_measurements_start(void);
 
 /**
- * @brief Compatibility alias for environment_measurements_stop().
+ * @brief Stop polling without releasing process-lifetime storage.
  *
- * Repeated calls are safe and permanent resources remain allocated.
+ * The module uses only static or process-lifetime resources, so deinitializing
+ * has the same effect as stopping. Repeated calls are safe.
  */
 void environment_measurements_deinit(void);
 
@@ -72,17 +73,17 @@ void environment_measurements_deinit(void);
 void environment_measurements_stop(void);
 
 /**
- * @brief Copy the latest stable environment measurement.
+ * @brief Copy the latest complete indoor sample when it is still usable.
  *
  * The function briefly blocks on the latest-value mutex.
  *
  * @param out Caller-owned output sample, must not be NULL.
- * @return True when a fresh complete sample was copied, false otherwise.
+ * @return True when a complete sample no older than the module timeout was copied.
  */
 bool environment_measurements_get_latest(environment_measurement_sample_t* out);
 
 /**
- * @brief Check whether the latest valid sample is recent enough.
+ * @brief Apply a caller-selected age limit to the latest complete indoor sample.
  *
  * @param max_age_ms Maximum accepted sample age in milliseconds.
  * @return True when the latest valid sample exists and is no older than max_age_ms.

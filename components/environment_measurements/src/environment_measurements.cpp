@@ -3,19 +3,13 @@
 #include <atomic>
 #include <cstdint>
 
-#include "bme280/bme280_sensor.hpp"
-#include "environment_sensor.hpp"
+#include "environment_sensors.hpp"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
-#include "sim/simulated_bme280_sensor.hpp"
-
-extern "C" {
-#include "board_i2c.h"
-}
 
 #ifndef CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC
 #define CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC 1
@@ -23,9 +17,11 @@ extern "C" {
 
 namespace {
 
-using redmole::environment::Bme280Sensor;
+using redmole::environment::EnvironmentLocation;
+using redmole::environment::EnvironmentSensorBinding;
+using redmole::environment::EnvironmentSensorReading;
+using redmole::environment::EnvironmentSensors;
 using redmole::environment::kMicrosecondsPerMillisecond;
-using redmole::environment::SimulatedEnvironmentSensor;
 
 constexpr const char* kTag = "ENV_MEASURE";
 constexpr uint32_t kReadingIntervalMs = CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC * 1000U;
@@ -33,31 +29,12 @@ constexpr uint32_t kTaskStackDepth = 4096U;
 constexpr UBaseType_t kTaskPriority = 5U;
 constexpr int64_t kStaleTimeoutMs = 5000LL;
 
-#if CONFIG_REDMOLE_ENVIRONMENT_SOURCE_SIMULATOR
-using SelectedEnvironmentSensor = SimulatedEnvironmentSensor;
-#else
-using SelectedEnvironmentSensor = Bme280Sensor;
-#endif
-
-#if CONFIG_REDMOLE_BME280_ADDRESS_0X76
-constexpr uint8_t kBme280Address = 0x76U;
-#else
-constexpr uint8_t kBme280Address = 0x77U;
-#endif
-
 int64_t now_ms() {
     return esp_timer_get_time() / kMicrosecondsPerMillisecond;
 }
 
 class EnvironmentMeasurements {
   public:
-    EnvironmentMeasurements()
-#if !CONFIG_REDMOLE_ENVIRONMENT_SOURCE_SIMULATOR
-        : sensor_(kBme280Address)
-#endif
-    {
-    }
-
     esp_err_t init() {
         esp_err_t result;
 
@@ -67,21 +44,21 @@ class EnvironmentMeasurements {
 
         latest_mutex_ = xSemaphoreCreateMutexStatic(&latest_mutex_storage_);
         stopped_ = xSemaphoreCreateBinaryStatic(&stopped_storage_);
-        if ((latest_mutex_ == nullptr) || (stopped_ == nullptr)) {
+        if (latest_mutex_ == nullptr) {
             return ESP_ERR_NO_MEM;
         }
 
-#if !CONFIG_REDMOLE_ENVIRONMENT_SOURCE_SIMULATOR
-        result = board_i2c_init();
-        if (result != ESP_OK) {
-            return result;
+        if (stopped_ == nullptr) {
+            return ESP_ERR_NO_MEM;
         }
-#endif
 
-        result = sensor_.init();
-        if (result != ESP_OK) {
-            ESP_LOGE(kTag, "Environment sensor initialization failed: %s", esp_err_to_name(result));
-            sensor_failed_ = true;
+        for (EnvironmentSensorBinding& binding : sensors_.bindings()) {
+            result = binding.sensor->init();
+            if (result != ESP_OK) {
+                ESP_LOGE(kTag, "%s initialization failed: %s", binding.name,
+                         esp_err_to_name(result));
+                binding.last_read_failed = true;
+            }
         }
 
         initialized_ = true;
@@ -98,19 +75,20 @@ class EnvironmentMeasurements {
         }
 
         stop_requested_.store(false, std::memory_order_release);
-        running_ = true;
 
         if (task_ == nullptr) {
             task_ = xTaskCreateStatic(task_entry, "environment", kTaskStackDepth, this,
                                       kTaskPriority, task_stack_, &task_control_block_);
             if (task_ == nullptr) {
-                running_ = false;
                 return ESP_ERR_NO_MEM;
             }
-        } else {
-            xTaskNotifyGive(task_);
+
+            running_ = true;
+            return ESP_OK;
         }
 
+        xTaskNotifyGive(task_);
+        running_ = true;
         return ESP_OK;
     }
 
@@ -127,8 +105,13 @@ class EnvironmentMeasurements {
 
     bool get_latest(environment_measurement_sample_t* out) const {
         int64_t current_ms;
+        int64_t sample_age_ms;
 
-        if ((out == nullptr) || !initialized_) {
+        if (out == nullptr) {
+            return false;
+        }
+
+        if (!initialized_) {
             return false;
         }
 
@@ -137,8 +120,17 @@ class EnvironmentMeasurements {
         xSemaphoreGive(latest_mutex_);
 
         current_ms = now_ms();
-        if (!out->valid || (out->timestamp_ms > current_ms) ||
-            ((current_ms - out->timestamp_ms) > kStaleTimeoutMs)) {
+        if (!out->valid) {
+            return false;
+        }
+
+        if (out->timestamp_ms > current_ms) {
+            out->valid = false;
+            return false;
+        }
+
+        sample_age_ms = current_ms - out->timestamp_ms;
+        if (sample_age_ms > kStaleTimeoutMs) {
             out->valid = false;
             return false;
         }
@@ -149,13 +141,19 @@ class EnvironmentMeasurements {
     bool is_fresh(uint32_t max_age_ms) const {
         environment_measurement_sample_t sample = {};
         int64_t current_ms;
+        int64_t sample_age_ms;
 
         if (!get_latest(&sample)) {
             return false;
         }
 
         current_ms = now_ms();
-        return (current_ms - sample.timestamp_ms) <= static_cast<int64_t>(max_age_ms);
+        sample_age_ms = current_ms - sample.timestamp_ms;
+        if (sample_age_ms > static_cast<int64_t>(max_age_ms)) {
+            return false;
+        }
+
+        return true;
     }
 
     uint32_t get_update_count() const {
@@ -171,35 +169,69 @@ class EnvironmentMeasurements {
     }
 
     void task_loop() {
-        environment_measurement_sample_t sample;
+        EnvironmentSensorReading reading = {};
         esp_err_t result;
 
         while (true) {
-            while (!stop_requested_.load(std::memory_order_acquire)) {
-                sample = {};
-                result = sensor_.read(sample);
-
-                if (result == ESP_OK) {
-                    publish(sample);
-                    if (sensor_failed_) {
-                        ESP_LOGI(kTag, "Environment sensor recovered");
-                        sensor_failed_ = false;
-                    }
-                } else {
-                    invalidate_latest();
-                    if (!sensor_failed_) {
-                        ESP_LOGE(kTag, "Environment sensor read failed: %s",
-                                 esp_err_to_name(result));
-                        sensor_failed_ = true;
-                    }
-                }
-
-                ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(kReadingIntervalMs));
+            if (stop_requested_.load(std::memory_order_acquire)) {
+                xSemaphoreGive(stopped_);
+                ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+                continue;
             }
 
-            xSemaphoreGive(stopped_);
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            for (EnvironmentSensorBinding& binding : sensors_.bindings()) {
+                reading = {};
+                result = binding.sensor->read(reading);
+                process_reading(binding, result, reading);
+            }
+
+            ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(kReadingIntervalMs));
         }
+    }
+
+    void process_reading(EnvironmentSensorBinding& binding, esp_err_t result,
+                         const EnvironmentSensorReading& reading) {
+        environment_measurement_sample_t sample = {};
+
+        if (result != ESP_OK) {
+            if (binding.location == EnvironmentLocation::Indoor) {
+                invalidate_latest();
+            }
+
+            if (!binding.last_read_failed) {
+                ESP_LOGE(kTag, "%s read failed: %s", binding.name, esp_err_to_name(result));
+                binding.last_read_failed = true;
+            }
+            return;
+        }
+
+        if (binding.last_read_failed) {
+            ESP_LOGI(kTag, "%s recovered", binding.name);
+            binding.last_read_failed = false;
+        }
+
+        if (binding.location != EnvironmentLocation::Indoor) {
+            return;
+        }
+
+        if (!reading.has_temperature) {
+            return;
+        }
+
+        if (!reading.has_humidity) {
+            return;
+        }
+
+        if (!reading.has_pressure) {
+            return;
+        }
+
+        sample.timestamp_ms = reading.timestamp_ms;
+        sample.temperature_deci_c = reading.temperature_deci_c;
+        sample.humidity_deci_pct = reading.humidity_deci_pct;
+        sample.pressure_deci_hpa = reading.pressure_deci_hpa;
+        sample.valid = true;
+        publish(sample);
     }
 
     void publish(const environment_measurement_sample_t& sample) {
@@ -215,7 +247,7 @@ class EnvironmentMeasurements {
         xSemaphoreGive(latest_mutex_);
     }
 
-    SelectedEnvironmentSensor sensor_;
+    EnvironmentSensors sensors_;
     mutable StaticSemaphore_t latest_mutex_storage_ = {};
     mutable SemaphoreHandle_t latest_mutex_ = nullptr;
     StaticSemaphore_t stopped_storage_ = {};
@@ -228,7 +260,6 @@ class EnvironmentMeasurements {
     std::atomic_bool stop_requested_{false};
     bool initialized_ = false;
     bool running_ = false;
-    bool sensor_failed_ = false;
 };
 
 EnvironmentMeasurements s_environment_measurements;

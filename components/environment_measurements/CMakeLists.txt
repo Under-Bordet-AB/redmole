@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "src/environment_measurements.cpp"
+        "src/environment_sensors.cpp"
         "src/bme280/bme280_sensor.cpp"
         "src/sim/simulated_bme280_sensor.cpp"
     INCLUDE_DIRS "include"
