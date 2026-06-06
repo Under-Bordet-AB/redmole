@@ -118,7 +118,7 @@ The app-level integration adds additional dependencies around the GUI rather tha
 
 - `nac` for Wi-Fi status and requests
 - `rm_nvs` for persisted appearance preload and Wi-Fi metadata
-- `environment_measurements` for sensor acquisition, fallback, and latest-snapshot publication
+- `environment_measurements` for sensor acquisition and latest-snapshot publication
 
 The result is a deliberate split:
 

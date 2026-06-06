@@ -71,7 +71,7 @@ Startup flow:
 
 - `rm_nvs` is a single-instance NVS wrapper with a fixed default namespace.
 - `board_i2c` owns the shared ESP32-S3 I2C master bus configuration.
-- `environment_measurements` owns board-local environment readings and fallback simulation.
+- `environment_measurements` owns the configured BME280, polling, and latest indoor snapshot.
 - `gui` is currently a single-instance module that owns its own internal runtime state.
 - `wifi_module` matches the main branch implementation, but its startup path is not active in this build.
 

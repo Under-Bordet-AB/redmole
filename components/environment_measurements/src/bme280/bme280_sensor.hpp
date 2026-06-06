@@ -5,18 +5,20 @@
  * @brief BME280 hardware source for environment measurements.
  *
  * The source retains one board_i2c device handle for its lifetime and converts
- * each physical acquisition into a coherent temperature, humidity, and pressure
- * batch.
+ * each physical acquisition into complete temperature, humidity, and pressure
+ * measurements.
  */
 
 #include <cstdint>
 
 #include "driver/i2c_master.h"
-#include "environment_sensor.hpp"
+#include "esp_err.h"
+#include "temperature_humidity_pressure_source.hpp"
 
-namespace redmole::environment {
+namespace redmole::environment::bme280 {
 
-/** @brief Power and acquisition modes accepted by the BME280 mode field. */
+/** @brief Power and acquisition modes accepted by the BME280 mode field. "Forced" and
+ * "ForcedAlternate" represents the same mode. */
 enum class Bme280Mode : uint8_t {
     Sleep = 0,           /*!< No conversion runs until another mode is written. */
     Forced = 1,          /*!< Run one conversion and return automatically to sleep. */
@@ -58,8 +60,8 @@ enum class Bme280Standby : uint8_t {
 /**
  * @brief Complete set of BME280 measurement controls available over I2C.
  *
- * Temperature must be enabled whenever pressure or humidity is enabled because
- * both compensation formulas use the fine temperature value.
+ * Normal application readings require temperature, pressure, and humidity to
+ * remain enabled. Temperature is also required by both other compensation formulas.
  */
 struct Bme280Settings {
     Bme280Mode mode;                             /*!< Acquisition and power mode. */
@@ -81,21 +83,6 @@ struct Bme280RawSample {
     int32_t adc_temperature; /*!< Uncompensated 20-bit temperature ADC value. */
     int32_t adc_pressure;    /*!< Uncompensated 20-bit pressure ADC value. */
     int32_t adc_humidity;    /*!< Uncompensated 16-bit humidity ADC value. */
-};
-
-/**
- * @brief Compensated BME280 values in native engineering units.
- *
- * Presence flags remain false for channels disabled by the current settings.
- */
-struct Bme280Data {
-    int64_t timestamp_ms; /*!< Acquisition time in milliseconds since boot. */
-    double temperature_c; /*!< Compensated temperature in degrees Celsius. */
-    double pressure_pa;   /*!< Compensated pressure in pascals. */
-    double humidity_pct;  /*!< Compensated relative humidity in percent. */
-    bool has_temperature; /*!< The temperature field contains a measurement. */
-    bool has_pressure;    /*!< The pressure field contains a measurement. */
-    bool has_humidity;    /*!< The humidity field contains a measurement. */
 };
 
 /** @brief Factory calibration coefficients read from one BME280. */
@@ -127,7 +114,7 @@ struct Bme280Calibration {
  * complete initialization sequence again, which allows recovery after a sensor
  * is disconnected and reconnected.
  */
-class Bme280Sensor final : public EnvironmentSensor {
+class Bme280Sensor final : public TemperatureHumidityPressureSource {
   public:
     /**
      * @brief Construct a BME280 source for one seven-bit I2C address and settings.
@@ -143,18 +130,11 @@ class Bme280Sensor final : public EnvironmentSensor {
     esp_err_t init() override;
 
     /**
-     * @brief Acquire enabled values and convert them to the environment API units.
-     * @param reading Cleared output record populated with enabled measurements.
+     * @brief Acquire one complete strongly typed BME280 reading.
+     * @param out Cleared output populated only when all three channels are valid.
      * @return ESP_OK on complete success, otherwise an ESP-IDF error code.
      */
-    esp_err_t read(EnvironmentSensorReading& reading) override;
-
-    /**
-     * @brief Acquire compensated values without reducing the driver's precision.
-     * @param data Cleared output populated in degrees Celsius, pascals, and percent.
-     * @return ESP_OK when the acquisition completed, otherwise an ESP-IDF error code.
-     */
-    esp_err_t read_data(Bme280Data& data);
+    esp_err_t read(TemperatureHumidityPressureReading& out) override;
 
     /**
      * @brief Perform the BME280 software reset command.
@@ -195,7 +175,7 @@ class Bme280Sensor final : public EnvironmentSensor {
      * @brief Read one coherent block of uncompensated measurement registers.
      *
      * This is available for diagnostics. Normal application code should use
-     * read(), which applies calibration and marks skipped channels.
+     * read(), which applies calibration and requires all channels.
      *
      * @param out_raw Output populated from the sensor's measurement register block.
      * @return ESP_OK when data was read, otherwise an I2C or timeout error.
@@ -235,11 +215,12 @@ class Bme280Sensor final : public EnvironmentSensor {
     esp_err_t load_calibration();
 
     /**
-     * @brief Apply the BME280 datasheet formulas and public API units.
+     * @brief Apply the BME280 datasheet formulas and strong reading units.
      * @param raw Uncompensated values from the sensor.
-     * @param out Output populated with compensated values and acquisition time.
+     * @param out Output populated only when every channel can be compensated.
+     * @return ESP_OK on complete success, otherwise ESP_ERR_INVALID_RESPONSE.
      */
-    void convert(const Bme280RawSample& raw, Bme280Data& out) const;
+    esp_err_t convert(const Bme280RawSample& raw, TemperatureHumidityPressureReading& out) const;
 
     uint8_t address_;                          /*!< Address fixed by the product circuit. */
     Bme280Settings settings_;                  /*!< Controls reapplied after every recovery. */
@@ -248,4 +229,4 @@ class Bme280Sensor final : public EnvironmentSensor {
     bool ready_for_reads_ = false;             /*!< False requests full initialization on read. */
 };
 
-} // namespace redmole::environment
+} // namespace redmole::environment::bme280

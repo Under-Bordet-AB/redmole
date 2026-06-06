@@ -7,24 +7,9 @@ menu "RedMole Sensor Configuration"
         help
             Period used to read and publish environment measurements.
 
-    choice REDMOLE_ENVIRONMENT_SOURCE
-        prompt "Environment measurement source"
-        default REDMOLE_ENVIRONMENT_SOURCE_BME280
-        help
-            Select the one environment source used by this firmware build.
-            The simulator is explicit and is never used as a hardware fallback.
-
-        config REDMOLE_ENVIRONMENT_SOURCE_BME280
-            bool "BME280"
-
-        config REDMOLE_ENVIRONMENT_SOURCE_SIMULATOR
-            bool "Simulator"
-    endchoice
-
     choice REDMOLE_BME280_ADDRESS
         prompt "BME280 I2C address"
         default REDMOLE_BME280_ADDRESS_0X77
-        depends on REDMOLE_ENVIRONMENT_SOURCE_BME280
 
         config REDMOLE_BME280_ADDRESS_0X76
             bool "0x76"
@@ -37,7 +22,6 @@ menu "RedMole Sensor Configuration"
         int "BME280 mode"
         default 1
         range 0 3
-        depends on REDMOLE_ENVIRONMENT_SOURCE_BME280
         help
             BME280 mode register value: 0=sleep, 1=forced, 2=forced,
             3=normal. Forced mode is the default because the FreeRTOS task owns
@@ -47,36 +31,30 @@ menu "RedMole Sensor Configuration"
     config REDMOLE_BME280_OVERSAMPLING_TEMPERATURE
         int "BME280 temperature oversampling"
         default 1
-        range 0 5
-        depends on REDMOLE_ENVIRONMENT_SOURCE_BME280
+        range 1 5
         help
-            BME280 osrs_t setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
-            5=x16. Temperature must be enabled when pressure or humidity is
-            enabled because their compensation uses the temperature result.
+            BME280 osrs_t setting: 1=x1, 2=x2, 3=x4, 4=x8, 5=x16.
+            Every successful application reading contains temperature,
+            humidity, and pressure, so channels cannot be skipped.
 
     config REDMOLE_BME280_OVERSAMPLING_PRESSURE
         int "BME280 pressure oversampling"
         default 1
-        range 0 5
-        depends on REDMOLE_ENVIRONMENT_SOURCE_BME280
+        range 1 5
         help
-            BME280 osrs_p setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
-            5=x16.
+            BME280 osrs_p setting: 1=x1, 2=x2, 3=x4, 4=x8, 5=x16.
 
     config REDMOLE_BME280_OVERSAMPLING_HUMIDITY
         int "BME280 humidity oversampling"
         default 1
-        range 0 5
-        depends on REDMOLE_ENVIRONMENT_SOURCE_BME280
+        range 1 5
         help
-            BME280 osrs_h setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
-            5=x16.
+            BME280 osrs_h setting: 1=x1, 2=x2, 3=x4, 4=x8, 5=x16.
 
     config REDMOLE_BME280_IIR_FILTER
         int "BME280 IIR filter coefficient"
         default 0
         range 0 4
-        depends on REDMOLE_ENVIRONMENT_SOURCE_BME280
         help
             BME280 filter setting: 0=off, 1=2, 2=4, 3=8, 4=16. The filter
             affects pressure and temperature but not humidity.
@@ -85,7 +63,6 @@ menu "RedMole Sensor Configuration"
         int "BME280 normal-mode standby time"
         default 5
         range 0 7
-        depends on REDMOLE_ENVIRONMENT_SOURCE_BME280
         help
             BME280 t_sb setting: 0=0.5ms, 1=62.5ms, 2=125ms, 3=250ms,
             4=500ms, 5=1000ms, 6=10ms, 7=20ms. In forced mode this is

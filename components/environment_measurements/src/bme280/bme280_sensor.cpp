@@ -3,7 +3,6 @@
 #include <cmath>
 
 #include "esp_log.h"
-#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
@@ -36,7 +35,7 @@ extern "C" {
 #define CONFIG_REDMOLE_BME280_STANDBY_TIME 5
 #endif
 
-namespace redmole::environment {
+namespace redmole::environment::bme280 {
 namespace {
 
 constexpr const char* kTag = "ENV_BME280";
@@ -116,13 +115,15 @@ static bool settings_are_valid(const Bme280Settings& settings) {
     }
 
     if (settings.temperature_oversampling == Bme280Oversampling::Skipped) {
-        if (settings.pressure_oversampling != Bme280Oversampling::Skipped) {
-            return false;
-        }
+        return false;
+    }
 
-        if (settings.humidity_oversampling != Bme280Oversampling::Skipped) {
-            return false;
-        }
+    if (settings.pressure_oversampling == Bme280Oversampling::Skipped) {
+        return false;
+    }
+
+    if (settings.humidity_oversampling == Bme280Oversampling::Skipped) {
+        return false;
     }
 
     return true;
@@ -213,36 +214,7 @@ esp_err_t Bme280Sensor::init() {
     return ESP_OK;
 }
 
-esp_err_t Bme280Sensor::read(EnvironmentSensorReading& reading) {
-    Bme280Data data = {};
-    esp_err_t result;
-
-    result = read_data(data);
-    if (result != ESP_OK) {
-        return result;
-    }
-
-    reading.timestamp_ms = data.timestamp_ms;
-    reading.has_temperature = data.has_temperature;
-    reading.has_pressure = data.has_pressure;
-    reading.has_humidity = data.has_humidity;
-
-    if (data.has_temperature) {
-        reading.temperature_deci_c = static_cast<int32_t>(std::lround(data.temperature_c * 10.0));
-    }
-
-    if (data.has_pressure) {
-        reading.pressure_deci_hpa = static_cast<int32_t>(std::lround(data.pressure_pa / 10.0));
-    }
-
-    if (data.has_humidity) {
-        reading.humidity_deci_pct = static_cast<int32_t>(std::lround(data.humidity_pct * 10.0));
-    }
-
-    return ESP_OK;
-}
-
-esp_err_t Bme280Sensor::read_data(Bme280Data& data) {
+esp_err_t Bme280Sensor::read(TemperatureHumidityPressureReading& out) {
     Bme280RawSample raw = {};
     esp_err_t result;
 
@@ -270,7 +242,12 @@ esp_err_t Bme280Sensor::read_data(Bme280Data& data) {
         return result;
     }
 
-    convert(raw, data);
+    result = convert(raw, out);
+    if (result != ESP_OK) {
+        ready_for_reads_ = false;
+        return result;
+    }
+
     return ESP_OK;
 }
 
@@ -543,7 +520,8 @@ esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
     return ESP_OK;
 }
 
-void Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Data& out) const {
+esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw,
+                                TemperatureHumidityPressureReading& out) const {
     double compensation_value_1;
     double compensation_value_2;
     double t_fine;
@@ -551,17 +529,16 @@ void Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Data& out) const {
     double pressure_pa;
     double humidity_pct;
 
-    out.timestamp_ms = esp_timer_get_time() / kMicrosecondsPerMillisecond;
-    out.has_temperature = false;
-    out.has_pressure = false;
-    out.has_humidity = false;
-
-    if (settings_.temperature_oversampling == Bme280Oversampling::Skipped) {
-        return;
+    if (raw.adc_temperature == kSkippedTemperatureOrPressure) {
+        return ESP_ERR_INVALID_RESPONSE;
     }
 
-    if (raw.adc_temperature == kSkippedTemperatureOrPressure) {
-        return;
+    if (raw.adc_pressure == kSkippedTemperatureOrPressure) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    if (raw.adc_humidity == kSkippedHumidity) {
+        return ESP_ERR_INVALID_RESPONSE;
     }
 
     // These steps follow the BME280 datasheet compensation formulas.
@@ -576,70 +553,60 @@ void Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Data& out) const {
                            static_cast<double>(calibration_.dig_T3);
     t_fine = compensation_value_1 + compensation_value_2;
     temperature_c = t_fine / 5120.0;
-    out.temperature_c = temperature_c;
-    out.has_temperature = true;
 
-    if (settings_.pressure_oversampling != Bme280Oversampling::Skipped) {
-        if (raw.adc_pressure != kSkippedTemperatureOrPressure) {
-            compensation_value_1 = (t_fine / 2.0) - 64000.0;
-            compensation_value_2 = compensation_value_1 * compensation_value_1 *
-                                   static_cast<double>(calibration_.dig_P6) / 32768.0;
-            compensation_value_2 =
-                compensation_value_2 +
-                compensation_value_1 * static_cast<double>(calibration_.dig_P5) * 2.0;
-            compensation_value_2 =
-                (compensation_value_2 / 4.0) + (static_cast<double>(calibration_.dig_P4) * 65536.0);
-            compensation_value_1 =
-                ((static_cast<double>(calibration_.dig_P3) * compensation_value_1 *
-                  compensation_value_1 / 524288.0) +
-                 (static_cast<double>(calibration_.dig_P2) * compensation_value_1)) /
-                524288.0;
-            compensation_value_1 =
-                (1.0 + (compensation_value_1 / 32768.0)) * static_cast<double>(calibration_.dig_P1);
+    compensation_value_1 = (t_fine / 2.0) - 64000.0;
+    compensation_value_2 = compensation_value_1 * compensation_value_1 *
+                           static_cast<double>(calibration_.dig_P6) / 32768.0;
+    compensation_value_2 = compensation_value_2 +
+                           compensation_value_1 * static_cast<double>(calibration_.dig_P5) * 2.0;
+    compensation_value_2 =
+        (compensation_value_2 / 4.0) + (static_cast<double>(calibration_.dig_P4) * 65536.0);
+    compensation_value_1 = ((static_cast<double>(calibration_.dig_P3) * compensation_value_1 *
+                             compensation_value_1 / 524288.0) +
+                            (static_cast<double>(calibration_.dig_P2) * compensation_value_1)) /
+                           524288.0;
+    compensation_value_1 =
+        (1.0 + (compensation_value_1 / 32768.0)) * static_cast<double>(calibration_.dig_P1);
 
-            if (compensation_value_1 != 0.0) {
-                pressure_pa = 1048576.0 - static_cast<double>(raw.adc_pressure);
-                pressure_pa =
-                    (pressure_pa - (compensation_value_2 / 4096.0)) * 6250.0 / compensation_value_1;
-                compensation_value_1 = static_cast<double>(calibration_.dig_P9) * pressure_pa *
-                                       pressure_pa / 2147483648.0;
-                compensation_value_2 =
-                    pressure_pa * static_cast<double>(calibration_.dig_P8) / 32768.0;
-                pressure_pa = pressure_pa + (compensation_value_1 + compensation_value_2 +
-                                             static_cast<double>(calibration_.dig_P7)) /
-                                                16.0;
-                out.pressure_pa = pressure_pa;
-                out.has_pressure = true;
-            }
-        }
+    if (compensation_value_1 == 0.0) {
+        return ESP_ERR_INVALID_RESPONSE;
     }
 
-    if (settings_.humidity_oversampling != Bme280Oversampling::Skipped) {
-        if (raw.adc_humidity != kSkippedHumidity) {
-            humidity_pct = t_fine - 76800.0;
-            humidity_pct =
-                (raw.adc_humidity -
-                 ((static_cast<double>(calibration_.dig_H4) * 64.0) +
-                  (static_cast<double>(calibration_.dig_H5) / 16384.0 * humidity_pct))) *
-                (static_cast<double>(calibration_.dig_H2) / 65536.0 *
-                 (1.0 + (static_cast<double>(calibration_.dig_H6) / 67108864.0 * humidity_pct *
-                         (1.0 + (static_cast<double>(calibration_.dig_H3) / 67108864.0 *
-                                 humidity_pct)))));
-            humidity_pct =
-                humidity_pct *
-                (1.0 - (static_cast<double>(calibration_.dig_H1) * humidity_pct / 524288.0));
-            if (humidity_pct > 100.0) {
-                humidity_pct = 100.0;
-            }
+    pressure_pa = 1048576.0 - static_cast<double>(raw.adc_pressure);
+    pressure_pa = (pressure_pa - (compensation_value_2 / 4096.0)) * 6250.0 / compensation_value_1;
+    compensation_value_1 =
+        static_cast<double>(calibration_.dig_P9) * pressure_pa * pressure_pa / 2147483648.0;
+    compensation_value_2 = pressure_pa * static_cast<double>(calibration_.dig_P8) / 32768.0;
+    pressure_pa = pressure_pa + (compensation_value_1 + compensation_value_2 +
+                                 static_cast<double>(calibration_.dig_P7)) /
+                                    16.0;
 
-            if (humidity_pct < 0.0) {
-                humidity_pct = 0.0;
-            }
-
-            out.humidity_pct = humidity_pct;
-            out.has_humidity = true;
-        }
+    humidity_pct = t_fine - 76800.0;
+    humidity_pct =
+        (raw.adc_humidity - ((static_cast<double>(calibration_.dig_H4) * 64.0) +
+                             (static_cast<double>(calibration_.dig_H5) / 16384.0 * humidity_pct))) *
+        (static_cast<double>(calibration_.dig_H2) / 65536.0 *
+         (1.0 + (static_cast<double>(calibration_.dig_H6) / 67108864.0 * humidity_pct *
+                 (1.0 + (static_cast<double>(calibration_.dig_H3) / 67108864.0 * humidity_pct)))));
+    humidity_pct =
+        humidity_pct * (1.0 - (static_cast<double>(calibration_.dig_H1) * humidity_pct / 524288.0));
+    if (humidity_pct > 100.0) {
+        humidity_pct = 100.0;
     }
+
+    if (humidity_pct < 0.0) {
+        humidity_pct = 0.0;
+    }
+
+    if (!std::isfinite(temperature_c) || !std::isfinite(humidity_pct) ||
+        !std::isfinite(pressure_pa)) {
+        return ESP_ERR_INVALID_RESPONSE;
+    }
+
+    out.temperature.deci_c = static_cast<int32_t>(std::lround(temperature_c * 10.0));
+    out.humidity.deci_pct = static_cast<int32_t>(std::lround(humidity_pct * 10.0));
+    out.pressure.deci_hpa = static_cast<int32_t>(std::lround(pressure_pa / 10.0));
+    return ESP_OK;
 }
 
-} // namespace redmole::environment
+} // namespace redmole::environment::bme280

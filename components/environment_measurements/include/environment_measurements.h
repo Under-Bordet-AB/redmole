@@ -5,8 +5,8 @@
  * @file
  * @brief Public API for board-local environment measurements.
  *
- * The module owns the product's fixed sensor list, polls it from one task, and
- * exposes the latest complete indoor sample.
+ * The module owns and polls the configured indoor BME280 and exposes its latest
+ * complete temperature, humidity, and pressure sample.
  */
 
 #include <stdbool.h>
@@ -37,10 +37,10 @@ typedef struct {
 /**
  * @brief Initialize the environment measurements module.
  *
- * Creates the synchronization objects and attempts to initialize every sensor
- * installed in the fixed product composition. A missing sensor does not prevent
- * startup; its first successful polling read completes recovery. Polling does
- * not begin until environment_measurements_start().
+ * Creates the synchronization objects and attempts to initialize the configured
+ * indoor BME280. A missing sensor does not prevent startup; its first successful
+ * polling read completes recovery. Polling does not begin until
+ * environment_measurements_start().
  *
  * @return ESP_OK on success, otherwise an ESP-IDF error code.
  */
