@@ -74,6 +74,19 @@ static int16_t sign_extend_12_bit(int16_t value) {
     return value;
 }
 
+static int32_t read_unsigned_20_be(const uint8_t* data) {
+    return (static_cast<int32_t>(data[0]) << 12U) | (static_cast<int32_t>(data[1]) << 4U) |
+           (data[2] >> 4U);
+}
+
+static int32_t read_unsigned_16_be(const uint8_t* data) {
+    return (static_cast<int32_t>(data[0]) << 8U) | data[1];
+}
+
+static bool is_forced_mode(Bme280Mode mode) {
+    return mode == Bme280Mode::Forced || mode == Bme280Mode::ForcedAlternate;
+}
+
 static bool settings_are_valid(const Bme280Settings& settings) {
     if (static_cast<uint8_t>(settings.mode) > static_cast<uint8_t>(Bme280Mode::Normal)) {
         return false;
@@ -239,20 +252,11 @@ esp_err_t Bme280Sensor::read_data(Bme280Data& data) {
             return result;
         }
     }
-
     if (settings_.mode == Bme280Mode::Sleep) {
         return ESP_ERR_INVALID_STATE;
     }
 
-    if (settings_.mode == Bme280Mode::Forced) {
-        result = write_ctrl_meas(settings_.mode);
-        if (result != ESP_OK) {
-            ready_for_reads_ = false;
-            return result;
-        }
-    }
-
-    if (settings_.mode == Bme280Mode::ForcedAlternate) {
+    if (is_forced_mode(settings_.mode)) {
         result = write_ctrl_meas(settings_.mode);
         if (result != ESP_OK) {
             ready_for_reads_ = false;
@@ -448,11 +452,11 @@ esp_err_t Bme280Sensor::read_status(Bme280Status& status) {
 }
 
 esp_err_t Bme280Sensor::write_ctrl_meas(Bme280Mode mode) {
-    uint8_t control_value;
+    const uint8_t temperature_bits = static_cast<uint8_t>(settings_.temperature_oversampling) << 5U;
+    const uint8_t pressure_bits = static_cast<uint8_t>(settings_.pressure_oversampling) << 2U;
+    const uint8_t mode_bits = static_cast<uint8_t>(mode);
+    const uint8_t control_value = temperature_bits | pressure_bits | mode_bits;
 
-    control_value = static_cast<uint8_t>(
-        (static_cast<uint8_t>(settings_.temperature_oversampling) << 5U) |
-        (static_cast<uint8_t>(settings_.pressure_oversampling) << 2U) | static_cast<uint8_t>(mode));
     return board_i2c_write_reg(device_, BME280_REG_CTRL_MEAS, control_value);
 }
 
@@ -521,14 +525,7 @@ esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
     uint8_t data[8] = {};
     esp_err_t result;
 
-    if (settings_.mode == Bme280Mode::Forced) {
-        result = wait_until_ready();
-        if (result != ESP_OK) {
-            return result;
-        }
-    }
-
-    if (settings_.mode == Bme280Mode::ForcedAlternate) {
+    if (is_forced_mode(settings_.mode)) {
         result = wait_until_ready();
         if (result != ESP_OK) {
             return result;
@@ -540,11 +537,9 @@ esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
         return result;
     }
 
-    out_raw.adc_pressure = (static_cast<int32_t>(data[0]) << 12U) |
-                           (static_cast<int32_t>(data[1]) << 4U) | (data[2] >> 4U);
-    out_raw.adc_temperature = (static_cast<int32_t>(data[3]) << 12U) |
-                              (static_cast<int32_t>(data[4]) << 4U) | (data[5] >> 4U);
-    out_raw.adc_humidity = (static_cast<int32_t>(data[6]) << 8U) | data[7];
+    out_raw.adc_pressure = read_unsigned_20_be(&data[0]);
+    out_raw.adc_temperature = read_unsigned_20_be(&data[3]);
+    out_raw.adc_humidity = read_unsigned_16_be(&data[6]);
     return ESP_OK;
 }
 
@@ -570,6 +565,7 @@ void Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Data& out) const {
     }
 
     // These steps follow the BME280 datasheet compensation formulas.
+    // TODO should we use the bosch provided code for this?
     compensation_value_1 = ((static_cast<double>(raw.adc_temperature) / 16384.0) -
                             (static_cast<double>(calibration_.dig_T1) / 1024.0)) *
                            static_cast<double>(calibration_.dig_T2);
