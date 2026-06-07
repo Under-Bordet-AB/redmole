@@ -108,6 +108,17 @@ bool gui_is_active(gui_ctx_t *self);
 void gui_set_bindings(gui_ctx_t *self, const gui_module_bindings_t *bindings);
 
 /**
+ * @brief Resolve a theme to one supported by the current GUI build.
+ *
+ * Disabled, out-of-range, or otherwise unavailable theme values resolve to
+ * the GUI default theme.
+ *
+ * @param theme Requested theme value.
+ * @return Theme value that can be applied and persisted safely.
+ */
+gui_view_theme_t gui_resolve_available_theme(gui_view_theme_t theme);
+
+/**
  * @brief Force the GUI to rebuild and apply its current view model.
  *
  * Takes the LVGL port lock while rendering.
@@ -301,7 +312,7 @@ void gui_set_brightness(gui_ctx_t *self, int32_t brightness_percent);
 /**
  * @brief Read back the current display brightness setting.
  *
- * @param self GUI context, currently unused and may be NULL.
+ * @param self Initialized GUI context.
  * @param brightness_percent Output pointer that receives the current brightness on success, must not be NULL.
  * @return True when the context is ready and the brightness value was written.
  */

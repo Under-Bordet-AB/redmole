@@ -63,8 +63,8 @@ typedef enum {
 #define GUI_WIFI_NETWORK_COUNT 4
 /** Maximum number of saved Wi-Fi networks surfaced as known networks. */
 #define GUI_WIFI_KNOWN_NETWORK_COUNT 3
-/** Fixed size of SSID buffers stored in GUI models. */
-#define GUI_WIFI_SSID_MAX_LEN 32
+/** Buffer size for 32-byte SSIDs plus the trailing null byte. */
+#define GUI_WIFI_SSID_MAX_LEN 33
 /** Maximum Wi-Fi password length accepted from the password dialog. */
 #define GUI_WIFI_PASSWORD_MAX_LEN 64
 /** Maximum length of the user-visible Wi-Fi status message buffer. */

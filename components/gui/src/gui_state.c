@@ -308,7 +308,12 @@ bool gui_state_set_sd_card_state(gui_state_t *state, gui_sd_card_state_t sd_card
 
 bool gui_state_set_theme(gui_state_t *state, gui_view_theme_t theme)
 {
-    if ((state == NULL) || (state->appearance.theme == theme)) {
+    if (state == NULL) {
+        return false;
+    }
+
+    theme = gui_theme_resolve_available(theme);
+    if (state->appearance.theme == theme) {
         return false;
     }
 

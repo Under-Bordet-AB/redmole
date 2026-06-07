@@ -113,12 +113,14 @@ bool app_gui_wifi_sync_state(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
 void app_gui_wifi_sync(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
 {
     gui_wifi_settings_t wifi = { 0 };
+    gui_wifi_state_t previous_state;
     nac_wifi_status_t nac_status;
 
     if ((ctx == NULL) || (gui == NULL) || !gui_get_wifi_settings(gui, &wifi)) {
         return;
     }
 
+    previous_state = wifi.state;
     nac_status = nac_get_wifi_status();
     wifi.state = map_wifi_state(nac_status);
     wifi.connect_requested = ctx->wifi_connect_requested;
@@ -197,7 +199,14 @@ void app_gui_wifi_sync(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
     } else {
         wifi.connect_requested = false;
         wifi.can_disconnect = false;
-        if (wifi.status_text[0] == '\0') {
+        if ((previous_state == GUI_WIFI_STATE_CONNECTED) ||
+            (previous_state == GUI_WIFI_STATE_CONNECTING)) {
+            wifi.selected_network_index = -1;
+            wifi.selected_known_network_index = -1;
+            wifi.selected_ssid[0] = '\0';
+            wifi.password[0] = '\0';
+            snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Wi-Fi disconnected.");
+        } else if (wifi.status_text[0] == '\0') {
             snprintf(wifi.status_text, sizeof(wifi.status_text), "%s", "Press Scan to search for Wi-Fi networks.");
         }
     }
