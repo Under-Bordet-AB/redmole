@@ -117,9 +117,10 @@ nac_wifi_status_t nac_get_wifi_status(void)
     switch (s_nac.wifi.state)
     {
         case WIFI_STATE_CONNECTED:                       return NAC_WIFI_CONNECTED;
-        case WIFI_STATE_CONNECTING: /* fall-through */
+        case WIFI_REQUEST_CONNECT:  /* Fall through — request queued, not yet connecting */
+        case WIFI_STATE_CONNECTING: /* Fall through */
         case WIFI_STATE_RECONNECT:                       return NAC_WIFI_CONNECTING;
-        case WIFI_STATE_START_SCAN: /* fall-through */
+        case WIFI_STATE_START_SCAN: /* Fall through */
         case WIFI_STATE_SCANNING:                        return NAC_WIFI_SCANNING;
         case WIFI_STATE_ERROR:                           return NAC_WIFI_ERROR;
         case WIFI_STATE_IDLE:       /* fall-through */
@@ -188,7 +189,7 @@ const wifi_ap_record_t *nac_get_scan_results(uint16_t *out_count)
 
 bool nac_scan_is_complete(void)
 {
-    return s_nac.wifi.scan_complete != 0;
+    return s_nac.wifi.scan_complete;
 }
 
 /*  WiFi — internal implementation */
@@ -197,11 +198,14 @@ bool nac_scan_is_complete(void)
  * @brief Initialises the WiFi interface.
  * @note  Initialization order and ownership:
  *   1. [SYSTEM] nvs_flash_init()           rm_nvs_init() in main.c
- *   2. [STACK]  esp_netif_init()           nac_init()
- *   3. [SYSTEM] esp_event_loop_...()       nac_init()
+ *   2. [STACK]  esp_netif_init()           main.c — owned by main, not NAC
+ *   3. [SYSTEM] esp_event_loop_...()       main.c — owned by main, not NAC
  *   4. [BIND]   esp_netif_create_...()     here  — glue between LwIP and WiFi driver
  *   5. [HAL]    esp_wifi_init()            wifi_bring_hw_online()
  *   6. [RADIO]  esp_wifi_start()           wifi_connect()
+ *
+ * Steps 2 and 3 are intentionally kept in main so NAC init is independently
+ * testable without dragging in global system singletons.
  * @return 0 on success, -1 on failure
  */
 static int8_t wifi_init(wifi_ctx_t *self)

@@ -35,10 +35,21 @@ static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
         return rv;
     }
 
+    /* Initialize network interface and event loop
+     *
+     * esp_netif_init: Initializes the network interface TCP/IP stack
+     * esp_event_loop_create_default: Creates the default event loop for handling system events
+     *      the user must register event handlers to receive events from this loop, such as WiFi events
+     * Belongs in main rather than in NAC init, makes NAC init testable
+     */
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    /* NAC init relies on network interface and event loop being initialized first */
     if (nac_init(event_group) != ESP_OK) {
         ESP_LOGE(TAG, "nac_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
+    ESP_LOGI(TAG, "NAC module successfully initialized.");
 
     if (http_client_init(HTTP_CLIENT_TLS_BUNDLE, NULL) != ESP_OK) {
         ESP_LOGE(TAG, "http_client_init failed: %s", esp_err_to_name(rv));
