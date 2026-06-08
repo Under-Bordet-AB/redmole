@@ -12,7 +12,7 @@ history or expose the BME280 driver directly to application code.
 
 The component:
 
-- configures and owns the current BME280 producer at address `0x76` or `0x77`
+- configures and owns either the BME280 producer or the simulated producer
 - uses the shared bus provided by `board_i2c`
 - reads and compensates the BME280's temperature, humidity, and pressure data
 - converts each coherent BME280 read into three logical measurement channels
@@ -115,7 +115,8 @@ For example, `temperature_deci_c = 231` means `23.1 C`.
 - the sample is older than the fixed five-second timeout
 - the sample timestamp is later than the current monotonic time
 
-When a copied sample is stale, its `valid` field is set to `false`.
+For every failure other than a `NULL` output pointer, the output struct is
+cleared and its `valid` field is set to `false`.
 
 ## BME280 Behavior
 
@@ -139,21 +140,27 @@ and the first later recovery without logging every repeated failure.
 
 ## Configuration
 
-Run `idf.py menuconfig` and open `RedMole Sensor Configuration`.
+Run `idf.py menuconfig` and open `RedMole Sensor Configuration`. Indoor source
+and BME280 settings are grouped under `Indoor sensor`.
 
 | Setting | Meaning | Default |
 |---|---|---|
+| `REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280` / `SIMULATED` | Select the real BME280 or deterministic simulated measurements for the indoor environment. | BME280 |
 | `REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC` | Delay between polling attempts, from 1 to 3600 seconds. | `1` |
-| `REDMOLE_BME280_ADDRESS_0X76` / `0X77` | BME280 I2C address. | `0x77` |
-| `REDMOLE_BME280_MODE` | `0` sleep, `1` forced, `2` alternate forced, `3` normal. | `1` |
-| `REDMOLE_BME280_OVERSAMPLING_TEMPERATURE` | Temperature oversampling, `1` through `5` for x1 through x16. | `1` |
-| `REDMOLE_BME280_OVERSAMPLING_PRESSURE` | Pressure oversampling, `1` through `5` for x1 through x16. | `1` |
-| `REDMOLE_BME280_OVERSAMPLING_HUMIDITY` | Humidity oversampling, `1` through `5` for x1 through x16. | `1` |
-| `REDMOLE_BME280_IIR_FILTER` | IIR setting: off or coefficient 2, 4, 8, or 16. | off |
-| `REDMOLE_BME280_STANDBY_TIME` | Standby setting used in normal mode. | 1000 ms |
+| `REDMOLE_INDOOR_BME280_ADDRESS_0X76` / `0X77` | Indoor BME280 I2C address. | `0x77` |
+| `REDMOLE_INDOOR_BME280_MODE` | `0` sleep, `1` forced, `2` alternate forced, `3` normal. | `1` |
+| `REDMOLE_INDOOR_BME280_OVERSAMPLING_TEMPERATURE` | Temperature oversampling, `1` through `5` for x1 through x16. | `1` |
+| `REDMOLE_INDOOR_BME280_OVERSAMPLING_PRESSURE` | Pressure oversampling, `1` through `5` for x1 through x16. | `1` |
+| `REDMOLE_INDOOR_BME280_OVERSAMPLING_HUMIDITY` | Humidity oversampling, `1` through `5` for x1 through x16. | `1` |
+| `REDMOLE_INDOOR_BME280_IIR_FILTER` | IIR setting: off or coefficient 2, 4, 8, or 16. | off |
+| `REDMOLE_INDOOR_BME280_STANDBY_TIME` | Standby setting used in normal mode. | 1000 ms |
 
 Forced mode is the normal choice because the polling task owns the acquisition
 cadence. Sleep mode deliberately produces no successful samples.
+
+The simulated indoor source does not access the BME280. It publishes a
+repeating 21-sample ramp around 23.0 C, 45.0 percent relative humidity, and
+101325 Pa so GUI updates can be tested without sensor hardware.
 
 ## Implementation
 
@@ -166,6 +173,7 @@ cadence. Sleep mode deliberately produces no successful samples.
 | `src/measurement_store.hpp/.cpp` | Atomic latest-channel publication, invalidation, and copy-out. |
 | `src/measurements_manager.hpp/.cpp` | One polling task, producer validation, and failure handling. |
 | `src/bme280/bme280_producer.hpp/.cpp` | Adapts one coherent BME280 read into logical channels. |
+| `src/sim/sim_producer.hpp/.cpp` | Generates deterministic logical measurements without hardware. |
 | `src/reading_types.hpp` | Private strongly typed BME280 compensated values. |
 | `src/bme280/bme280_sensor.hpp/.cpp` | BME280 protocol, settings, calibration, compensation, and recovery. |
 
@@ -174,7 +182,7 @@ The controller uses:
 - one statically allocated FreeRTOS task
 - a static mutex protecting the latest sample
 - a static binary semaphore for stop acknowledgement
-- atomics for the stop request and update count
+- an atomic flag for the cross-task stop request
 - no dynamic measurement history
 
 The internal `MeasurementProducer` interface keeps physical acquisition

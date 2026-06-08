@@ -75,7 +75,9 @@ void environment_measurements_stop(void);
 /**
  * @brief Copy the latest complete indoor sample when it is still usable.
  *
- * The function briefly blocks on the latest-value mutex.
+ * The function briefly blocks on the latest-value mutex. A non-NULL output is
+ * cleared before reading, so it always has valid set to false when this
+ * function returns false.
  *
  * @param out Caller-owned output sample, must not be NULL.
  * @return True when a complete sample no older than the module timeout was copied.

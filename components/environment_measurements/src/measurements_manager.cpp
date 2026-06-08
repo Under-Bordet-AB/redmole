@@ -1,5 +1,10 @@
 #include "measurements_manager.hpp"
 
+/**
+ * @file
+ * @brief Implementation of sequential producer polling and publication.
+ */
+
 #include "esp_log.h"
 #include "sdkconfig.h"
 
@@ -24,6 +29,7 @@ MeasurementsManager::MeasurementsManager(const ProducerRegistration* registratio
 }
 
 esp_err_t MeasurementsManager::init() {
+    // Initialization owns synchronization setup, but producer failures remain recoverable.
     if (initialized_) {
         return ESP_OK;
     }
@@ -44,6 +50,7 @@ esp_err_t MeasurementsManager::init() {
     for (size_t index = 0; index < registration_count_; index++) {
         result = registrations_[index].producer.init();
         if (result != ESP_OK) {
+            // Do not fail the module because a disconnected sensor may recover on a later read.
             mark_failed(index, result);
         }
     }
@@ -62,12 +69,14 @@ esp_err_t MeasurementsManager::start() {
 
     stop_requested_.store(false, std::memory_order_release);
     if (task_ == nullptr) {
+        // The task and its stack use memory owned by this manager for the process lifetime.
         task_ = xTaskCreateStatic(task_entry, "environment", kTaskStackDepth, this, kTaskPriority,
                                   task_stack_, &task_control_block_);
         if (task_ == nullptr) {
             return ESP_ERR_NO_MEM;
         }
     } else {
+        // A stopped task waits on its notification. Giving one resumes that existing task.
         xTaskNotifyGive(task_);
     }
 
@@ -81,7 +90,10 @@ void MeasurementsManager::stop() {
     }
 
     stop_requested_.store(true, std::memory_order_release);
+    // Wake the task immediately if it is currently waiting between polling cycles.
     xTaskNotifyGive(task_);
+
+    // The task gives this semaphore only after it has observed the stop request.
     xSemaphoreTake(stopped_, portMAX_DELAY);
     running_ = false;
 }
@@ -94,10 +106,12 @@ esp_err_t MeasurementsManager::poll_once() {
     esp_err_t first_error = ESP_OK;
     for (size_t index = 0; index < registration_count_; index++) {
         MeasurementBatch batch = {};
+
+        // Producers are polled one at a time, so no producer needs its own task.
         esp_err_t result = registrations_[index].producer.read(batch);
 
-        if (result == ESP_OK &&
-            !batch_is_valid_for_registration(batch, registrations_[index])) {
+        // A successful producer must still obey the channels declared in its registration.
+        if (result == ESP_OK && !batch_is_valid_for_registration(batch, registrations_[index])) {
             result = ESP_ERR_INVALID_RESPONSE;
         }
         if (result == ESP_OK) {
@@ -105,6 +119,7 @@ esp_err_t MeasurementsManager::poll_once() {
         }
 
         if (result != ESP_OK) {
+            // Fail fast: consumers must not keep using an older value after a read failure.
             store_.invalidate_channels(registrations_[index].channels,
                                        registrations_[index].channel_count);
             mark_failed(index, result);
@@ -127,12 +142,15 @@ void MeasurementsManager::task_entry(void* context) {
 void MeasurementsManager::task_loop() {
     while (true) {
         if (stop_requested_.load(std::memory_order_acquire)) {
+            // Acknowledge stop, then sleep until start() sends a new task notification.
             xSemaphoreGive(stopped_);
             ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
             continue;
         }
 
         poll_once();
+
+        // The notification doubles as an early wake-up for stop(); timeout means poll again.
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(kReadingIntervalMs));
     }
 }
@@ -143,6 +161,7 @@ bool MeasurementsManager::registrations_are_valid() const {
         return false;
     }
 
+    // Track channel ownership while walking registrations to reject duplicates.
     std::array<bool, measurement_channel_index(MeasurementChannel::Count)> owned = {};
     for (size_t producer_index = 0; producer_index < registration_count_; producer_index++) {
         if (registrations_[producer_index].diagnostic_name == nullptr ||
@@ -151,8 +170,7 @@ bool MeasurementsManager::registrations_are_valid() const {
             return false;
         }
 
-        for (size_t channel_index = 0;
-             channel_index < registrations_[producer_index].channel_count;
+        for (size_t channel_index = 0; channel_index < registrations_[producer_index].channel_count;
              channel_index++) {
             const MeasurementChannel channel =
                 registrations_[producer_index].channels[channel_index];
@@ -175,6 +193,8 @@ bool MeasurementsManager::batch_is_valid_for_registration(
     for (size_t measurement_index = 0; measurement_index < batch.count; measurement_index++) {
         const MeasurementChannel channel = batch.measurements[measurement_index].channel;
         bool registered = false;
+
+        // Find the returned channel in this producer's declared ownership list.
         for (size_t channel_index = 0; channel_index < registration.channel_count;
              channel_index++) {
             if (registration.channels[channel_index] == channel) {
@@ -186,6 +206,7 @@ bool MeasurementsManager::batch_is_valid_for_registration(
             return false;
         }
 
+        // Reject duplicate values for one channel in the same physical acquisition.
         for (size_t previous = 0; previous < measurement_index; previous++) {
             if (batch.measurements[previous].channel == channel) {
                 return false;

@@ -87,31 +87,36 @@ struct Bme280RawSample {
 
 /** @brief One complete compensated BME280 acquisition. */
 struct Bme280Reading {
-    Temperature temperature;
-    Humidity humidity;
-    Pressure pressure;
+    Temperature temperature; /*!< Compensated temperature. */
+    Humidity humidity;       /*!< Compensated relative humidity. */
+    Pressure pressure;       /*!< Compensated atmospheric pressure. */
 };
 
-/** @brief Factory calibration coefficients read from one BME280. */
+/**
+ * @brief Factory calibration coefficients read from one BME280.
+ *
+ * The field names match the Bosch datasheet so the compensation formulas can
+ * be checked directly against that document.
+ */
 struct Bme280Calibration {
-    uint16_t dig_T1;
-    int16_t dig_T2;
-    int16_t dig_T3;
-    uint16_t dig_P1;
-    int16_t dig_P2;
-    int16_t dig_P3;
-    int16_t dig_P4;
-    int16_t dig_P5;
-    int16_t dig_P6;
-    int16_t dig_P7;
-    int16_t dig_P8;
-    int16_t dig_P9;
-    uint8_t dig_H1;
-    int16_t dig_H2;
-    uint8_t dig_H3;
-    int16_t dig_H4;
-    int16_t dig_H5;
-    int8_t dig_H6;
+    uint16_t dig_T1; /*!< Unsigned temperature coefficient T1. */
+    int16_t dig_T2;  /*!< Signed temperature coefficient T2. */
+    int16_t dig_T3;  /*!< Signed temperature coefficient T3. */
+    uint16_t dig_P1; /*!< Unsigned pressure coefficient P1. */
+    int16_t dig_P2;  /*!< Signed pressure coefficient P2. */
+    int16_t dig_P3;  /*!< Signed pressure coefficient P3. */
+    int16_t dig_P4;  /*!< Signed pressure coefficient P4. */
+    int16_t dig_P5;  /*!< Signed pressure coefficient P5. */
+    int16_t dig_P6;  /*!< Signed pressure coefficient P6. */
+    int16_t dig_P7;  /*!< Signed pressure coefficient P7. */
+    int16_t dig_P8;  /*!< Signed pressure coefficient P8. */
+    int16_t dig_P9;  /*!< Signed pressure coefficient P9. */
+    uint8_t dig_H1;  /*!< Unsigned humidity coefficient H1. */
+    int16_t dig_H2;  /*!< Signed humidity coefficient H2. */
+    uint8_t dig_H3;  /*!< Unsigned humidity coefficient H3. */
+    int16_t dig_H4;  /*!< Signed 12-bit humidity coefficient H4. */
+    int16_t dig_H5;  /*!< Signed 12-bit humidity coefficient H5. */
+    int8_t dig_H6;   /*!< Signed humidity coefficient H6. */
 };
 
 /**
@@ -129,6 +134,12 @@ class Bme280Sensor final {
      * @param settings Initial measurement controls to apply during initialization.
      */
     Bme280Sensor(uint8_t address, const Bme280Settings& settings);
+
+    /** @brief Prevent multiple C++ objects from representing the same retained I2C handle. */
+    Bme280Sensor(const Bme280Sensor&) = delete;
+    Bme280Sensor& operator=(const Bme280Sensor&) = delete;
+    Bme280Sensor(Bme280Sensor&&) = delete;
+    Bme280Sensor& operator=(Bme280Sensor&&) = delete;
 
     /**
      * @brief Verify, reset, calibrate, and configure the sensor.

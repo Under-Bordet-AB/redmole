@@ -1,5 +1,10 @@
 #include "bme280/bme280_sensor.hpp"
 
+/**
+ * @file
+ * @brief Register-level BME280 initialization, acquisition, and compensation.
+ */
+
 #include <cmath>
 
 #include "esp_log.h"
@@ -11,42 +16,25 @@ extern "C" {
 #include "board_i2c.h"
 }
 
-#ifndef CONFIG_REDMOLE_BME280_MODE
-#define CONFIG_REDMOLE_BME280_MODE 1
-#endif
-
-#ifndef CONFIG_REDMOLE_BME280_OVERSAMPLING_TEMPERATURE
-#define CONFIG_REDMOLE_BME280_OVERSAMPLING_TEMPERATURE 1
-#endif
-
-#ifndef CONFIG_REDMOLE_BME280_OVERSAMPLING_PRESSURE
-#define CONFIG_REDMOLE_BME280_OVERSAMPLING_PRESSURE 1
-#endif
-
-#ifndef CONFIG_REDMOLE_BME280_OVERSAMPLING_HUMIDITY
-#define CONFIG_REDMOLE_BME280_OVERSAMPLING_HUMIDITY 1
-#endif
-
-#ifndef CONFIG_REDMOLE_BME280_IIR_FILTER
-#define CONFIG_REDMOLE_BME280_IIR_FILTER 0
-#endif
-
-#ifndef CONFIG_REDMOLE_BME280_STANDBY_TIME
-#define CONFIG_REDMOLE_BME280_STANDBY_TIME 5
-#endif
-
 namespace redmole::environment::bme280 {
 namespace {
 
 constexpr const char* kTag = "ENV_BME280";
+
+// Fixed values defined by the BME280 datasheet.
 constexpr uint8_t kBme280ChipId = 0x60U;
 constexpr uint8_t kBme280ResetCommand = 0xB6U;
+
+// Ready polling is bounded so a faulty sensor cannot block the manager forever.
 constexpr uint8_t kBme280ReadyWaitAttempts = 100U;
 constexpr uint32_t kBme280ReadyWaitDelayMs = 2U;
 constexpr uint32_t kBme280ResetDelayMs = 5U;
+
+// The sensor uses these all-ones ADC patterns when a channel is disabled.
 constexpr int32_t kSkippedTemperatureOrPressure = 0x80000;
 constexpr int32_t kSkippedHumidity = 0x8000;
 
+// Register addresses are named after the Bosch datasheet.
 constexpr uint8_t BME280_REG_CHIP_ID = 0xD0U;
 constexpr uint8_t BME280_REG_RESET = 0xE0U;
 constexpr uint8_t BME280_REG_CTRL_HUM = 0xF2U;
@@ -58,6 +46,7 @@ constexpr uint8_t BME280_REG_CALIB_26 = 0xE1U;
 constexpr uint8_t BME280_REG_DATA = 0xF7U;
 
 static uint16_t read_unsigned_16_le(const uint8_t* data) {
+    // Little-endian fields store the least significant byte first.
     return static_cast<uint16_t>((static_cast<uint16_t>(data[1]) << 8U) | data[0]);
 }
 
@@ -66,6 +55,7 @@ static int16_t read_signed_16_le(const uint8_t* data) {
 }
 
 static int16_t sign_extend_12_bit(int16_t value) {
+    // H4 and H5 are signed 12-bit fields packed across neighboring bytes.
     if ((value & 0x0800) != 0) {
         value |= static_cast<int16_t>(0xF000);
     }
@@ -74,6 +64,7 @@ static int16_t sign_extend_12_bit(int16_t value) {
 }
 
 static int32_t read_unsigned_20_be(const uint8_t* data) {
+    // Pressure and temperature occupy two full bytes plus the high nibble of a third.
     return (static_cast<int32_t>(data[0]) << 12U) | (static_cast<int32_t>(data[1]) << 4U) |
            (data[2] >> 4U);
 }
@@ -87,6 +78,7 @@ static bool is_forced_mode(Bme280Mode mode) {
 }
 
 static bool settings_are_valid(const Bme280Settings& settings) {
+    // Validate enum values because Kconfig and casts can still create out-of-range values.
     if (static_cast<uint8_t>(settings.mode) > static_cast<uint8_t>(Bme280Mode::Normal)) {
         return false;
     }
@@ -114,6 +106,7 @@ static bool settings_are_valid(const Bme280Settings& settings) {
         return false;
     }
 
+    // This module promises complete temperature, pressure, and humidity samples.
     if (settings.temperature_oversampling == Bme280Oversampling::Skipped) {
         return false;
     }
@@ -130,6 +123,8 @@ static bool settings_are_valid(const Bme280Settings& settings) {
 }
 
 static bool settings_match(const Bme280Settings& first, const Bme280Settings& second) {
+    // Forced mode automatically returns to sleep, so sleep is a valid readback
+    // after either forced-mode encoding has triggered a conversion.
     if (first.mode == Bme280Mode::Normal) {
         if (second.mode != Bme280Mode::Normal) {
             return false;
@@ -189,6 +184,7 @@ esp_err_t Bme280Sensor::init() {
     ready_for_reads_ = false;
 
     if (device_ == nullptr) {
+        // Add the bus device only once. The handle remains useful after disconnect/reconnect.
         result = board_i2c_add_device(address_, BOARD_I2C_DEFAULT_SPEED_HZ, &device_);
         if (result != ESP_OK) {
             return result;
@@ -219,6 +215,7 @@ esp_err_t Bme280Sensor::read(Bme280Reading& out) {
     esp_err_t result;
 
     if (!ready_for_reads_) {
+        // Any earlier failure requests the complete probe/reset/calibration sequence.
         result = init();
         if (result != ESP_OK) {
             return result;
@@ -229,6 +226,7 @@ esp_err_t Bme280Sensor::read(Bme280Reading& out) {
     }
 
     if (is_forced_mode(settings_.mode)) {
+        // In forced mode each read must explicitly start one new conversion.
         result = write_ctrl_meas(settings_.mode);
         if (result != ESP_OK) {
             ready_for_reads_ = false;
@@ -280,6 +278,7 @@ esp_err_t Bme280Sensor::configure() {
         return result;
     }
 
+    // The datasheet requires a short delay before status polling after reset.
     vTaskDelay(pdMS_TO_TICKS(kBme280ResetDelayMs));
 
     result = wait_until_ready();
@@ -325,8 +324,10 @@ esp_err_t Bme280Sensor::apply_settings(const Bme280Settings& settings) {
         return ESP_ERR_INVALID_ARG;
     }
 
+    // Retain requested settings first so every register-writing helper uses one source of truth.
     settings_ = settings;
 
+    // Config writes may be ignored in normal mode, so enter sleep before changing them.
     result = write_ctrl_meas(Bme280Mode::Sleep);
     if (result != ESP_OK) {
         ready_for_reads_ = false;
@@ -339,6 +340,7 @@ esp_err_t Bme280Sensor::apply_settings(const Bme280Settings& settings) {
         return result;
     }
 
+    // ctrl_hum must be written before ctrl_meas; writing ctrl_meas latches humidity settings.
     result = board_i2c_write_reg(device_, BME280_REG_CTRL_HUM,
                                  static_cast<uint8_t>(settings_.humidity_oversampling));
     if (result != ESP_OK) {
@@ -346,6 +348,7 @@ esp_err_t Bme280Sensor::apply_settings(const Bme280Settings& settings) {
         return result;
     }
 
+    // Assemble register fields explicitly so their datasheet bit positions remain visible.
     config_value = static_cast<uint8_t>((static_cast<uint8_t>(settings_.standby) << 5U) |
                                         (static_cast<uint8_t>(settings_.filter) << 2U));
     result = board_i2c_write_reg(device_, BME280_REG_CONFIG, config_value);
@@ -360,6 +363,7 @@ esp_err_t Bme280Sensor::apply_settings(const Bme280Settings& settings) {
         return result;
     }
 
+    // Readback catches failed or ignored writes before measurements are published.
     result = read_settings(readback);
     if (result != ESP_OK) {
         ready_for_reads_ = false;
@@ -399,6 +403,7 @@ esp_err_t Bme280Sensor::read_settings(Bme280Settings& settings) {
         return result;
     }
 
+    // Mask and shift each packed register field into its strongly typed enum.
     settings.mode = static_cast<Bme280Mode>(control_measurement & 0x03U);
     settings.temperature_oversampling =
         static_cast<Bme280Oversampling>((control_measurement >> 5U) & 0x07U);
@@ -448,10 +453,9 @@ esp_err_t Bme280Sensor::wait_until_ready() {
             return result;
         }
 
-        if (!status.measuring) {
-            if (!status.updating_calibration) {
-                return ESP_OK;
-            }
+        // Both activities must finish before registers and calibration are stable.
+        if (!status.measuring && !status.updating_calibration) {
+            return ESP_OK;
         }
 
         vTaskDelay(pdMS_TO_TICKS(kBme280ReadyWaitDelayMs));
@@ -475,6 +479,7 @@ esp_err_t Bme280Sensor::load_calibration() {
         return result;
     }
 
+    // Coefficients are split across two blocks and use mixed signedness.
     calibration_.dig_T1 = read_unsigned_16_le(&calib0[0]);
     calibration_.dig_T2 = read_signed_16_le(&calib0[2]);
     calibration_.dig_T3 = read_signed_16_le(&calib0[4]);
@@ -490,6 +495,7 @@ esp_err_t Bme280Sensor::load_calibration() {
     calibration_.dig_H1 = calib0[25];
     calibration_.dig_H2 = read_signed_16_le(&calib1[0]);
     calibration_.dig_H3 = calib1[2];
+    // H4 and H5 share calib1[4], with one coefficient in each nibble.
     calibration_.dig_H4 = sign_extend_12_bit(
         static_cast<int16_t>((static_cast<int16_t>(calib1[3]) << 4U) | (calib1[4] & 0x0FU)));
     calibration_.dig_H5 = sign_extend_12_bit(
@@ -503,6 +509,7 @@ esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
     esp_err_t result;
 
     if (is_forced_mode(settings_.mode)) {
+        // Forced mode returns to sleep only after its single conversion is complete.
         result = wait_until_ready();
         if (result != ESP_OK) {
             return result;
@@ -514,6 +521,7 @@ esp_err_t Bme280Sensor::read_raw(Bme280RawSample& out_raw) {
         return result;
     }
 
+    // The data block order is pressure, temperature, then humidity.
     out_raw.adc_pressure = read_unsigned_20_be(&data[0]);
     out_raw.adc_temperature = read_unsigned_20_be(&data[3]);
     out_raw.adc_humidity = read_unsigned_16_be(&data[6]);
@@ -540,7 +548,7 @@ esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Reading& out) 
         return ESP_ERR_INVALID_RESPONSE;
     }
 
-    // These steps follow the BME280 datasheet compensation formulas.
+    // Temperature must be compensated first because pressure and humidity both use t_fine.
     compensation_value_1 = ((static_cast<double>(raw.adc_temperature) / 16384.0) -
                             (static_cast<double>(calibration_.dig_T1) / 1024.0)) *
                            static_cast<double>(calibration_.dig_T2);
@@ -552,6 +560,7 @@ esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Reading& out) 
     t_fine = compensation_value_1 + compensation_value_2;
     temperature_c = t_fine / 5120.0;
 
+    // Pressure compensation follows the floating-point Bosch datasheet formula.
     compensation_value_1 = (t_fine / 2.0) - 64000.0;
     compensation_value_2 = compensation_value_1 * compensation_value_1 *
                            static_cast<double>(calibration_.dig_P6) / 32768.0;
@@ -579,6 +588,7 @@ esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Reading& out) 
                                  static_cast<double>(calibration_.dig_P7)) /
                                     16.0;
 
+    // Humidity compensation also uses t_fine and is clamped to the physical 0-100% range.
     humidity_pct = t_fine - 76800.0;
     humidity_pct =
         (raw.adc_humidity - ((static_cast<double>(calibration_.dig_H4) * 64.0) +
@@ -596,11 +606,13 @@ esp_err_t Bme280Sensor::convert(const Bme280RawSample& raw, Bme280Reading& out) 
         humidity_pct = 0.0;
     }
 
+    // Reject invalid floating-point results before converting them to fixed-point integers.
     if (!std::isfinite(temperature_c) || !std::isfinite(humidity_pct) ||
         !std::isfinite(pressure_pa)) {
         return ESP_ERR_INVALID_RESPONSE;
     }
 
+    // Store canonical integer units only after every compensated value is known to be valid.
     out.temperature.milli_c = std::llround(temperature_c * 1000.0);
     out.humidity.milli_pct = std::llround(humidity_pct * 1000.0);
     out.pressure.pa = std::llround(pressure_pa);

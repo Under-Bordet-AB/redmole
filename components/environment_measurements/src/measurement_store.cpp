@@ -1,8 +1,14 @@
 #include "measurement_store.hpp"
 
+/**
+ * @file
+ * @brief Implementation of atomic latest-measurement storage.
+ */
+
 namespace redmole::environment {
 
 esp_err_t MeasurementStore::init() {
+    // The mutex has static backing storage. Creating it once makes init idempotent.
     if (mutex_ != nullptr) {
         return ESP_OK;
     }
@@ -19,18 +25,20 @@ esp_err_t MeasurementStore::publish_batch(const MeasurementBatch& batch, int64_t
         return ESP_ERR_INVALID_ARG;
     }
 
+    // Validate before taking the mutex so an invalid batch can never partially update latest_.
     xSemaphoreTake(mutex_, portMAX_DELAY);
+
+    // Every value from one physical acquisition receives the same version.
     const uint64_t publication_version = next_publication_version_;
     next_publication_version_++;
 
     for (size_t index = 0; index < batch.count; index++) {
-        latest_[measurement_channel_index(batch.measurements[index].channel)].timestamp_ms =
-            timestamp_ms;
-        latest_[measurement_channel_index(batch.measurements[index].channel)].value =
-            batch.measurements[index].value;
-        latest_[measurement_channel_index(batch.measurements[index].channel)]
-            .publication_version = publication_version;
-        latest_[measurement_channel_index(batch.measurements[index].channel)].valid = true;
+        // Resolve the array position once to keep the update easy to read.
+        const size_t channel_index = measurement_channel_index(batch.measurements[index].channel);
+        latest_[channel_index].timestamp_ms = timestamp_ms;
+        latest_[channel_index].value = batch.measurements[index].value;
+        latest_[channel_index].publication_version = publication_version;
+        latest_[channel_index].valid = true;
     }
     xSemaphoreGive(mutex_);
     return ESP_OK;
@@ -46,6 +54,7 @@ esp_err_t MeasurementStore::invalidate_channels(const MeasurementChannel* channe
 
     xSemaphoreTake(mutex_, portMAX_DELAY);
     for (size_t index = 0; index < count; index++) {
+        // Keep the previous value for diagnostics, but prevent consumers from using it.
         latest_[measurement_channel_index(channels[index])].valid = false;
     }
     xSemaphoreGive(mutex_);
@@ -59,6 +68,7 @@ bool MeasurementStore::copy_channels(const MeasurementChannel* channels, size_t 
     }
 
     xSemaphoreTake(mutex_, portMAX_DELAY);
+    // Holding the mutex across the whole loop gives the caller one coherent snapshot.
     for (size_t index = 0; index < count; index++) {
         out[index] = latest_[measurement_channel_index(channels[index])];
     }
@@ -71,6 +81,7 @@ bool MeasurementStore::batch_is_valid(const MeasurementBatch& batch) {
         return false;
     }
 
+    // A duplicate channel in one batch would overwrite an earlier value ambiguously.
     for (size_t index = 0; index < batch.count; index++) {
         const MeasurementChannel channel = batch.measurements[index].channel;
         if (!measurement_channel_is_valid(channel)) {
