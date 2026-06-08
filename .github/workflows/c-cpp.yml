@@ -1,5 +1,4 @@
-name: Espressif IoT Development Framework (ESP-IDF)
-uses: espressif/esp-idf-ci-action@v1.2.0
+name: ESP-IDF Build
 
 on:
   push:
@@ -9,16 +8,17 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: configure
-      run: ./configure
-    - name: make
-      run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build ESP32-S3 project
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v4.4
+          target: esp32s3
+          path: esp32-s2-hmi-devkit-1/examples/smart-panel
