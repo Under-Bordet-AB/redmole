@@ -1,386 +1,245 @@
 #include "environment_measurements.h"
 
-#include <atomic>
+/**
+ * @file
+ * @brief Product composition and public C adapters for environment measurements.
+ *
+ * This file selects the configured indoor producer, connects it to the generic
+ * manager and store, and converts internal canonical units into the stable
+ * public C representation.
+ */
+
 #include <array>
 #include <cstdint>
-#include <cstring>
+#include <limits>
 
+#include "bme280/bme280_producer.hpp"
 #include "bme280/bme280_sensor.hpp"
-#include "environment_sensor.hpp"
-#include "esp_log.h"
 #include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "measurement_store.hpp"
+#include "measurement_types.hpp"
+#include "measurements_manager.hpp"
+#include "reading_types.hpp"
 #include "sdkconfig.h"
-#include "sim/simulated_bme280_sensor.hpp"
+#include "sim/sim_producer.hpp"
 
-extern "C" {
-#include "board_i2c.h"
-}
-
-#ifndef CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC
-#define CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC 1
+#ifndef CONFIG_REDMOLE_INDOOR_BME280_MODE
+#define CONFIG_REDMOLE_INDOOR_BME280_MODE 1
 #endif
 
-#ifndef CONFIG_REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC
-#define CONFIG_REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC 2
+#ifndef CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_TEMPERATURE
+#define CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_TEMPERATURE 1
+#endif
+
+#ifndef CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_PRESSURE
+#define CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_PRESSURE 1
+#endif
+
+#ifndef CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_HUMIDITY
+#define CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_HUMIDITY 1
+#endif
+
+#ifndef CONFIG_REDMOLE_INDOOR_BME280_IIR_FILTER
+#define CONFIG_REDMOLE_INDOOR_BME280_IIR_FILTER 0
+#endif
+
+#ifndef CONFIG_REDMOLE_INDOOR_BME280_STANDBY_TIME
+#define CONFIG_REDMOLE_INDOOR_BME280_STANDBY_TIME 5
 #endif
 
 namespace {
 
-using redmole::environment::Bme280Sensor;
-using redmole::environment::EnvironmentSensor;
-using redmole::environment::SimulatedBme280Sensor;
-using redmole::environment::kUsPerMs;
+using redmole::environment::kMicrosecondsPerMillisecond;
+using redmole::environment::MeasurementChannel;
+using redmole::environment::MeasurementRecord;
+using redmole::environment::MeasurementsManager;
+using redmole::environment::MeasurementStore;
+using redmole::environment::ProducerRegistration;
+using redmole::environment::bme280::Bme280Filter;
+using redmole::environment::bme280::Bme280Mode;
+using redmole::environment::bme280::Bme280Oversampling;
+using redmole::environment::bme280::Bme280Producer;
+using redmole::environment::bme280::Bme280Sensor;
+using redmole::environment::bme280::Bme280Settings;
+using redmole::environment::bme280::Bme280Standby;
+using redmole::environment::sim::SimProducer;
 
-constexpr uint32_t kTaskStackBytes = 4096U;
-constexpr UBaseType_t kTaskPriority = 5U;
-constexpr const char* kTag = "ENV_MEASURE";
-constexpr size_t kMaxPhysicalSensors = 2U;
+constexpr int64_t kStaleTimeoutMs = 5000LL;
+constexpr int64_t kMilliToDeci = 100LL;
+constexpr int64_t kPascalsToDeciHectopascals = 10LL;
 
-static TickType_t seconds_to_ticks(uint32_t seconds) {
-    TickType_t ticks = pdMS_TO_TICKS(seconds * 1000U);
-    if (ticks == 0U) {
-        ticks = 1U;
-    }
+// The address and settings below translate Kconfig values into strong C++ types.
+#if CONFIG_REDMOLE_INDOOR_BME280_ADDRESS_0X76
+constexpr uint8_t kIndoorBme280Address = 0x76U;
+#else
+constexpr uint8_t kIndoorBme280Address = 0x77U;
+#endif
 
-    return ticks;
-}
-
-static bool tick_elapsed(TickType_t now, TickType_t last, TickType_t interval) {
-    return (now - last) >= interval;
-}
-
-class EnvironmentMeasurements {
-public:
-    EnvironmentMeasurements()
-        : physical_sensors_{&real_primary_, &real_alternate_}, active_inside_(&simulator_) {
-    }
-
-    EnvironmentMeasurements(const EnvironmentMeasurements&) = delete;
-    EnvironmentMeasurements& operator=(const EnvironmentMeasurements&) = delete;
-    EnvironmentMeasurements(EnvironmentMeasurements&&) = delete;
-    EnvironmentMeasurements& operator=(EnvironmentMeasurements&&) = delete;
-
-    esp_err_t init() {
-        if (initialized_) {
-            return ESP_OK;
-        }
-
-        reset_store();
-
-        esp_err_t rv = board_i2c_init();
-        if (rv != ESP_OK) {
-            ESP_LOGE(kTag, "board_i2c_init failed: %s", esp_err_to_name(rv));
-            return rv;
-        }
-
-        for (EnvironmentSensor* sensor : physical_sensors_) {
-            (void)sensor->init();
-        }
-
-        rv = simulator_.init();
-        if (rv != ESP_OK) {
-            return rv;
-        }
-
-        environment_measurement_sample_t unused = {};
-        EnvironmentSensor* discovered_sensor = nullptr;
-        if (try_read_physical(unused, discovered_sensor)) {
-            active_inside_ = discovered_sensor;
-        } else {
-            active_inside_ = &simulator_;
-        }
-        log_active_sensor();
-
-        initialized_ = true;
-        return ESP_OK;
-    }
-
-    esp_err_t start() {
-        if (!initialized_) {
-            return ESP_ERR_INVALID_STATE;
-        }
-
-        if (task_ != nullptr) {
-            return ESP_OK;
-        }
-
-        BaseType_t created =
-            xTaskCreate(&EnvironmentMeasurements::task_entry, "env_measure_task",
-                        kTaskStackBytes, this, kTaskPriority, &task_);
-        if (created != pdPASS) {
-            ESP_LOGE(kTag, "Could not spawn env_measure_task");
-            task_ = nullptr;
-            return ESP_FAIL;
-        }
-
-        ESP_LOGI(kTag, "env_measure_task started");
-        return ESP_OK;
-    }
-
-    void deinit() {
-        if (task_ != nullptr) {
-            vTaskDelete(task_);
-            task_ = nullptr;
-        }
-
-        active_inside_ = &simulator_;
-        reset_store();
-        initialized_ = false;
-    }
-
-    bool get_latest(environment_measurement_sample_t* out) const {
-        if ((out == nullptr) || !initialized_) {
-            return false;
-        }
-
-        unsigned int version_before = 0U;
-        unsigned int version_after = 0U;
-
-        do {
-            version_before = version_.load(std::memory_order_acquire);
-            if ((version_before & 1U) != 0U) {
-                continue;
-            }
-
-            *out = latest_;
-            version_after = version_.load(std::memory_order_acquire);
-        } while (version_before != version_after);
-
-        return out->valid;
-    }
-
-    bool is_fresh(uint32_t max_age_ms) const {
-        environment_measurement_sample_t sample = {};
-        const int64_t now_ms = esp_timer_get_time() / kUsPerMs;
-
-        if (!get_latest(&sample)) {
-            return false;
-        }
-
-        if (sample.timestamp_ms > now_ms) {
-            return false;
-        }
-
-        return static_cast<uint64_t>(now_ms - sample.timestamp_ms) <=
-               static_cast<uint64_t>(max_age_ms);
-    }
-
-    uint32_t get_update_count() const {
-        if (!initialized_) {
-            return 0U;
-        }
-
-        return update_count_.load(std::memory_order_relaxed);
-    }
-
-private:
-    static void task_entry(void* context) {
-        auto* self = static_cast<EnvironmentMeasurements*>(context);
-        self->task_loop();
-    }
-
-    void task_loop() {
-        const TickType_t reading_ticks =
-            seconds_to_ticks(CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC);
-        const TickType_t detect_ticks =
-            seconds_to_ticks(CONFIG_REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC);
-        TickType_t last_wake = xTaskGetTickCount();
-        TickType_t last_publish = last_wake - reading_ticks;
-
-        ESP_LOGI(kTag, "environment task cadence: reading=%ds detect=%ds active=%s",
-                 CONFIG_REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC,
-                 CONFIG_REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC, sensor_name(active_inside_));
-
-        while (true) {
-            const TickType_t now = xTaskGetTickCount();
-            const bool published_on_detection = update_sensor_presence(now, last_publish);
-
-            if (!published_on_detection && tick_elapsed(now, last_publish, reading_ticks)) {
-                if (read_and_publish()) {
-                    last_publish = xTaskGetTickCount();
-                }
-            }
-
-            vTaskDelayUntil(&last_wake, detect_ticks);
-        }
-    }
-
-    bool update_sensor_presence(TickType_t now, TickType_t& last_publish) {
-        environment_measurement_sample_t sample = {};
-        EnvironmentSensor* sensor = nullptr;
-
-        if (active_inside_->is_simulated()) {
-            if (!try_read_physical(sample, sensor)) {
-                return false;
-            }
-
-            active_inside_ = sensor;
-            ESP_LOGI(kTag, "physical environment sensor detected: %s; using hardware readings",
-                     sensor_name(active_inside_));
-            if (publish(sample) == ESP_OK) {
-                last_publish = now;
-                return true;
-            }
-
-            return false;
-        }
-
-        if (active_inside_->probe()) {
-            return false;
-        }
-
-        ESP_LOGW(kTag, "active physical environment sensor lost: %s", sensor_name(active_inside_));
-
-        if (try_read_physical(sample, sensor)) {
-            active_inside_ = sensor;
-            ESP_LOGI(kTag, "switched to alternate physical environment sensor: %s",
-                     sensor_name(active_inside_));
-            if (publish(sample) == ESP_OK) {
-                last_publish = now;
-                return true;
-            }
-
-            return false;
-        }
-
-        active_inside_ = &simulator_;
-        ESP_LOGW(kTag, "physical environment sensor unplugged; falling back to simulation: %s",
-                 sensor_name(active_inside_));
-        esp_err_t rv = active_inside_->read(sample);
-        if (rv != ESP_OK) {
-            ESP_LOGW(kTag, "simulated environment sensor read failed: %s", esp_err_to_name(rv));
-            return false;
-        }
-
-        if (publish(sample) == ESP_OK) {
-            last_publish = now;
-            return true;
-        }
-
-        return false;
-    }
-
-    bool read_and_publish() {
-        environment_measurement_sample_t sample = {};
-
-        esp_err_t rv = active_inside_->read(sample);
-        if ((rv != ESP_OK) && !active_inside_->is_simulated()) {
-            ESP_LOGW(kTag, "physical environment sensor read failed for %s: %s",
-                     sensor_name(active_inside_), esp_err_to_name(rv));
-            active_inside_ = &simulator_;
-            ESP_LOGW(kTag, "physical environment sensor unplugged; falling back to simulation: %s",
-                     sensor_name(active_inside_));
-            rv = active_inside_->read(sample);
-        }
-
-        if (rv != ESP_OK) {
-            ESP_LOGW(kTag, "environment sensor read failed: %s", esp_err_to_name(rv));
-            return false;
-        }
-
-        rv = publish(sample);
-        if (rv != ESP_OK) {
-            ESP_LOGE(kTag, "publish failed: %s", esp_err_to_name(rv));
-            return false;
-        }
-
-        return true;
-    }
-
-    bool try_read_physical(environment_measurement_sample_t& sample, EnvironmentSensor*& out_sensor) {
-        for (EnvironmentSensor* sensor : physical_sensors_) {
-            if (sensor->read(sample) == ESP_OK) {
-                out_sensor = sensor;
-                return true;
-            }
-        }
-
-        out_sensor = nullptr;
-        return false;
-    }
-
-    void log_active_sensor() const {
-        if (active_inside_->is_simulated()) {
-            ESP_LOGW(kTag, "BME280 not detected; using simulated inside environment sensor: %s",
-                     sensor_name(active_inside_));
-        } else {
-            ESP_LOGI(kTag, "BME280 detected; using physical inside environment sensor: %s",
-                     sensor_name(active_inside_));
-        }
-    }
-
-    const char* sensor_name(const EnvironmentSensor* sensor) const {
-        if (sensor == &real_primary_) {
-            return "BME280@0x76";
-        }
-
-        if (sensor == &real_alternate_) {
-            return "BME280@0x77";
-        }
-
-        if (sensor == &simulator_) {
-            return "simulated BME280";
-        }
-
-        return "unknown sensor";
-    }
-
-    esp_err_t publish(const environment_measurement_sample_t& sample) {
-        if (!initialized_) {
-            return ESP_ERR_INVALID_STATE;
-        }
-
-        version_.fetch_add(1U, std::memory_order_relaxed);
-        latest_ = sample;
-        update_count_.fetch_add(1U, std::memory_order_relaxed);
-        version_.fetch_add(1U, std::memory_order_release);
-        return ESP_OK;
-    }
-
-    void reset_store() {
-        latest_ = {};
-        version_.store(0U, std::memory_order_relaxed);
-        update_count_.store(0U, std::memory_order_relaxed);
-    }
-
-    Bme280Sensor real_primary_{0x76U};
-    Bme280Sensor real_alternate_{0x77U};
-    SimulatedBme280Sensor simulator_{};
-    std::array<EnvironmentSensor*, kMaxPhysicalSensors> physical_sensors_{};
-    EnvironmentSensor* active_inside_ = nullptr;
-    TaskHandle_t task_ = nullptr;
-    environment_measurement_sample_t latest_ = {};
-    std::atomic_uint version_{0U};
-    std::atomic_uint update_count_{0U};
-    bool initialized_ = false;
+constexpr Bme280Settings kIndoorBme280Settings = {
+    static_cast<Bme280Mode>(CONFIG_REDMOLE_INDOOR_BME280_MODE),
+    static_cast<Bme280Oversampling>(CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_TEMPERATURE),
+    static_cast<Bme280Oversampling>(CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_PRESSURE),
+    static_cast<Bme280Oversampling>(CONFIG_REDMOLE_INDOOR_BME280_OVERSAMPLING_HUMIDITY),
+    static_cast<Bme280Filter>(CONFIG_REDMOLE_INDOOR_BME280_IIR_FILTER),
+    static_cast<Bme280Standby>(CONFIG_REDMOLE_INDOOR_BME280_STANDBY_TIME),
 };
 
-EnvironmentMeasurements g_environment_measurements;
+constexpr std::array<MeasurementChannel, 3> kIndoorBme280Channels = {
+    MeasurementChannel::IndoorAmbientTemperature,
+    MeasurementChannel::IndoorRelativeHumidity,
+    MeasurementChannel::IndoorPressure,
+};
+
+int64_t now_ms() {
+    // esp_timer_get_time() is monotonic and returns microseconds since boot.
+    return esp_timer_get_time() / kMicrosecondsPerMillisecond;
+}
+
+bool sample_is_fresh(const MeasurementRecord& sample, int64_t current_ms, int64_t max_age_ms) {
+    // A future timestamp is rejected because it usually means a clock or data error.
+    return sample.valid && sample.timestamp_ms <= current_ms &&
+           current_ms - sample.timestamp_ms <= max_age_ms;
+}
+
+bool convert_to_int32(int64_t value, int64_t divisor, int32_t& out) {
+    // Integer division truncates toward zero, so inspect the remainder to round
+    // positive and negative values to the nearest output unit.
+    int64_t converted = value / divisor;
+    const int64_t remainder = value % divisor;
+    if (remainder >= divisor / 2LL) {
+        converted++;
+    } else if (remainder <= -(divisor / 2LL)) {
+        converted--;
+    }
+
+    if (converted < std::numeric_limits<int32_t>::min() ||
+        converted > std::numeric_limits<int32_t>::max()) {
+        return false;
+    }
+
+    out = static_cast<int32_t>(converted);
+    return true;
+}
+
+// Product composition chooses exactly one producer at build time. Everything
+// after this block is independent of whether the source is real or simulated.
+#if CONFIG_REDMOLE_INDOOR_ENVIRONMENT_SOURCE_SIMULATED
+SimProducer s_indoor_producer(MeasurementChannel::IndoorAmbientTemperature,
+                              MeasurementChannel::IndoorRelativeHumidity,
+                              MeasurementChannel::IndoorPressure);
+#else
+Bme280Sensor s_indoor_sensor(kIndoorBme280Address, kIndoorBme280Settings);
+Bme280Producer s_indoor_producer(s_indoor_sensor, MeasurementChannel::IndoorAmbientTemperature,
+                                 MeasurementChannel::IndoorRelativeHumidity,
+                                 MeasurementChannel::IndoorPressure);
+#endif
+MeasurementStore s_measurement_store;
+const std::array<ProducerRegistration, 1> s_producers = {{
+    {
+#if CONFIG_REDMOLE_INDOOR_ENVIRONMENT_SOURCE_SIMULATED
+        "simulated indoor environment",
+#else
+        "indoor BME280",
+#endif
+        s_indoor_producer,
+        kIndoorBme280Channels.data(),
+        kIndoorBme280Channels.size(),
+    },
+}};
+MeasurementsManager s_measurements_manager(s_producers.data(), s_producers.size(),
+                                           s_measurement_store, now_ms);
+
+bool copy_indoor_measurements(std::array<MeasurementRecord, 3>& out) {
+    // The store holds its mutex across this complete multi-channel copy.
+    return s_measurement_store.copy_channels(kIndoorBme280Channels.data(),
+                                             kIndoorBme280Channels.size(), out.data());
+}
 
 } // namespace
 
 extern "C" esp_err_t environment_measurements_init(void) {
-    return g_environment_measurements.init();
+    return s_measurements_manager.init();
 }
 
 extern "C" esp_err_t environment_measurements_start(void) {
-    return g_environment_measurements.start();
+    return s_measurements_manager.start();
+}
+
+extern "C" void environment_measurements_stop(void) {
+    s_measurements_manager.stop();
 }
 
 extern "C" void environment_measurements_deinit(void) {
-    g_environment_measurements.deinit();
+    s_measurements_manager.stop();
 }
 
 extern "C" bool environment_measurements_get_latest(environment_measurement_sample_t* out) {
-    return g_environment_measurements.get_latest(out);
+    if (out == nullptr) {
+        return false;
+    }
+
+    // Clear first so every failure path returns a visibly invalid sample.
+    *out = {};
+
+    std::array<MeasurementRecord, 3> stored = {};
+    if (!copy_indoor_measurements(stored)) {
+        return false;
+    }
+
+    const int64_t current_ms = now_ms();
+    for (const MeasurementRecord& sample : stored) {
+        if (!sample_is_fresh(sample, current_ms, kStaleTimeoutMs)) {
+            return false;
+        }
+    }
+
+    // The oldest timestamp conservatively represents the age of the complete sample.
+    out->timestamp_ms = stored[0].timestamp_ms;
+    for (const MeasurementRecord& sample : stored) {
+        if (sample.timestamp_ms < out->timestamp_ms) {
+            out->timestamp_ms = sample.timestamp_ms;
+        }
+    }
+
+    // Convert only at the public boundary so internal producers retain greater precision.
+    if (!convert_to_int32(stored[0].value, kMilliToDeci, out->temperature_deci_c) ||
+        !convert_to_int32(stored[1].value, kMilliToDeci, out->humidity_deci_pct) ||
+        !convert_to_int32(stored[2].value, kPascalsToDeciHectopascals, out->pressure_deci_hpa)) {
+        *out = {};
+        return false;
+    }
+
+    out->valid = true;
+    return true;
 }
 
 extern "C" bool environment_measurements_is_fresh(uint32_t max_age_ms) {
-    return g_environment_measurements.is_fresh(max_age_ms);
+    std::array<MeasurementRecord, 3> stored = {};
+    if (!copy_indoor_measurements(stored)) {
+        return false;
+    }
+
+    const int64_t current_ms = now_ms();
+    for (const MeasurementRecord& sample : stored) {
+        if (!sample_is_fresh(sample, current_ms, static_cast<int64_t>(max_age_ms))) {
+            return false;
+        }
+    }
+    return true;
 }
 
 extern "C" uint32_t environment_measurements_get_update_count(void) {
-    return g_environment_measurements.get_update_count();
+    std::array<MeasurementRecord, 3> stored = {};
+    if (!copy_indoor_measurements(stored)) {
+        return 0U;
+    }
+
+    // The newest version changes when any channel represented by this API changes.
+    uint64_t publication_version = 0U;
+    for (const MeasurementRecord& sample : stored) {
+        if (sample.publication_version > publication_version) {
+            publication_version = sample.publication_version;
+        }
+    }
+    return static_cast<uint32_t>(publication_version);
 }

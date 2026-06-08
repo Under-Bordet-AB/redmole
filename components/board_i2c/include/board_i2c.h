@@ -36,18 +36,18 @@
  * The enum does not reserve or register devices by itself.
  */
 typedef enum {
-    BOARD_I2C_KNOWN_DEVICE_IO_EXTENSION,
-    BOARD_I2C_KNOWN_DEVICE_GT911_TOUCH,
-    BOARD_I2C_KNOWN_DEVICE_GT911_TOUCH_ALT,
-    BOARD_I2C_KNOWN_DEVICE_BME280,
-    BOARD_I2C_KNOWN_DEVICE_BME280_ALT,
+    BOARD_I2C_KNOWN_DEVICE_IO_EXTENSION,    /*!< Board IO expander at address 0x24. */
+    BOARD_I2C_KNOWN_DEVICE_GT911_TOUCH,     /*!< GT911 touch controller at address 0x5d. */
+    BOARD_I2C_KNOWN_DEVICE_GT911_TOUCH_ALT, /*!< GT911 alternate address 0x14. */
+    BOARD_I2C_KNOWN_DEVICE_BME280,          /*!< External BME280 at address 0x76. */
+    BOARD_I2C_KNOWN_DEVICE_BME280_ALT,      /*!< External BME280 alternate address 0x77. */
 } board_i2c_known_device;
 
 /**
  * @brief Initialize the shared board I2C bus.
  *
- * The bus is single-instance and idempotent. It is used by the board IO
- * expander, GT911 touch controller, and external I2C header.
+ * The bus is single-instance, idempotent, and thread-safe. It is used by the
+ * board IO expander, GT911 touch controller, and external I2C header.
  *
  * @return ESP_OK on success, otherwise an ESP-IDF error code.
  */
@@ -57,7 +57,9 @@ esp_err_t board_i2c_init(void);
  * @brief Return the shared board I2C bus handle.
  *
  * Initializes the bus if needed. This is intended for ESP-IDF APIs that need
- * the raw bus handle, such as LCD/touch panel IO creation.
+ * the raw bus handle, such as LCD/touch panel IO creation. The returned handle
+ * remains valid until controlled teardown. Raw-handle operations are outside
+ * the board_i2c lifecycle lock.
  *
  * @return Bus handle on success, NULL when initialization fails.
  */
@@ -67,7 +69,8 @@ i2c_master_bus_handle_t board_i2c_get_bus(void);
  * @brief Scan the shared board I2C bus and log devices that ACK.
  *
  * This is a diagnostic helper for bring-up and troubleshooting. Normal runtime
- * code should prefer targeted probes or owned device handles.
+ * code should prefer targeted probes or owned device handles. The lifecycle
+ * lock remains held for the complete scan.
  *
  * @param out_found_count Optional output for number of ACKing addresses found.
  * @return ESP_OK when the scan ran, otherwise an ESP-IDF error code.
@@ -78,7 +81,7 @@ esp_err_t board_i2c_scan(uint8_t* out_found_count);
  * @brief Probe one 7-bit I2C address on the shared board bus.
  *
  * @param address 7-bit I2C address to probe.
- * @return True when a device ACKs the address.
+ * @return True when a device ACKs the address, otherwise false.
  */
 bool board_i2c_probe_address(uint8_t address);
 
@@ -88,17 +91,15 @@ bool board_i2c_probe_address(uint8_t address);
  * This only proves I2C presence at 0x76 or 0x77. The BME280 backend still
  * verifies chip ID before treating the device as a real BME280.
  *
- * @return True when 0x76 or 0x77 ACKs.
+ * @return True when 0x76 or 0x77 ACKs, otherwise false.
  */
 bool board_i2c_bme280_present(void);
 
 /**
  * @brief Add an I2C device handle on the shared board bus.
  *
- * Ownership of the returned handle belongs to the caller. The current helper
- * creates a new handle, so callers must avoid registering the same address
- * repeatedly. The intended long-term direction is for board_i2c to own a small
- * address registry and return an existing handle for duplicate requests.
+ * Ownership of the returned handle belongs to the caller. This function creates
+ * a new handle, so callers must avoid registering the same address repeatedly.
  *
  * @param address 7-bit I2C address.
  * @param speed_hz Device bus speed, or 0 to use BOARD_I2C_DEFAULT_SPEED_HZ.
@@ -164,7 +165,10 @@ esp_err_t board_i2c_read(i2c_master_dev_handle_t dev, uint8_t* data, size_t len)
 /**
  * @brief Delete the shared board I2C bus.
  *
- * Call only during teardown when no device handles are still in use.
+ * Call only during teardown when no device handles are still in use. This
+ * function is serialized with wrapper operations, but cannot coordinate users
+ * of a raw handle previously returned by board_i2c_get_bus(). Repeated calls
+ * after successful teardown are safe.
  */
 void board_i2c_deinit(void);
 

@@ -1,72 +1,97 @@
 menu "RedMole Sensor Configuration"
 
+menu "Indoor sensor"
+
+    choice REDMOLE_INDOOR_ENVIRONMENT_SOURCE
+        prompt "Measurement source"
+        default REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+
+        config REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+            bool "BME280 sensor"
+
+        config REDMOLE_INDOOR_ENVIRONMENT_SOURCE_SIMULATED
+            bool "Simulated measurements"
+            help
+                Generate deterministic indoor temperature, humidity, and
+                pressure measurements without accessing the BME280.
+    endchoice
+
+    choice REDMOLE_INDOOR_BME280_ADDRESS
+        prompt "BME280 I2C address"
+        default REDMOLE_INDOOR_BME280_ADDRESS_0X77
+        depends on REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+
+        config REDMOLE_INDOOR_BME280_ADDRESS_0X76
+            bool "0x76"
+
+        config REDMOLE_INDOOR_BME280_ADDRESS_0X77
+            bool "0x77"
+    endchoice
+
+    config REDMOLE_INDOOR_BME280_MODE
+        int "BME280 mode"
+        default 1
+        range 0 3
+        depends on REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+        help
+            BME280 mode register value: 0=sleep, 1=forced, 2=forced,
+            3=normal. Forced mode is the default because the FreeRTOS task owns
+            the sampling cadence. Sleep mode deliberately produces no new
+            environment samples.
+
+    config REDMOLE_INDOOR_BME280_OVERSAMPLING_TEMPERATURE
+        int "BME280 temperature oversampling"
+        default 1
+        range 1 5
+        depends on REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+        help
+            BME280 osrs_t setting: 1=x1, 2=x2, 3=x4, 4=x8, 5=x16.
+            Every successful application reading contains temperature,
+            humidity, and pressure, so channels cannot be skipped.
+
+    config REDMOLE_INDOOR_BME280_OVERSAMPLING_PRESSURE
+        int "BME280 pressure oversampling"
+        default 1
+        range 1 5
+        depends on REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+        help
+            BME280 osrs_p setting: 1=x1, 2=x2, 3=x4, 4=x8, 5=x16.
+
+    config REDMOLE_INDOOR_BME280_OVERSAMPLING_HUMIDITY
+        int "BME280 humidity oversampling"
+        default 1
+        range 1 5
+        depends on REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+        help
+            BME280 osrs_h setting: 1=x1, 2=x2, 3=x4, 4=x8, 5=x16.
+
+    config REDMOLE_INDOOR_BME280_IIR_FILTER
+        int "BME280 IIR filter coefficient"
+        default 0
+        range 0 4
+        depends on REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+        help
+            BME280 filter setting: 0=off, 1=2, 2=4, 3=8, 4=16. The filter
+            affects pressure and temperature but not humidity.
+
+    config REDMOLE_INDOOR_BME280_STANDBY_TIME
+        int "BME280 normal-mode standby time"
+        default 5
+        range 0 7
+        depends on REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280
+        help
+            BME280 t_sb setting: 0=0.5ms, 1=62.5ms, 2=125ms, 3=250ms,
+            4=500ms, 5=1000ms, 6=10ms, 7=20ms. In forced mode this is
+            configured but not used as the task controls the cadence.
+
+endmenu
+
     config REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC
         int "Environment reading interval in seconds"
         default 1
         range 1 3600
         help
-            Period used by the environment measurement task. The task uses
-            vTaskDelayUntil(), so sensor execution time is included in this
-            cadence.
-
-    config REDMOLE_ENVIRONMENT_DETECT_INTERVAL_SEC
-        int "Environment hardware detection interval in seconds"
-        default 2
-        range 1 300
-        help
-            Period used to check whether the physical environment sensor has
-            been unplugged or reconnected. This is intentionally separate from
-            the slower reading interval so demos can show fallback and recovery
-            without publishing environment readings too often.
-
-    config REDMOLE_BME280_MODE
-        int "BME280 mode"
-        default 1
-        range 0 3
-        help
-            BME280 mode register value: 0=sleep, 1=forced, 2=forced,
-            3=normal. Forced mode is the default because the FreeRTOS task owns
-            the sampling cadence.
-
-    config REDMOLE_BME280_OVERSAMPLING_TEMPERATURE
-        int "BME280 temperature oversampling"
-        default 1
-        range 0 5
-        help
-            BME280 osrs_t setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
-            5=x16.
-
-    config REDMOLE_BME280_OVERSAMPLING_PRESSURE
-        int "BME280 pressure oversampling"
-        default 1
-        range 0 5
-        help
-            BME280 osrs_p setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
-            5=x16.
-
-    config REDMOLE_BME280_OVERSAMPLING_HUMIDITY
-        int "BME280 humidity oversampling"
-        default 1
-        range 0 5
-        help
-            BME280 osrs_h setting: 0=skipped, 1=x1, 2=x2, 3=x4, 4=x8,
-            5=x16.
-
-    config REDMOLE_BME280_IIR_FILTER
-        int "BME280 IIR filter coefficient"
-        default 0
-        range 0 4
-        help
-            BME280 filter setting: 0=off, 1=2, 2=4, 3=8, 4=16.
-
-    config REDMOLE_BME280_STANDBY_TIME
-        int "BME280 normal-mode standby time"
-        default 5
-        range 0 7
-        help
-            BME280 t_sb setting: 0=0.5ms, 1=62.5ms, 2=125ms, 3=250ms,
-            4=500ms, 5=1000ms, 6=10ms, 7=20ms. In forced mode this is
-            configured but not used as the task controls the cadence.
+            Period used to read and publish environment measurements.
 
 endmenu
 

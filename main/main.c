@@ -16,15 +16,15 @@
 #include "sdcard_log.h"
 #include "uart_mole.h"
 
-static const char *TAG = "MAIN";
-static gui_ctx_t        s_gui           = {0};
+static const char* TAG = "MAIN";
+static gui_ctx_t s_gui = {0};
 static EventGroupHandle_t s_event_group = NULL;
-static char             s_ssid[32];
-static char             s_password[64];
-static size_t           s_ssid_len      = 32;
-static size_t           s_password_len  = 64;
+static char s_ssid[32];
+static char s_password[64];
+static size_t s_ssid_len = 32;
+static size_t s_password_len = 64;
 
-static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
+static esp_err_t init_single_instance_modules(EventGroupHandle_t* event_group) {
     esp_err_t rv = rm_nvs_init("app");
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "rm_nvs_init failed: %s", esp_err_to_name(rv));
@@ -70,10 +70,9 @@ static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
     }
 
     rv = sdcard_init();
-    if (rv != ESP_OK){
+    if (rv != ESP_OK) {
         ESP_LOGE(TAG, "sdcard_init failed: %s", esp_err_to_name(rv));
     }
-
 
     rv = uart_mole_init(event_group);
     if (rv != ESP_OK) {
@@ -102,7 +101,7 @@ static esp_err_t init_runtime_modules(void) {
     }
 
     rv = sdcard_log_init("logs");
-    if (rv != ESP_OK){
+    if (rv != ESP_OK) {
         ESP_LOGE(TAG, "sdcard_log_init failed: %s", esp_err_to_name(rv));
     }
 
@@ -161,13 +160,11 @@ void app_main(void) {
     /* Try connecting to saved WiFi credentials via scan and match */
     rm_nvs_get_str("wifi_ssid", s_ssid, &s_ssid_len);
     rm_nvs_get_str("wifi_pass", s_password, &s_password_len);
-    if (s_ssid[0] != '\0' && s_password[0] != '\0')
-    {
+    if (s_ssid[0] != '\0' && s_password[0] != '\0') {
         nac_connect_to_saved_wifi(s_ssid, s_password);
     }
 
-    while (1)
-    {
+    while (1) {
         // Synchronize the GUI with the backend
         app_gui_bindings_sync(&s_gui);
 

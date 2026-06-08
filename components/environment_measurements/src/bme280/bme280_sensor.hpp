@@ -1,76 +1,250 @@
 #pragma once
 
+/**
+ * @file
+ * @brief BME280 hardware source for environment measurements.
+ *
+ * The source retains one board_i2c device handle for its lifetime and converts
+ * each physical acquisition into complete temperature, humidity, and pressure
+ * measurements.
+ */
+
 #include <cstdint>
 
 #include "driver/i2c_master.h"
-#include "environment_sensor.hpp"
+#include "esp_err.h"
+#include "reading_types.hpp"
 
-namespace redmole::environment {
+namespace redmole::environment::bme280 {
 
+/** @brief Power and acquisition modes accepted by the BME280 mode field. "Forced" and
+ * "ForcedAlternate" represents the same mode. */
+enum class Bme280Mode : uint8_t {
+    Sleep = 0,           /*!< No conversion runs until another mode is written. */
+    Forced = 1,          /*!< Run one conversion and return automatically to sleep. */
+    ForcedAlternate = 2, /*!< Second register encoding with the same behavior as forced mode. */
+    Normal = 3,          /*!< Repeat conversions using the configured standby period. */
+};
+
+/** @brief Per-channel oversampling accepted by the BME280 control registers. */
+enum class Bme280Oversampling : uint8_t {
+    Skipped = 0, /*!< Disable this measurement channel. */
+    X1 = 1,      /*!< Perform one internal conversion. */
+    X2 = 2,      /*!< Average two internal conversions. */
+    X4 = 3,      /*!< Average four internal conversions. */
+    X8 = 4,      /*!< Average eight internal conversions. */
+    X16 = 5,     /*!< Average sixteen internal conversions. */
+};
+
+/** @brief IIR filter coefficients accepted by the BME280 config register. */
+enum class Bme280Filter : uint8_t {
+    Off = 0,           /*!< Do not filter pressure or temperature. */
+    Coefficient2 = 1,  /*!< Use IIR filter coefficient 2. */
+    Coefficient4 = 2,  /*!< Use IIR filter coefficient 4. */
+    Coefficient8 = 3,  /*!< Use IIR filter coefficient 8. */
+    Coefficient16 = 4, /*!< Use IIR filter coefficient 16. */
+};
+
+/** @brief Inactive periods available between measurements in normal mode. */
+enum class Bme280Standby : uint8_t {
+    Ms0_5 = 0,  /*!< Wait 0.5 milliseconds. */
+    Ms62_5 = 1, /*!< Wait 62.5 milliseconds. */
+    Ms125 = 2,  /*!< Wait 125 milliseconds. */
+    Ms250 = 3,  /*!< Wait 250 milliseconds. */
+    Ms500 = 4,  /*!< Wait 500 milliseconds. */
+    Ms1000 = 5, /*!< Wait 1000 milliseconds. */
+    Ms10 = 6,   /*!< Wait 10 milliseconds. */
+    Ms20 = 7,   /*!< Wait 20 milliseconds. */
+};
+
+/**
+ * @brief Complete set of BME280 measurement controls available over I2C.
+ *
+ * Normal application readings require temperature, pressure, and humidity to
+ * remain enabled. Temperature is also required by both other compensation formulas.
+ */
+struct Bme280Settings {
+    Bme280Mode mode;                             /*!< Acquisition and power mode. */
+    Bme280Oversampling temperature_oversampling; /*!< Temperature channel setting. */
+    Bme280Oversampling pressure_oversampling;    /*!< Pressure channel setting. */
+    Bme280Oversampling humidity_oversampling;    /*!< Humidity channel setting. */
+    Bme280Filter filter;                         /*!< Pressure and temperature IIR filter. */
+    Bme280Standby standby;                       /*!< Normal-mode inactive period. */
+};
+
+/** @brief Live work flags reported by the BME280 status register. */
+struct Bme280Status {
+    bool measuring;            /*!< A measurement conversion is running. */
+    bool updating_calibration; /*!< Calibration data is being copied from internal memory. */
+};
+
+/** @brief Raw register values that must be compensated with this device's calibration. */
 struct Bme280RawSample {
-    int32_t adc_temperature;
-    int32_t adc_pressure;
-    int32_t adc_humidity;
+    int32_t adc_temperature; /*!< Uncompensated 20-bit temperature ADC value. */
+    int32_t adc_pressure;    /*!< Uncompensated 20-bit pressure ADC value. */
+    int32_t adc_humidity;    /*!< Uncompensated 16-bit humidity ADC value. */
 };
 
+/** @brief One complete compensated BME280 acquisition. */
+struct Bme280Reading {
+    Temperature temperature; /*!< Compensated temperature. */
+    Humidity humidity;       /*!< Compensated relative humidity. */
+    Pressure pressure;       /*!< Compensated atmospheric pressure. */
+};
+
+/**
+ * @brief Factory calibration coefficients read from one BME280.
+ *
+ * The field names match the Bosch datasheet so the compensation formulas can
+ * be checked directly against that document.
+ */
 struct Bme280Calibration {
-    uint16_t dig_T1;
-    int16_t dig_T2;
-    int16_t dig_T3;
-    uint16_t dig_P1;
-    int16_t dig_P2;
-    int16_t dig_P3;
-    int16_t dig_P4;
-    int16_t dig_P5;
-    int16_t dig_P6;
-    int16_t dig_P7;
-    int16_t dig_P8;
-    int16_t dig_P9;
-    uint8_t dig_H1;
-    int16_t dig_H2;
-    uint8_t dig_H3;
-    int16_t dig_H4;
-    int16_t dig_H5;
-    int8_t dig_H6;
+    uint16_t dig_T1; /*!< Unsigned temperature coefficient T1. */
+    int16_t dig_T2;  /*!< Signed temperature coefficient T2. */
+    int16_t dig_T3;  /*!< Signed temperature coefficient T3. */
+    uint16_t dig_P1; /*!< Unsigned pressure coefficient P1. */
+    int16_t dig_P2;  /*!< Signed pressure coefficient P2. */
+    int16_t dig_P3;  /*!< Signed pressure coefficient P3. */
+    int16_t dig_P4;  /*!< Signed pressure coefficient P4. */
+    int16_t dig_P5;  /*!< Signed pressure coefficient P5. */
+    int16_t dig_P6;  /*!< Signed pressure coefficient P6. */
+    int16_t dig_P7;  /*!< Signed pressure coefficient P7. */
+    int16_t dig_P8;  /*!< Signed pressure coefficient P8. */
+    int16_t dig_P9;  /*!< Signed pressure coefficient P9. */
+    uint8_t dig_H1;  /*!< Unsigned humidity coefficient H1. */
+    int16_t dig_H2;  /*!< Signed humidity coefficient H2. */
+    uint8_t dig_H3;  /*!< Unsigned humidity coefficient H3. */
+    int16_t dig_H4;  /*!< Signed 12-bit humidity coefficient H4. */
+    int16_t dig_H5;  /*!< Signed 12-bit humidity coefficient H5. */
+    int8_t dig_H6;   /*!< Signed humidity coefficient H6. */
 };
 
-class Bme280Sensor final : public EnvironmentSensor {
-public:
-    explicit Bme280Sensor(uint8_t address);
+/**
+ * @brief Read one explicitly addressed BME280 on the shared board I2C bus.
+ *
+ * A failed read marks the device unready. The following read then performs the
+ * complete initialization sequence again, which allows recovery after a sensor
+ * is disconnected and reconnected.
+ */
+class Bme280Sensor final {
+  public:
+    /**
+     * @brief Construct a BME280 source for one seven-bit I2C address and settings.
+     * @param address Configured seven-bit BME280 address.
+     * @param settings Initial measurement controls to apply during initialization.
+     */
+    Bme280Sensor(uint8_t address, const Bme280Settings& settings);
+
+    /** @brief Prevent multiple C++ objects from representing the same retained I2C handle. */
     Bme280Sensor(const Bme280Sensor&) = delete;
     Bme280Sensor& operator=(const Bme280Sensor&) = delete;
     Bme280Sensor(Bme280Sensor&&) = delete;
     Bme280Sensor& operator=(Bme280Sensor&&) = delete;
 
-    esp_err_t init() override;
-    bool probe() override;
-    esp_err_t read(environment_measurement_sample_t& out) override;
-    SensorLocation location() const override;
-    bool is_simulated() const override;
+    /**
+     * @brief Verify, reset, calibrate, and configure the sensor.
+     * @return ESP_OK when reads can begin, otherwise an ESP-IDF error code.
+     */
+    esp_err_t init();
 
-private:
-    esp_err_t ensure_device_handle();
-    esp_err_t connect();
-    void mark_disconnected();
-    esp_err_t configure();
-    esp_err_t write_ctrl_meas();
-    esp_err_t read_u8(uint8_t reg, uint8_t& out);
-    esp_err_t wait_until_ready();
-    esp_err_t load_calibration();
+    /**
+     * @brief Acquire one complete strongly typed BME280 reading.
+     * @param out Cleared output populated only when all three channels are valid.
+     * @return ESP_OK on complete success, otherwise an ESP-IDF error code.
+     */
+    esp_err_t read(Bme280Reading& out);
+
+    /**
+     * @brief Perform the BME280 software reset command.
+     *
+     * The next read performs full initialization and reapplies current settings.
+     *
+     * @return ESP_OK when the reset command was accepted, otherwise an I2C error.
+     */
+    esp_err_t reset();
+
+    /**
+     * @brief Validate and apply every I2C-relevant BME280 measurement setting.
+     *
+     * The sensor is placed in sleep mode before config is written because the
+     * BME280 may ignore config writes in normal mode.
+     *
+     * @param settings Complete settings to apply and retain for recovery.
+     * @return ESP_OK when readback matches, ESP_ERR_INVALID_ARG for an invalid
+     *         combination, otherwise an I2C error.
+     */
+    esp_err_t apply_settings(const Bme280Settings& settings);
+
+    /**
+     * @brief Read the active measurement settings back from the sensor.
+     * @param settings Output populated from ctrl_hum, ctrl_meas, and config.
+     * @return ESP_OK when all settings registers were read, otherwise an I2C error.
+     */
+    esp_err_t read_settings(Bme280Settings& settings);
+
+    /**
+     * @brief Read the sensor's measurement and calibration-update flags.
+     * @param status Output populated from the BME280 status register.
+     * @return ESP_OK when status was read, otherwise an I2C error.
+     */
+    esp_err_t read_status(Bme280Status& status);
+
+    /**
+     * @brief Read one coherent block of uncompensated measurement registers.
+     *
+     * This is available for diagnostics. Normal application code should use
+     * read(), which applies calibration and requires all channels.
+     *
+     * @param out_raw Output populated from the sensor's measurement register block.
+     * @return ESP_OK when data was read, otherwise an I2C or timeout error.
+     */
     esp_err_t read_raw(Bme280RawSample& out_raw);
-    void convert(const Bme280RawSample& raw, environment_measurement_sample_t& out) const;
 
-    uint8_t address_;
-    i2c_master_dev_handle_t dev_ = nullptr;
-    Bme280Calibration calibration_ = {};
-    bool present_ = false;
-    bool configured_ = false;
-    uint8_t mode_ = 1U;
-    uint8_t osrs_t_ = 1U;
-    uint8_t osrs_p_ = 1U;
-    uint8_t osrs_h_ = 1U;
-    uint8_t filter_ = 0U;
-    uint8_t standby_ = 5U;
+  private:
+    /**
+     * @brief Confirm that the responding device has the BME280 chip ID.
+     * @return ESP_OK for a BME280, ESP_ERR_NOT_FOUND for no device or a different chip.
+     */
+    esp_err_t check_chip_id();
+
+    /**
+     * @brief Reset the sensor and apply calibration and build-time settings.
+     * @return ESP_OK when configuration completed, otherwise an I2C or timeout error.
+     */
+    esp_err_t configure();
+
+    /**
+     * @brief Write the current oversampling fields and requested operating mode.
+     * @param mode Mode field to write with the retained oversampling settings.
+     * @return Result from writing the BME280 measurement-control register.
+     */
+    esp_err_t write_ctrl_meas(Bme280Mode mode);
+
+    /**
+     * @brief Wait until reset or measurement work reported by the sensor is complete.
+     * @return ESP_OK when ready, ESP_ERR_TIMEOUT after the bounded wait, or an I2C error.
+     */
+    esp_err_t wait_until_ready();
+
+    /**
+     * @brief Read the factory coefficients needed by the compensation formulas.
+     * @return ESP_OK when both calibration blocks were read, otherwise an I2C error.
+     */
+    esp_err_t load_calibration();
+
+    /**
+     * @brief Apply the BME280 datasheet formulas and strong reading units.
+     * @param raw Uncompensated values from the sensor.
+     * @param out Output populated only when every channel can be compensated.
+     * @return ESP_OK on complete success, otherwise ESP_ERR_INVALID_RESPONSE.
+     */
+    esp_err_t convert(const Bme280RawSample& raw, Bme280Reading& out) const;
+
+    uint8_t address_;                          /*!< Address fixed by the product circuit. */
+    Bme280Settings settings_;                  /*!< Controls reapplied after every recovery. */
+    i2c_master_dev_handle_t device_ = nullptr; /*!< Handle retained across disconnects. */
+    Bme280Calibration calibration_ = {};       /*!< Replaced after every successful reset. */
+    bool ready_for_reads_ = false;             /*!< False requests full initialization on read. */
 };
 
-} // namespace redmole::environment
+} // namespace redmole::environment::bme280

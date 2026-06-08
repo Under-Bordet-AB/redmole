@@ -47,7 +47,7 @@ Current runtime behavior:
 
 - console output uses `USB Serial/JTAG`
 - PSRAM is enabled because the RGB panel frame buffers need it
-- `environment_measurements` owns BME280 discovery, polling, latest data, and simulation fallback
+- `environment_measurements` owns the configured environment sensor, polling task, and latest data
 - `main.c` owns app-layer orchestration
 - the Wi-Fi module code is still present in the repo
 - Wi-Fi behavior is driven through the current NAC/app binding path
@@ -71,7 +71,7 @@ Startup flow:
 
 - `rm_nvs` is a single-instance NVS wrapper with a fixed default namespace.
 - `board_i2c` owns the shared ESP32-S3 I2C master bus configuration.
-- `environment_measurements` owns board-local environment readings and fallback simulation.
+- `environment_measurements` owns the configured BME280, polling, and latest indoor snapshot.
 - `gui` is currently a single-instance module that owns its own internal runtime state.
 - `wifi_module` matches the main branch implementation, but its startup path is not active in this build.
 
