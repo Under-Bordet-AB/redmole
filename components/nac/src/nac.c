@@ -25,11 +25,13 @@
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
+#include "task_scheduler.h"
 
-#define REDMOLE_WIFI_SSID   CONFIG_REDMOLE_WIFI_SSID
-#define REDMOLE_WIFI_PASS   CONFIG_REDMOLE_WIFI_PASSWORD
-#define REDMOLE_MAX_RETRY   CONFIG_REDMOLE_MAXIMUM_RETRY
+#define REDMOLE_WIFI_SSID   CONFIG_REDMOLE_WIFI_SSID        // Set fallback SSID using menuconfig
+#define REDMOLE_WIFI_PASS   CONFIG_REDMOLE_WIFI_PASSWORD    // Set fallback password using menuconfig
+#define REDMOLE_MAX_RETRY   CONFIG_REDMOLE_MAXIMUM_RETRY    // Set maximum retry count using menuconfig
 
+/*
 #if CONFIG_REDMOLE_WPA3_SAE_PWE_HUNT_AND_PECK
     #define REDMOLE_WPA3_SAE_MODE  WPA3_SAE_PWE_HUNT_AND_PECK
     #define REDMOLE_H2E_IDENTIFIER ""
@@ -63,6 +65,7 @@
 #else
     #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA2_PSK
 #endif
+*/
 
 typedef struct
 {
@@ -91,9 +94,6 @@ task_status_t wifi_connect(task_node_t *node);
 
 esp_err_t nac_init(EventGroupHandle_t *event_group)
 {
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
     memset(&s_nac, 0, sizeof(s_nac));
     s_nac.event_group = event_group;
 
@@ -117,9 +117,10 @@ nac_wifi_status_t nac_get_wifi_status(void)
     switch (s_nac.wifi.state)
     {
         case WIFI_STATE_CONNECTED:                       return NAC_WIFI_CONNECTED;
-        case WIFI_STATE_CONNECTING: /* fall-through */
+        case WIFI_REQUEST_CONNECT:  /* Fall through — request queued, not yet connecting */
+        case WIFI_STATE_CONNECTING: /* Fall through */
         case WIFI_STATE_RECONNECT:                       return NAC_WIFI_CONNECTING;
-        case WIFI_STATE_START_SCAN: /* fall-through */
+        case WIFI_STATE_START_SCAN: /* Fall through */
         case WIFI_STATE_SCANNING:                        return NAC_WIFI_SCANNING;
         case WIFI_STATE_ERROR:                           return NAC_WIFI_ERROR;
         case WIFI_STATE_IDLE:       /* fall-through */
@@ -146,11 +147,10 @@ esp_err_t nac_request_wifi_connect(const char *ssid, const char *password)
         strncpy(s_wifi_pass, password, WIFI_CRED_MAX_LENGTH - 1);
         s_wifi_pass[WIFI_CRED_MAX_LENGTH - 1] = '\0';
     }
-    ESP_LOGI("NAC", "Got ssid=%s, password=%s", ssid, password);
 
     s_nac.wifi.retry_count    = 0;
     s_nac.wifi.saved_to_nvs   = 0;
-    s_nac.wifi.state          = WIFI_STATE_IDLE;
+    s_nac.wifi.state          = WIFI_REQUEST_CONNECT;
     s_nac.wifi.task_node.work = wifi_connect;
 
     return task_scheduler_add(&s_nac.wifi.task_node, 0) == 0 ? ESP_OK : ESP_FAIL;
@@ -189,7 +189,7 @@ const wifi_ap_record_t *nac_get_scan_results(uint16_t *out_count)
 
 bool nac_scan_is_complete(void)
 {
-    return s_nac.wifi.scan_complete != 0;
+    return s_nac.wifi.scan_complete;
 }
 
 /*  WiFi — internal implementation */
@@ -198,11 +198,14 @@ bool nac_scan_is_complete(void)
  * @brief Initialises the WiFi interface.
  * @note  Initialization order and ownership:
  *   1. [SYSTEM] nvs_flash_init()           rm_nvs_init() in main.c
- *   2. [STACK]  esp_netif_init()           nac_init()
- *   3. [SYSTEM] esp_event_loop_...()       nac_init()
+ *   2. [STACK]  esp_netif_init()           main.c — owned by main, not NAC
+ *   3. [SYSTEM] esp_event_loop_...()       main.c — owned by main, not NAC
  *   4. [BIND]   esp_netif_create_...()     here  — glue between LwIP and WiFi driver
  *   5. [HAL]    esp_wifi_init()            wifi_bring_hw_online()
  *   6. [RADIO]  esp_wifi_start()           wifi_connect()
+ *
+ * Steps 2 and 3 are intentionally kept in main so NAC init is independently
+ * testable without dragging in global system singletons.
  * @return 0 on success, -1 on failure
  */
 static int8_t wifi_init(wifi_ctx_t *self)
@@ -372,8 +375,9 @@ static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
  * @return TASK_ERROR  Driver failure or retry limit reached; node removed.
  *                     Call nac_request_wifi_connect() to start over.
  *
- * @note TASK_RUN_AGAIN is unused — all rescheduling goes through
- *       task_scheduler_add() so back-off delay is enforced explicitly.
+ * @note TASK_RUN_AGAIN is used only for the WIFI_REQUEST_CONNECT → RECONNECT
+ *       handoff. All other rescheduling goes through task_scheduler_add()
+ *       so back-off delay is enforced explicitly.
  */
 task_status_t wifi_connect(task_node_t *task_node)
 {
@@ -383,6 +387,16 @@ task_status_t wifi_connect(task_node_t *task_node)
     {
         /*  Initial connect or scheduled reconnect */
         case WIFI_STATE_IDLE:
+        {
+            ESP_LOGI(self->tag, "WIFI statemachine idle and sleepy... ZzZZz.");
+            return TASK_DONE;
+        }
+        case WIFI_REQUEST_CONNECT: /* Fall through */
+        {
+            ESP_LOGI(self->tag, "WIFI request received!");
+            self->state = WIFI_STATE_RECONNECT;
+            return TASK_RUN_AGAIN;
+        }
         case WIFI_STATE_RECONNECT:
         {
             if (self->retry_count >= REDMOLE_MAX_RETRY)
@@ -654,5 +668,83 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
             rm_nvs_set_str("wifi_pass", s_wifi_pass);
             self->saved_to_nvs = 1;
         }
+    }
+}
+
+void nac_connect_to_saved_wifi(const char *ssid, const char *password)
+{
+    // call sites check if strings empty before calling this
+    if (wifi_bring_hw_online(&s_nac.wifi) != 0)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: hw online failed");
+        return;
+    }
+
+    esp_err_t err = esp_wifi_start();
+    if (err != ESP_OK && err != ESP_ERR_WIFI_IF)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: esp_wifi_start failed: %s", esp_err_to_name(err));
+        s_nac.wifi.state = WIFI_STATE_IDLE;
+        wifi_bring_hw_offline(&s_nac.wifi);
+        return;
+    }
+
+    s_nac.wifi.scan_complete = 0;
+    s_nac.wifi.ap_count      = 0;
+
+    wifi_scan_config_t scan_cfg;
+    memset(&scan_cfg, 0, sizeof(scan_cfg));
+    scan_cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+
+    if (esp_wifi_scan_start(&scan_cfg, true) != ESP_OK)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: scan failed");
+        s_nac.wifi.state = WIFI_STATE_IDLE;
+        wifi_bring_hw_offline(&s_nac.wifi);
+        return;
+    }
+
+    /*
+     * esp_wifi_scan_start(block=true) returns when hardware finishes, but
+     * WIFI_EVENT_SCAN_DONE is dispatched asynchronously by the event loop task.
+     * wifi_scan_done() consumes esp_wifi_scan_get_ap_records() — if it runs
+     * first our direct call would get count=0. Poll for the event handler to
+     * populate ap_records; fall back to a direct read if it doesn't fire in time.
+     */
+    for (int i = 0; i < 50 && !s_nac.wifi.scan_complete; i++)
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    if (!s_nac.wifi.scan_complete)
+    {
+        ESP_LOGW("NAC", "SCAN_DONE event not received — reading records directly");
+        s_nac.wifi.ap_count = WIFI_SCAN_MAX_RESULT;
+        esp_wifi_scan_get_ap_records(&s_nac.wifi.ap_count, s_nac.wifi.ap_records);
+    }
+
+    uint16_t count = s_nac.wifi.ap_count;
+
+    bool found = false;
+    for (uint16_t i = 0; i < count; i++)
+    {
+        if (strcmp((const char *)s_nac.wifi.ap_records[i].ssid, ssid) == 0)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    s_nac.wifi.state = WIFI_STATE_IDLE;
+    wifi_bring_hw_offline(&s_nac.wifi);
+
+    if (found)
+    {
+        ESP_LOGI("NAC", "Found saved network '%s' — queuing connect", ssid);
+        nac_request_wifi_connect(ssid, password);
+    }
+    else
+    {
+        ESP_LOGI("NAC", "Saved network '%s' not in range — staying idle", ssid);
     }
 }

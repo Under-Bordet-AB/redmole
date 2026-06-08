@@ -780,12 +780,11 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         sidebar_grad   = lv_color_hex(def->sidebar_grad);
         sidebar_shadow = lv_color_hex(def->sidebar_shadow);
         sidebar_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
-        //brand_text     = lv_color_hex(def->brand_text);
-        brand_text     = lv_color_hex(def->accent_color);
+        brand_text     = lv_color_hex(def->brand_text);
 
         content_bg     = lv_color_hex(def->content_bg);
         content_shadow = lv_color_hex(def->content_shadow);
-        content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_90;
+        content_bg_opa = use_background_image ? LV_OPA_TRANSP : LV_OPA_COVER;
 
         title_text    = lv_color_hex(def->title_text);
         subtitle_text = lv_color_hex(def->subtitle_text);
@@ -953,6 +952,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                  subtitle_text, effective_theme);
     gui_view_style_settings_card(view->location_card, item_bg, item_border, title_text,
                                  subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->reset_card, item_bg, item_border, title_text,
+                                 subtitle_text, effective_theme);
     if (view->wifi_status_label != NULL) {
         gui_wifi_state_t wifi_state = view->has_last_wifi_settings
                                       ? view->last_wifi_settings.state
@@ -1093,6 +1094,7 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     gui_view_style_action_button(view->password_dialog_cancel_button, effective_theme, false);
     gui_view_style_action_button(view->password_dialog_connect_button, effective_theme, true);
     gui_view_style_action_button(view->password_dialog_disconnect_button, effective_theme, false);
+    gui_view_style_action_button(view->reset_button, effective_theme, true);
 
     lv_obj_set_style_bg_color(view->network_dialog, panel_bg, 0);
     lv_obj_set_style_bg_opa(view->network_dialog, LV_OPA_COVER, 0);
@@ -1133,6 +1135,14 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
     if (view->password_dialog_network_label != NULL) {
         lv_obj_set_style_text_color(view->password_dialog_network_label, subtitle_text, 0);
         lv_obj_set_style_text_font(view->password_dialog_network_label, body_font, 0);
+    }
+    if (view->password_dialog_status_label != NULL) {
+        lv_obj_set_style_text_font(view->password_dialog_status_label, body_font, 0);
+    }
+    if (view->password_dialog_spinner != NULL) {
+        lv_obj_set_style_arc_color(view->password_dialog_spinner, dropdown_border, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(view->password_dialog_spinner, 3, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(view->password_dialog_spinner, 3, LV_PART_INDICATOR);
     }
 
     lv_obj_set_style_bg_color(view->wifi_password_textarea, dropdown_bg, 0);

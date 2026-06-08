@@ -40,7 +40,7 @@ The active screen contains:
 - a `BME280` panel showing temperature, humidity, and pressure
 - a `Settings` panel placeholder
 
-If no live `sensor_data` snapshot is available yet, the BME280 panel waits for the first published reading instead of generating placeholder measurements.
+If no live `environment_measurements` snapshot is available yet, the BME280 panel waits for the first published reading instead of generating placeholder measurements.
 
 ## Public API
 
@@ -60,13 +60,13 @@ The public API also exposes callback bindings plus setters/getters for GUI-owned
 
 Current data path:
 
-`selected BME280 HAL backend -> bme280_hal -> sensor_data -> gui_state -> gui_screen`
+`environment_measurements -> gui_state -> gui_screen`
 
 The GUI does not talk to the BME280 directly. At the moment the BME280 values are intentionally left at zero until a real GUI-side sensor integration path is wired in.
 
 ## Measurement Format
 
-Rendered values use the scaled integers published by `sensor_data`:
+Rendered values use the scaled integers published by `environment_measurements`:
 
 - temperature: deci-C
 - humidity: deci-percent

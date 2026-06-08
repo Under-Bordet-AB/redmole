@@ -169,6 +169,14 @@ static bool gui_update_location_from_textarea(gui_runtime_t *runtime, lv_obj_t *
     return gui_state_set_location_settings(&runtime->state, &location);
 }
 
+static void gui_notify_reset_requested(gui_runtime_t *runtime) {
+    if ((runtime == NULL) || (runtime->owner == NULL) || (runtime->bindings.on_reset_requested == NULL)) {
+            return;
+        }
+    
+        runtime->bindings.on_reset_requested(runtime->owner, runtime->bindings.user_data);
+}
+
 static gui_panel_id_t gui_screen_target_to_panel(gui_screen_t *screen, lv_obj_t *target)
 {
     if ((screen == NULL) || (target == NULL)) {
@@ -454,6 +462,15 @@ static bool gui_handle_network_dialog_selection(gui_runtime_t *runtime, lv_obj_t
     return false;
 }
 
+static void gui_handle_reset_action_event(gui_runtime_t *runtime, lv_obj_t *target, lv_event_code_t event_code) {
+    if ((runtime == NULL) || (target != runtime->screen.reset_button) ||
+        (event_code != LV_EVENT_CLICKED)) {
+        return;
+    }
+
+    gui_notify_reset_requested(runtime);
+}
+
 static void gui_handle_settings_event(lv_event_t *event)
 {
     gui_runtime_t *runtime;
@@ -474,6 +491,7 @@ static void gui_handle_settings_event(lv_event_t *event)
     gui_handle_location_textarea_event(runtime, target, event_code);
     gui_handle_settings_navigation_event(runtime, target, event_code);
     gui_handle_wifi_action_event(runtime, target, event_code);
+    gui_handle_reset_action_event(runtime, target, event_code);
     (void)gui_handle_network_dialog_selection(runtime, target, event_code);
 }
 

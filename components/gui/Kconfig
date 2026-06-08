@@ -24,4 +24,10 @@ menu "RedMole GUI Configuration"
         help
             Build the SpongeBob theme assets and expose the theme in the UI.
 
+    config REDMOLE_GUI_THEME_BONZI_BUDDY
+        bool "Enable Bonzi Buddy theme"
+        default y
+        help
+            Build the Bonzi Buddy theme assets and expose the theme in the UI.
+
 endmenu

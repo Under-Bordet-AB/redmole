@@ -4,19 +4,25 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "app_gui_bindings.h"
+#include "board_i2c.h"
+#include "environment_measurements.h"
 #include "task_scheduler.h"
 #include "gui_module.h"
-#include "local_sensor_service.h"
 #include "nac.h"
 #include "rm_nvs.h"
-#include "sensor_data.h"
 #include "http_client.h"
 #include "blufi_main.h"
+#include "sdcard.h"
+#include "sdcard_log.h"
 #include "uart_mole.h"
 
 static const char *TAG = "MAIN";
-static gui_ctx_t        s_gui         = {0};
+static gui_ctx_t        s_gui           = {0};
 static EventGroupHandle_t s_event_group = NULL;
+static char             s_ssid[32];
+static char             s_password[64];
+static size_t           s_ssid_len      = 32;
+static size_t           s_password_len  = 64;
 
 static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
     esp_err_t rv = rm_nvs_init("app");
@@ -30,21 +36,44 @@ static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
         return rv;
     }
 
+    /* Initialize network interface and event loop
+     *
+     * esp_netif_init: Initializes the network interface TCP/IP stack
+     * esp_event_loop_create_default: Creates the default event loop for handling system events
+     *      the user must register event handlers to receive events from this loop, such as WiFi events
+     * Belongs in main rather than in NAC init, makes NAC init testable
+     */
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    /* NAC init relies on network interface and event loop being initialized first */
     if (nac_init(event_group) != ESP_OK) {
         ESP_LOGE(TAG, "nac_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
+    ESP_LOGI(TAG, "NAC module successfully initialized.");
 
     if (http_client_init(HTTP_CLIENT_TLS_BUNDLE, NULL) != ESP_OK) {
         ESP_LOGE(TAG, "http_client_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
-    rv = sensor_data_init();
+    rv = board_i2c_init();
     if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "sensor_data_init failed: %s", esp_err_to_name(rv));
+        ESP_LOGE(TAG, "board_i2c_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
+
+    rv = environment_measurements_init();
+    if (rv != ESP_OK) {
+        ESP_LOGE(TAG, "environment_measurements_init failed: %s", esp_err_to_name(rv));
+        return rv;
+    }
+
+    rv = sdcard_init();
+    if (rv != ESP_OK){
+        ESP_LOGE(TAG, "sdcard_init failed: %s", esp_err_to_name(rv));
+    }
+
 
     rv = uart_mole_init(event_group);
     if (rv != ESP_OK) {
@@ -52,24 +81,12 @@ static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
         return rv;
     }
 
+    blufi_main();
+
     return ESP_OK;
 }
 
 static esp_err_t init_runtime_modules(void) {
-/*     if (task_scheduler_init() != ESP_OK) {
-        ESP_LOGE(TAG, "task_scheduler_init failed");
-        return ESP_FAIL;
-    }
-        ESP_LOGI(TAG, "task_scheduler_init started"); */
-
-    esp_err_t rv = local_sensor_service_init();
-    if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "local_sensor_service_init failed: %s", esp_err_to_name(rv));
-        return rv;
-    }
-
-    blufi_main();
-
     // Load previously saved GUI settings
     gui_init_config_t gui_init_config = {0};
     (void)app_gui_bindings_load_saved_appearance(&gui_init_config);
@@ -78,19 +95,24 @@ static esp_err_t init_runtime_modules(void) {
     gui_init(&s_gui, &gui_init_config);
 
     // Initialize the GUI bindings
-    rv = app_gui_bindings_init(&s_gui, &s_event_group);
+    esp_err_t rv = app_gui_bindings_init(&s_gui, &s_event_group);
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "app_gui_bindings_init failed: %s", esp_err_to_name(rv));
         return rv;
+    }
+
+    rv = sdcard_log_init("logs");
+    if (rv != ESP_OK){
+        ESP_LOGE(TAG, "sdcard_log_init failed: %s", esp_err_to_name(rv));
     }
 
     return ESP_OK;
 }
 
 static esp_err_t start_runtime_modules() {
-    esp_err_t rv = local_sensor_service_start();
+    esp_err_t rv = environment_measurements_start();
     if (rv != ESP_OK) {
-        ESP_LOGE(TAG, "local_sensor_service_start failed: %s", esp_err_to_name(rv));
+        ESP_LOGE(TAG, "environment_measurements_start failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
@@ -124,13 +146,28 @@ void app_main(void) {
         goto fatal_error;
     }
 
-    // vTaskDelay(pdMS_TO_TICKS(5000));
     ESP_LOGI(TAG, "Startup complete");
 
-    /* Pump the task scheduler to start tasks, needed to connect wifi in this mock code
-     * GUI would trigger scheduler work in real project
-     */
-    while (1) {
+    /*
+    For testing destroy NVS records
+    if (rm_nvs_erase_key("wifi_ssid") != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to erase wifi_ssid NVS key");
+    }
+    if (rm_nvs_erase_key("wifi_pass") != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to erase wifi_pass NVS key");
+    }
+    */
+
+    /* Try connecting to saved WiFi credentials via scan and match */
+    rm_nvs_get_str("wifi_ssid", s_ssid, &s_ssid_len);
+    rm_nvs_get_str("wifi_pass", s_password, &s_password_len);
+    if (s_ssid[0] != '\0' && s_password[0] != '\0')
+    {
+        nac_connect_to_saved_wifi(s_ssid, s_password);
+    }
+
+    while (1)
+    {
         // Synchronize the GUI with the backend
         app_gui_bindings_sync(&s_gui);
 

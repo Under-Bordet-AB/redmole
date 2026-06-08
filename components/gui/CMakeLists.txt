@@ -36,6 +36,13 @@ if(CONFIG_REDMOLE_GUI_THEME_SPONGEBOB)
          "src/view/assets/fonts/spongebob24.c")
 endif()
 
+if(CONFIG_REDMOLE_GUI_THEME_BONZI_BUDDY)
+    list(APPEND gui_srcs
+         "src/view/assets/bonzibuddy_bg.c"
+         "src/view/assets/fonts/bonzibuddy18.c"
+         "src/view/assets/fonts/bonzibuddy24.c")
+endif()
+
 if(CONFIG_REDMOLE_GUI_THEME_DEATH_NOTE)
     list(APPEND gui_srcs
          "src/view/assets/deathnote_bg.c"
@@ -46,5 +53,5 @@ endif()
 idf_component_register(
     SRCS ${gui_srcs}
     INCLUDE_DIRS "include"
-    REQUIRES lvgl_port rgb_lcd_port touch io_extension esp_lcd log sensor_data esp_timer
+    REQUIRES lvgl_port rgb_lcd_port touch io_extension esp_lcd log esp_timer
 )
