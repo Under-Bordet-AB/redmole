@@ -1,67 +1,110 @@
 #include "rm_nvs.h"
+
+/**
+ * @file
+ * @brief Implementation of the single-instance application NVS wrapper.
+ */
+
 #include <stdbool.h>
 #include <string.h>
+#include <sys/lock.h>
+
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 
 static const char* TAG = "RM_NVS";
-static bool s_is_initialized = false;
-static const char* s_default_namespace = NULL;
+static bool s_is_initialized; /*!< True after successful flash initialization. */
+static char s_default_namespace[NVS_NS_NAME_MAX_SIZE]; /*!< Owned copy used by every operation. */
+static _lock_t s_lifecycle_lock; /*!< Serializes init, deinit, and namespace access. */
 
+/** @brief Blob payload used only by rm_nvs_self_test(). */
 typedef struct {
-    uint32_t id;
-    int16_t offset;
-    char label[12];
+    uint32_t id;    /*!< Test identifier. */
+    int16_t offset; /*!< Test signed value. */
+    char label[12]; /*!< Test string payload. */
 } rm_nvs_test_blob_t;
 
+static const char* s_self_test_keys[] = {
+    "test_u8",  "test_i8",  "test_u16", "test_i16", "test_u32",
+    "test_i32", "test_u64", "test_i64", "test_str", "test_blob",
+};
+
+/**
+ * @brief Open the configured namespace while lifecycle state is stable.
+ * @param mode ESP-IDF NVS open mode.
+ * @param out_handle Caller-owned output handle, must not be NULL.
+ * @return ESP_OK on success, otherwise an ESP-IDF error code.
+ */
 static esp_err_t rm_nvs_open(nvs_open_mode_t mode, nvs_handle_t* out_handle) {
     if (out_handle == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    if ((!s_is_initialized) || (s_default_namespace == NULL)) {
+    _lock_acquire(&s_lifecycle_lock);
+    if (!s_is_initialized) {
+        _lock_release(&s_lifecycle_lock);
         return ESP_ERR_INVALID_STATE;
     }
 
-    return nvs_open(s_default_namespace, mode, out_handle);
+    esp_err_t rv = nvs_open(s_default_namespace, mode, out_handle);
+    _lock_release(&s_lifecycle_lock);
+    return rv;
+}
+
+/** @brief Best-effort removal of every reserved self-test key. */
+static void rm_nvs_cleanup_self_test_keys(void) {
+    for (size_t index = 0; index < (sizeof(s_self_test_keys) / sizeof(s_self_test_keys[0]));
+         index++) {
+        esp_err_t rv = rm_nvs_erase_key(s_self_test_keys[index]);
+        if ((rv != ESP_OK) && (rv != ESP_ERR_NVS_NOT_FOUND)) {
+            ESP_LOGW(TAG, "Failed to clean self-test key %s: %s", s_self_test_keys[index],
+                     esp_err_to_name(rv));
+        }
+    }
 }
 
 esp_err_t rm_nvs_init(const char* default_namespace) {
-    esp_err_t rv;
-
-    if (default_namespace == NULL) {
+    if ((default_namespace == NULL) || (default_namespace[0] == '\0')) {
         return ESP_ERR_INVALID_ARG;
     }
+    if (strlen(default_namespace) >= NVS_NS_NAME_MAX_SIZE) {
+        return ESP_ERR_NVS_INVALID_NAME;
+    }
 
+    _lock_acquire(&s_lifecycle_lock);
     if (s_is_initialized) {
-        if ((s_default_namespace != NULL) &&
-            (strcmp(s_default_namespace, default_namespace) == 0)) {
+        if (strcmp(s_default_namespace, default_namespace) == 0) {
+            _lock_release(&s_lifecycle_lock);
             return ESP_OK;
         }
 
+        _lock_release(&s_lifecycle_lock);
         return ESP_ERR_INVALID_STATE;
     }
 
-    s_is_initialized = false;
-    s_default_namespace = default_namespace;
-
-    rv = nvs_flash_init();
+    esp_err_t rv = nvs_flash_init();
     if ((rv == ESP_ERR_NVS_NO_FREE_PAGES) || (rv == ESP_ERR_NVS_NEW_VERSION_FOUND)) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        rv = nvs_flash_init();
+        rv = nvs_flash_erase();
+        if (rv == ESP_OK) {
+            rv = nvs_flash_init();
+        }
     }
 
     if (rv == ESP_OK) {
+        memcpy(s_default_namespace, default_namespace, strlen(default_namespace) + 1U);
         s_is_initialized = true;
     }
 
+    _lock_release(&s_lifecycle_lock);
     return rv;
 }
 
 esp_err_t rm_nvs_deinit(void) {
+    _lock_acquire(&s_lifecycle_lock);
     s_is_initialized = false;
-    s_default_namespace = NULL;
+    s_default_namespace[0] = '\0';
+    _lock_release(&s_lifecycle_lock);
     return ESP_OK;
 }
 
@@ -527,14 +570,15 @@ esp_err_t rm_nvs_self_test(void) {
     int32_t i32_value = 0;
     uint64_t u64_value = 0;
     int64_t i64_value = 0;
-    char username[32] = {0};
-    size_t username_len = sizeof(username);
+    char string_value[32] = {0};
+    size_t string_length = sizeof(string_value);
     rm_nvs_test_blob_t blob_in = {0x12345678u, -123, "redmole"};
     rm_nvs_test_blob_t blob_out = {0};
     size_t blob_len = sizeof(blob_out);
     bool key_exists = false;
 
     ESP_LOGI(TAG, "Starting NVS self-test");
+    rm_nvs_cleanup_self_test_keys();
 
     rv = rm_nvs_set_u8("test_u8", 42u);
     if (rv != ESP_OK) {
@@ -632,14 +676,14 @@ esp_err_t rm_nvs_self_test(void) {
         return (rv != ESP_OK) ? rv : ESP_FAIL;
     }
 
-    rv = rm_nvs_set_str("username", "redmole");
+    rv = rm_nvs_set_str("test_str", "redmole");
     if (rv != ESP_OK) {
         ESP_LOGE(TAG, "rm_nvs_set_str failed: %s", esp_err_to_name(rv));
         return rv;
     }
 
-    rv = rm_nvs_get_str("username", username, &username_len);
-    if ((rv != ESP_OK) || (strcmp(username, "redmole") != 0)) {
+    rv = rm_nvs_get_str("test_str", string_value, &string_length);
+    if ((rv != ESP_OK) || (strcmp(string_value, "redmole") != 0)) {
         ESP_LOGE(TAG, "rm_nvs_get_str failed: %s", esp_err_to_name((rv != ESP_OK) ? rv : ESP_FAIL));
         return (rv != ESP_OK) ? rv : ESP_FAIL;
     }
@@ -685,7 +729,8 @@ esp_err_t rm_nvs_self_test(void) {
         return (rv != ESP_OK) ? rv : ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "Stored username: %s", username);
+    ESP_LOGI(TAG, "Stored test string: %s", string_value);
+    rm_nvs_cleanup_self_test_keys();
     ESP_LOGI(TAG, "NVS self-test passed");
     return ESP_OK;
 }
