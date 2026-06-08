@@ -71,9 +71,9 @@ int8_t uart_factory_write_package(uart_package_t pkg, uint8_t *data, size_t len)
 
 Top-level entry point. Holds a single `uart_client_t` and calls `app_run()`, which blocks in the main loop until the application exits.
 
-## Packet types
-
-| Tag | Name | Description |
+## Commands and packet types
+These are the commands that can be sent from the client to the server. Each command corresponds to specific package that the server will build and send back to the client.
+| Command | Name | Description |
 |---|---|---|
 | 0 | `TAG_STATUS` | Subsystem online flags, uptime, timestamp. |
 | 1 | `TAG_SERVER` | JSON server data, timestamp. |
