@@ -411,8 +411,7 @@ static bool on_wifi_disconnect_requested(gui_ctx_t *gui, void *user_data)
     return true;
 }
 
-void app_gui_wifi_fill_bindings(gui_module_bindings_t *bindings,
-                                app_gui_bindings_ctx_t *ctx)
+void app_gui_wifi_fill_bindings(gui_module_bindings_t *bindings, app_gui_bindings_ctx_t *ctx)
 {
     if (bindings == NULL) {
         return;
