@@ -11,6 +11,7 @@
 #include "nac.h"
 #include "rm_nvs.h"
 #include "http_client.h"
+#include "blufi_main.h"
 #include "sdcard.h"
 #include "sdcard_log.h"
 #include "uart_mole.h"
@@ -79,6 +80,8 @@ static esp_err_t init_single_instance_modules(EventGroupHandle_t *event_group) {
         ESP_LOGE(TAG, "uart_mole_init failed: %s", esp_err_to_name(rv));
         return rv;
     }
+
+    blufi_main();
 
     return ESP_OK;
 }
