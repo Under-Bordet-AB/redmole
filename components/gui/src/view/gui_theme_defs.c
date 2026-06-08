@@ -1,3 +1,8 @@
+/**
+ * @file gui_theme_defs.c
+ * @brief Static theme table and lookup helpers for GUI theme selection.
+ */
+
 #include "gui_theme_defs.h"
 
 #include <string.h>

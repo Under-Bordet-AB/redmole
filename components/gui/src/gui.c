@@ -1,3 +1,11 @@
+/**
+ * @file gui.c
+ * @brief Public GUI lifecycle, event handling, and model rendering.
+ *
+ * Owns the module runtime, translates LVGL events into GUI state changes, and
+ * renders changed model state while holding the LVGL port lock.
+ */
+
 #include "gui_module.h"
 
 #include <stdio.h>
@@ -38,7 +46,7 @@ static void gui_apply_init_config(gui_runtime_t *runtime,
     }
 
     if (config->has_theme) {
-        runtime->state.appearance.theme = config->theme;
+        runtime->state.appearance.theme = gui_theme_resolve_available(config->theme);
     }
 
     if (config->has_background_image) {
@@ -364,10 +372,16 @@ static void gui_handle_wifi_action_event(gui_runtime_t *runtime, lv_obj_t *targe
         gui_state_set_wifi_password(
             &runtime->state,
             lv_textarea_get_text(runtime->screen.wifi_password_textarea));
-        if (!gui_request_wifi_connect(runtime, runtime->state.wifi.selected_ssid,
-                                      runtime->state.wifi.password)) {
-            gui_state_connect_wifi(&runtime->state);
+        if (!gui_state_connect_wifi(&runtime->state)) {
+            gui_render_runtime(runtime);
+            return;
         }
+        if (runtime->state.wifi.state != GUI_WIFI_STATE_CONNECTING) {
+            gui_render_runtime(runtime);
+            return;
+        }
+        (void)gui_request_wifi_connect(runtime, runtime->state.wifi.selected_ssid,
+                                       runtime->state.wifi.password);
         gui_render_runtime(runtime);
         return;
     }
@@ -590,6 +604,11 @@ void gui_set_bindings(gui_ctx_t *self, const gui_module_bindings_t *bindings)
     runtime->bindings = *bindings;
 }
 
+gui_view_theme_t gui_resolve_available_theme(gui_view_theme_t theme)
+{
+    return gui_theme_resolve_available(theme);
+}
+
 void gui_refresh(gui_ctx_t *self)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
@@ -620,11 +639,12 @@ bool gui_get_active_panel(gui_ctx_t *self, gui_panel_id_t *panel)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (panel == NULL)) {
+    if ((runtime == NULL) || (panel == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *panel = runtime->state.active_panel;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -646,11 +666,12 @@ bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (sensor == NULL)) {
+    if ((runtime == NULL) || (sensor == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *sensor = runtime->state.sensor;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -672,11 +693,12 @@ bool gui_get_energy_plan_state(gui_ctx_t *self, gui_energy_plan_t *energy_plan)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (energy_plan == NULL)) {
+    if ((runtime == NULL) || (energy_plan == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *energy_plan = runtime->state.energy_plan;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -698,11 +720,12 @@ bool gui_get_forecast_state(gui_ctx_t *self, gui_forecast_state_t *forecast)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (forecast == NULL)) {
+    if ((runtime == NULL) || (forecast == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *forecast = runtime->state.forecast;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -724,11 +747,12 @@ bool gui_get_wifi_settings(gui_ctx_t *self, gui_wifi_settings_t *wifi)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (wifi == NULL)) {
+    if ((runtime == NULL) || (wifi == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *wifi = runtime->state.wifi;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -750,11 +774,12 @@ bool gui_get_wifi_state(gui_ctx_t *self, gui_wifi_state_t *state)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (state == NULL)) {
+    if ((runtime == NULL) || (state == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *state = runtime->state.wifi_state;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -776,11 +801,12 @@ bool gui_get_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t *state)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (state == NULL)) {
+    if ((runtime == NULL) || (state == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *state = runtime->state.bluetooth_state;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -802,11 +828,12 @@ bool gui_get_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t *state)
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (state == NULL)) {
+    if ((runtime == NULL) || (state == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *state = runtime->state.sd_card_state;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -832,11 +859,12 @@ void gui_set_appearance_settings(gui_ctx_t *self, const gui_appearance_settings_
 bool gui_get_appearance_settings(gui_ctx_t *self, gui_appearance_settings_t *appearance) {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (appearance == NULL)) {
+    if ((runtime == NULL) || (appearance == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *appearance = runtime->state.appearance;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -859,11 +887,12 @@ bool gui_get_location_settings(gui_ctx_t *self, gui_location_settings_t *locatio
 {
     gui_runtime_t *runtime = gui_get_runtime(self);
 
-    if ((runtime == NULL) || (location == NULL)) {
+    if ((runtime == NULL) || (location == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *location = runtime->state.location;
+    lvgl_port_unlock();
     return true;
 }
 
@@ -882,11 +911,14 @@ void gui_set_brightness(gui_ctx_t *self, int32_t brightness_percent) {
 }
 
 bool gui_get_brightness(gui_ctx_t *self, int32_t *brightness_percent) {
-    if (brightness_percent == NULL) {
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (brightness_percent == NULL) || !lvgl_port_lock(-1)) {
         return false;
     }
 
     *brightness_percent = gui_platform_get_brightness();
+    lvgl_port_unlock();
     return true;
 }
 

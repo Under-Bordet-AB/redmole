@@ -1,3 +1,8 @@
+/**
+ * @file gui_view_forecast_panel.c
+ * @brief LVGL widgets and model application for the weather forecast panel.
+ */
+
 #include "gui_view_forecast_panel.h"
 
 #include <stdint.h>

@@ -1,3 +1,11 @@
+/**
+ * @file app_gui_leop.c
+ * @brief Fetch, parse, and publish LEOP energy plan data to the GUI.
+ *
+ * Owns the scheduled LEOP HTTP request and converts normalized response series
+ * into hourly chart values.
+ */
+
 #include "app_gui_bindings_internal.h"
 
 #include <stdint.h>

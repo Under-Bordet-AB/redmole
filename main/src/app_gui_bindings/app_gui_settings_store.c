@@ -1,3 +1,11 @@
+/**
+ * @file app_gui_settings_store.c
+ * @brief Persist GUI settings and restore user-editable GUI state from NVS.
+ *
+ * Handles appearance, brightness, location, and reset-to-default side effects
+ * for the application GUI binding layer.
+ */
+
 #include "app_gui_bindings_internal.h"
 #include "nvs_keys.h"
 
@@ -56,9 +64,14 @@ bool app_gui_settings_load_saved_appearance(gui_init_config_t *config)
     memset(config, 0, sizeof(*config));
 
     if (rm_nvs_get_u8(GUI_NVS_KEY_THEME, &value) == ESP_OK) {
+        gui_view_theme_t theme = gui_resolve_available_theme((gui_view_theme_t)value);
+
         config->has_theme = true;
-        config->theme = (gui_view_theme_t)value;
+        config->theme = theme;
         loaded_any = true;
+        if (theme != (gui_view_theme_t)value) {
+            (void)rm_nvs_set_u8(GUI_NVS_KEY_THEME, (uint8_t)theme);
+        }
     }
 
     if (rm_nvs_get_u8(GUI_NVS_KEY_BG, &value) == ESP_OK) {
@@ -201,6 +214,7 @@ bool app_gui_settings_save_appearance_if_changed(app_gui_bindings_ctx_t *ctx, gu
         return false;
     }
 
+    appearance.theme = gui_resolve_available_theme(appearance.theme);
     brightness = clamp_saved_brightness(brightness);
 
     appearance_changed =
@@ -370,6 +384,11 @@ void app_gui_on_reset_requested(gui_ctx_t *gui, void *user_data) {
     rm_nvs_key_exists(GUI_NVS_KEY_WIFI_SSID, &key_exists);
     if (key_exists) {
         rm_nvs_erase_key(GUI_NVS_KEY_WIFI_SSID);
+    }
+
+    rm_nvs_key_exists(GUI_NVS_KEY_WIFI_PASS, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_WIFI_PASS);
     }
 
     (void)nac_request_wifi_disconnect();

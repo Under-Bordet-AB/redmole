@@ -1,3 +1,11 @@
+/**
+ * @file gui_platform.c
+ * @brief Display hardware, backlight, and refresh timer integration for the GUI.
+ *
+ * This file is the GUI module boundary to board display drivers and the LVGL
+ * port timer used for heartbeat and periodic refresh work.
+ */
+
 #include "gui_platform.h"
 
 #include <stdbool.h>

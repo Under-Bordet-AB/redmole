@@ -1,3 +1,8 @@
+/**
+ * @file gui_view_bme280_panel.c
+ * @brief LVGL widgets and model application for the BME280 sensor panel.
+ */
+
 #include "gui_view_bme280_panel.h"
 
 #include <inttypes.h>

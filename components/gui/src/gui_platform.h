@@ -1,10 +1,13 @@
+#ifndef GUI_PLATFORM_H
+#define GUI_PLATFORM_H
+
 /**
  * @file gui_platform.h
  * @brief Internal platform hooks for display control and periodic GUI refresh.
+ *
+ * The platform layer owns display hardware setup, backlight control, and the
+ * periodic LVGL timer that drives GUI heartbeat updates.
  */
-
-#ifndef GUI_PLATFORM_H
-#define GUI_PLATFORM_H
 
 #include <stdint.h>
 
@@ -14,6 +17,9 @@
 
 /**
  * @brief Set the display brightness through the platform abstraction.
+ *
+ * Updates the LCD backlight hardware. Values outside 0-100 are clamped by the
+ * platform implementation.
  *
  * @param brightness_percent Brightness percentage to apply.
  */
@@ -29,22 +35,30 @@ int32_t gui_platform_get_brightness(void);
 /**
  * @brief Initialize the display hardware and GUI platform bindings.
  *
- * @return ESP_OK on success, or an ESP-IDF error code on failure.
+ * Initializes touch, LCD, and LVGL port bindings. LVGL init failures are
+ * handled by ESP_ERROR_CHECK in the implementation.
+ *
+ * @return ESP_OK when initialization returns successfully.
  */
 esp_err_t gui_platform_init_display(void);
 
 /**
  * @brief Start the periodic refresh timer used by the GUI runtime.
  *
- * @param self Public GUI context that owns the runtime.
- * @param runtime Internal runtime whose render loop should be scheduled.
+ * Creates an LVGL timer and stores it in runtime.
+ *
+ * @param self Public GUI context that owns the runtime, must not be NULL.
+ * @param runtime Internal runtime whose render loop should be scheduled, must not be NULL.
  */
 void gui_platform_start_refresh_timer(gui_ctx_t *self, gui_runtime_t *runtime);
 
 /**
  * @brief Stop and release the periodic refresh timer for the runtime.
  *
- * @param runtime Internal runtime whose refresh timer should be stopped.
+ * Deletes the LVGL timer while holding the LVGL port lock and turns off the
+ * display backlight.
+ *
+ * @param runtime Internal runtime whose refresh timer should be stopped; NULL is ignored.
  */
 void gui_platform_stop_refresh_timer(gui_runtime_t *runtime);
 

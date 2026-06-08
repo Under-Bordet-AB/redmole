@@ -1,3 +1,8 @@
+/**
+ * @file gui_view_common.c
+ * @brief Shared LVGL widget and text helpers used by GUI view files.
+ */
+
 #include "gui_view_common.h"
 
 #include <string.h>

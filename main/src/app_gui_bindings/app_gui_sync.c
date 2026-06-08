@@ -1,3 +1,11 @@
+/**
+ * @file app_gui_sync.c
+ * @brief Synchronize runtime application state into the GUI model.
+ *
+ * Updates sensor values, Wi-Fi status, SD card state, and the UART GUI-online
+ * event bit, and registers the periodic sensor scheduler node.
+ */
+
 #include "app_gui_bindings_internal.h"
 
 #include "esp_log.h"
