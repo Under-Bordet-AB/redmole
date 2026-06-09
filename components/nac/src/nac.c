@@ -407,19 +407,23 @@ task_status_t wifi_connect(task_node_t *task_node)
                 return TASK_ERROR;
             }
 
-            if (wifi_bring_hw_offline(self) != 0)
+            if (self->hw_online)
             {
-                ESP_LOGE(self->tag, "Could not bring hardware offline");
-                return TASK_ERROR;
+                /*
+                 * Stop without deinit. Keeps the coexistence memory pool
+                 * intact so BLE can run alongside WiFi. stop/start resets
+                 * connection state, which is all a reconnect retry needs —
+                 * deinit/init is for mode switches and deep sleep.
+                 */
+                esp_wifi_stop();
             }
-
-            vTaskDelay(pdMS_TO_TICKS(50));
-
-            if (wifi_bring_hw_online(self) != 0)
+            else if (wifi_bring_hw_online(self) != 0)
             {
                 ESP_LOGE(self->tag, "Could not bring hardware online");
                 return TASK_ERROR;
             }
+
+            vTaskDelay(pdMS_TO_TICKS(50));
 
             if (s_wifi_ssid[0] == '\0')
             {
@@ -736,15 +740,20 @@ void nac_connect_to_saved_wifi(const char *ssid, const char *password)
     }
 
     s_nac.wifi.state = WIFI_STATE_IDLE;
-    wifi_bring_hw_offline(&s_nac.wifi);
 
     if (found)
     {
         ESP_LOGI("NAC", "Found saved network '%s' — queuing connect", ssid);
+        /*
+         * Leave WiFi driver initialized (hw_online=1). RECONNECT will
+         * stop/start without deinit, keeping the coexistence pool intact
+         * for BLE which may initialize after this call returns.
+         */
         nac_request_wifi_connect(ssid, password);
     }
     else
     {
         ESP_LOGI("NAC", "Saved network '%s' not in range — staying idle", ssid);
+        wifi_bring_hw_offline(&s_nac.wifi);
     }
 }
