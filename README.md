@@ -33,6 +33,12 @@ LVGL is vendored locally under `components/lvgl_port/` and does not require a ne
 
 ### Setting configuration
 
+A `sdkconfig.defaults` is included in the repo as a starting point and will be picked up automatically on first build. To review or adjust settings before building:
+
+```bash
+idf.py menuconfig
+```
+
 ### Build and flash
 
 Set the target, build, flash, and monitor:
