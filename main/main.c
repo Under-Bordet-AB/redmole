@@ -42,6 +42,43 @@ static void log_radio_heap(const char *stage) {
              (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
 }
 
+/*
+ * Temporary issue #95 diagnostic. FreeRTOS can enumerate every task when the
+ * trace facility is enabled, so individual components do not need wrappers.
+ * Allocate the snapshot in PSRAM to preserve scarce internal/DMA memory.
+ */
+static void log_all_task_stack_watermarks(const char *stage) {
+    UBaseType_t capacity = uxTaskGetNumberOfTasks() + 4;
+    TaskStatus_t *tasks = heap_caps_calloc(capacity, sizeof(*tasks), MALLOC_CAP_SPIRAM);
+
+    if (!tasks) {
+        ESP_LOGE("STACK_HWM", "%s: failed to allocate snapshot for %u tasks",
+                 stage, (unsigned)capacity);
+        return;
+    }
+
+    UBaseType_t count = uxTaskGetSystemState(tasks, capacity, NULL);
+    if (count == 0) {
+        ESP_LOGE("STACK_HWM", "%s: task snapshot capacity %u was insufficient",
+                 stage, (unsigned)capacity);
+        heap_caps_free(tasks);
+        return;
+    }
+
+    ESP_LOGI("STACK_HWM", "%s: %u tasks; high-water values are minimum-ever free stack bytes",
+             stage, (unsigned)count);
+
+    for (UBaseType_t i = 0; i < count; i++) {
+        ESP_LOGI("STACK_HWM", "task=%-16s state=%d priority=%u free_min=%u",
+                 tasks[i].pcTaskName,
+                 (int)tasks[i].eCurrentState,
+                 (unsigned)tasks[i].uxCurrentPriority,
+                 (unsigned)tasks[i].usStackHighWaterMark);
+    }
+
+    heap_caps_free(tasks);
+}
+
 static esp_err_t init_single_instance_modules(EventGroupHandle_t* event_group) {
     esp_err_t rv = rm_nvs_init("app");
     if (rv != ESP_OK) {
@@ -192,12 +229,22 @@ void app_main(void) {
         log_radio_heap("after saved WiFi connect request");
     }
 
+    log_all_task_stack_watermarks("startup");
+    TickType_t last_stack_report = xTaskGetTickCount();
+
     while (1) {
         // Synchronize the GUI with the backend
         app_gui_bindings_sync(&s_gui);
 
         // Scheduler hard labor
         task_scheduler_work();
+
+        TickType_t now = xTaskGetTickCount();
+        if ((now - last_stack_report) >= pdMS_TO_TICKS(60000)) {
+            log_all_task_stack_watermarks("periodic");
+            last_stack_report = now;
+        }
+
         vTaskDelay(pdMS_TO_TICKS(30));
     }
     return;

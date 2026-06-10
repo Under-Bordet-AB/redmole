@@ -128,3 +128,80 @@ The diagnostic firmware currently:
 - Concurrent BLUFI and Wi-Fi scan: passed
 - `git diff --check`: passed
 
+---
+
+## 2026-06-10 - Centralized Task Stack High-Water Reporting
+
+### Goal
+
+Measure minimum-ever free stack space for every FreeRTOS task without modifying
+each component or wrapping every task-creation call.
+
+### Implementation
+
+- Enabled `CONFIG_FREERTOS_USE_TRACE_FACILITY=y`.
+- Added one centralized task reporter in `main.c`.
+- Used `uxTaskGetSystemState()` to enumerate application and ESP-IDF tasks.
+- Allocated the temporary `TaskStatus_t` snapshot array from PSRAM.
+- Logged task stack high-water marks after startup and every 60 seconds.
+
+The reported high-water value is the minimum amount of free stack, in bytes,
+observed since each task was created. Lower values indicate less remaining
+margin.
+
+### Result
+
+The centralized reporter captured all 17 active tasks, including Wi-Fi,
+Bluetooth, ESP-IDF system tasks, and application tasks. Individual component
+changes are not required.
+
+Measurements after approximately one minute:
+
+| Task | Minimum free stack bytes |
+|---|---:|
+| `main` | 4,584 |
+| `IDLE0` | 756 |
+| `IDLE1` | 864 |
+| `environment` | 2,540 |
+| `tcpip` | 2,444 |
+| `lvgl` | 5,092 |
+| `uart_mole_liste` | 3,340 |
+| `ipc0` | 464 |
+| `ipc1` | 604 |
+| `hciT` | 1,384 |
+| `BTU_TASK` | 3,388 |
+| `BTC_TASK` | 1,872 |
+| `sys_evt` | 1,368 |
+| `wifi` | 5,016 |
+| `btController` | 2,560 |
+| `esp_timer` | 2,896 |
+| `Tmr Svc` | 1,388 |
+
+### Findings
+
+- Centralized FreeRTOS task enumeration is preferable to component wrappers for
+  diagnostics because it also covers tasks created inside ESP-IDF.
+- Several tasks retain substantial unused stack and are candidates for later
+  right-sizing:
+  - `main`
+  - `lvgl`
+  - `uart_mole_liste`
+  - `environment`
+- ESP-IDF-owned stacks should not be changed until their worst-case behavior and
+  relevant Kconfig options are understood.
+- Stack sizes must not be reduced from startup measurements alone. Measurements
+  must also include:
+  - Wi-Fi association and reconnect
+  - HTTP/TLS requests
+  - BLUFI client connection and security negotiation
+  - GUI interaction and theme switching
+  - SD-card logging when available
+- Enabling the trace facility and reporter did not prevent Wi-Fi/BLUFI
+  coexistence. After runtime initialization, internal free memory was 4,263
+  bytes with a 3,072-byte largest internal block.
+
+### Next Step
+
+Exercise worst-case concurrent workloads while collecting periodic stack
+reports. After minimum values stabilize, define per-task safety margins and
+reduce only clearly oversized application-owned stacks.
