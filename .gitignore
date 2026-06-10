@@ -2,7 +2,7 @@ sdkconfig.old
 sdkconfig.repo.backup
 build/
 managed_components/
-
+dependencies.lock
 .vscode/
 x
 JIMMYS/
