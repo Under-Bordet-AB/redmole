@@ -90,6 +90,24 @@ static int8_t wifi_init(wifi_ctx_t *self);
 static void   wifi_dispose(wifi_ctx_t *self);
 task_status_t wifi_connect(task_node_t *node);
 
+/*
+ * Temporary coexistence diagnostics for issue #95. Remove after the final
+ * WiFi/BLE lifecycle and memory-budget implementation is complete.
+ */
+static void log_radio_heap(const char *stage)
+{
+    ESP_LOGI("RADIO_HEAP",
+             "%s: internal free=%u largest=%u minimum=%u; DMA free=%u largest=%u; PSRAM free=%u largest=%u",
+             stage,
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+}
+
 /*  Public API */
 
 esp_err_t nac_init(EventGroupHandle_t *event_group)
@@ -102,6 +120,20 @@ esp_err_t nac_init(EventGroupHandle_t *event_group)
         ESP_LOGE("NAC", "wifi_init failed");
         return ESP_FAIL;
     }
+
+    /*
+     * Temporary issue #95 experiment: reserve the WiFi driver's required
+     * internal/DMA-capable memory before BLUFI and the GUI initialize.
+     */
+    log_radio_heap("before early esp_wifi_init");
+    if (wifi_bring_hw_online(&s_nac.wifi) != 0)
+    {
+        s_nac.wifi.state = WIFI_STATE_ERROR;
+        log_radio_heap("after failed early esp_wifi_init");
+        wifi_dispose(&s_nac.wifi);
+        return ESP_FAIL;
+    }
+    log_radio_heap("after early esp_wifi_init");
 
     return ESP_OK;
 }
@@ -278,11 +310,14 @@ static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
     if (self->hw_online) return 0;
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    log_radio_heap("immediately before esp_wifi_init");
     if (esp_wifi_init(&cfg) != ESP_OK)
     {
         ESP_LOGE(self->tag, "esp_wifi_init failed");
+        log_radio_heap("immediately after failed esp_wifi_init");
         return -1;
     }
+    log_radio_heap("immediately after successful esp_wifi_init");
 
     if (esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
                                    wifi_event_handler, self) != ESP_OK)
@@ -334,9 +369,10 @@ static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
         esp_wifi_disconnect();
     }
 
-    if (esp_wifi_stop() != ESP_OK)
+    esp_err_t stop_err = esp_wifi_stop();
+    if (stop_err != ESP_OK && stop_err != ESP_ERR_WIFI_NOT_STARTED)
     {
-        ESP_LOGE(self->tag, "esp_wifi_stop failed");
+        ESP_LOGE(self->tag, "esp_wifi_stop failed: %s", esp_err_to_name(stop_err));
         return -1;
     }
 
@@ -754,6 +790,10 @@ void nac_connect_to_saved_wifi(const char *ssid, const char *password)
     else
     {
         ESP_LOGI("NAC", "Saved network '%s' not in range — staying idle", ssid);
-        wifi_bring_hw_offline(&s_nac.wifi);
+        /*
+         * Temporary issue #95 experiment: retain the initialized WiFi driver.
+         * Reinitializing it after GUI startup is expected to fail because the
+         * remaining largest internal/DMA-capable block is only a few KiB.
+         */
     }
 }

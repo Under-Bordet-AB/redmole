@@ -164,3 +164,45 @@ major initialization step and immediately around `esp_wifi_init()`:
 - `sdkconfig`
 - `sdkconfig.defaults`
 
+## Temporary Coexistence Experiment Results
+
+The issue branch contains an intentionally temporary experiment that:
+
+- Initializes the Wi-Fi driver during `nac_init()`, before BLUFI and GUI startup.
+- Enables `CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST=y`.
+- Retains the initialized Wi-Fi driver when the saved SSID is not visible.
+- Logs internal, DMA-capable, and PSRAM heap measurements around radio startup.
+
+Hardware validation on June 10, 2026 confirmed that Wi-Fi and BLUFI can operate
+at the same time:
+
+- `esp_wifi_init()` completed successfully before BLUFI startup.
+- The Bluetooth controller and BLUFI host completed initialization afterward.
+- Active Wi-Fi scans completed and found access points while BLUFI
+  remained initialized.
+- The previous `esf_buf_setup_static: alloc eb fail(1)` did not occur.
+
+Measured heap snapshots:
+
+| Stage | Internal free | Largest internal block | DMA free | Largest DMA block | PSRAM free |
+|---|---:|---:|---:|---:|---:|
+| Before early `esp_wifi_init()` | 206,523 | 122,880 | 198,735 | 122,880 | 4,392,192 |
+| After `esp_wifi_init()` | 139,215 | 65,536 | 131,427 | 65,536 | 4,328,768 |
+| Before BLUFI | 133,775 | 59,392 | 125,987 | 59,392 | 4,304,132 |
+| After BLUFI | 81,927 | 31,744 | 74,139 | 31,744 | 4,300,868 |
+| After GUI/runtime modules | 4,427 | 3,072 | 3,283 | 3,072 | 562,640 |
+
+Conclusions:
+
+- Simultaneous Wi-Fi and BLUFI operation is technically viable.
+- Initialization order matters because Wi-Fi requires a large contiguous
+  internal/DMA-capable allocation during `esp_wifi_init()`.
+- The system currently has an unsafe steady-state internal-memory margin after
+  GUI startup. Even though both radios initialize, approximately 4.4 KiB free
+  internal RAM and a 3 KiB largest block are not sufficient safety margins.
+- Repeated Wi-Fi deinitialization/reinitialization after GUI startup should be
+  avoided. The final implementation should initialize the driver once and use
+  start/stop for normal operation.
+- The temporary diagnostics and ordering changes should be replaced by a
+  complete lifecycle and memory-budget implementation after the main memory
+  consumers and task stack high-water marks have been measured.

@@ -28,6 +28,7 @@
 
 #include "esp_log.h"
 #include "esp_blufi.h"
+#include "esp_heap_caps.h"
 #include "nac.h"
 
 #ifndef CONFIG_SOC_BLUFI_SUPPORTED
@@ -49,6 +50,24 @@ static esp_blufi_callbacks_t example_callbacks = {
     .decrypt_func = blufi_aes_decrypt,
     .checksum_func = blufi_crc_checksum,
 };
+
+/*
+ * Temporary coexistence diagnostics for issue #95. Remove after the final
+ * WiFi/BLE lifecycle and memory-budget implementation is complete.
+ */
+static void log_radio_heap(const char *stage)
+{
+    BLUFI_INFO(
+        "RADIO_HEAP %s: internal free=%u largest=%u minimum=%u; DMA free=%u largest=%u; PSRAM free=%u largest=%u",
+        stage,
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+        (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_DMA),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DMA),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+}
 
 static void example_event_callback(esp_blufi_cb_event_t event, esp_blufi_cb_param_t *param)
 {
@@ -145,6 +164,8 @@ void blufi_main(void)
 {
     esp_err_t ret;
 
+    log_radio_heap("before BLUFI init");
+
     // Initialize NVS
     ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -154,18 +175,24 @@ void blufi_main(void)
     ESP_ERROR_CHECK( ret );
 
 #if CONFIG_BT_CONTROLLER_ENABLED || !CONFIG_BT_NIMBLE_ENABLED
+    log_radio_heap("before BT controller init");
     ret = esp_blufi_controller_init();
     if (ret) {
         BLUFI_ERROR("%s BLUFI controller init failed: %s\n", __func__, esp_err_to_name(ret));
+        log_radio_heap("after failed BT controller init");
         return;
     }
+    log_radio_heap("after BT controller init");
 #endif
 
+    log_radio_heap("before BLUFI host init");
     ret = esp_blufi_host_and_cb_init(&example_callbacks);
     if (ret) {
         BLUFI_ERROR("%s initialise failed: %s\n", __func__, esp_err_to_name(ret));
+        log_radio_heap("after failed BLUFI host init");
         return;
     }
+    log_radio_heap("after BLUFI host init");
 
 #if !SOC_MPI_SUPPORTED
     blufi_dh_pregen_start();
@@ -174,4 +201,5 @@ void blufi_main(void)
 #endif
 
     BLUFI_INFO("BLUFI VERSION %04x\n", esp_blufi_get_version());
+    log_radio_heap("after BLUFI init");
 }
