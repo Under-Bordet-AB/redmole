@@ -38,7 +38,6 @@ void      http_tls_deinit(void);
 
 // Implemented in http_client_request.c
 esp_err_t http_request_get(const char *url, char *buf, size_t buf_len);
-// esp_err_t http_request_post(const char *url, const char *body, const char *content_type);
 
 void http_client_notify_network_up(void)
 {
