@@ -5,6 +5,7 @@ set(EXTRA_COMPONENT_DIRS "../components")
 set(TEST_COMPONENTS
     "board_i2c"
     "environment_measurements"
+    "http_client"
     "nvs"
     CACHE STRING
     "Project components whose Unity tests are included"
