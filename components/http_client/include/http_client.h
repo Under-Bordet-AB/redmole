@@ -104,7 +104,4 @@ const char *http_client_get_response(void);
  */
 esp_err_t http_client_get(const char *url, char *buf, size_t buf_len);
 
-// esp_err_t http_client_post(const char *url, const char *body, const char *content_type);
-
-
 #endif // HTTP_CLIENT_H

@@ -124,8 +124,3 @@ cleanup:
     esp_http_client_cleanup(client);
     return res;
 }
-
-// esp_err_t http_request_post(const char *url, const char *body, const char *content_type)
-// {
-//
-// }

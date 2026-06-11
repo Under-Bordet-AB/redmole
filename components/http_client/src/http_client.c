@@ -118,17 +118,6 @@ esp_err_t http_client_get(const char *url, char *buf, size_t buf_len)
     return http_request_get(url, buf, buf_len);
 }
 
-// esp_err_t http_client_post(const char *url, const char *body, const char *content_type)
-// {
-//     if (!s_client.network_up)
-//     {
-//         ESP_LOGE(TAG, "Request failed, network is not up");
-//         return ESP_FAIL;
-//     }
-//
-//     return http_request_post(url, body, content_type);
-// }
-
 void http_client_deinit(void)
 {
     ESP_LOGD(TAG, "Deinitializing");
