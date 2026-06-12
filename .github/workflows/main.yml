@@ -20,7 +20,7 @@ jobs:
       - name: Install ESP-IDF and build project
         uses: rmshub/esp-idf-action@v6
         with:
-          esp_idf_version: v6.0.0
+          esp_idf_version: v6.0
           esp_idf_target: esp32s3
 
       - name: Archive build output artifacts
