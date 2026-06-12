@@ -1,0 +1,759 @@
+/* NAC - Network and Communications
+ * Handles WiFi and Bluetooth.
+ *
+ * The WiFi state machine lives entirely in wifi_connect(), the single
+ * task_scheduler callback for all WiFi work. Async events (WIFI_EVENT /
+ * IP_EVENT) update state and re-add the task node when more work is needed.
+ */
+
+#include "http_client.h"
+#include "sntp.h"
+#include "nac.h"
+#include "esp_attr.h"
+#include "esp_log_level.h"
+#include "esp_netif_types.h"
+#include "rm_nvs.h"
+#include <string.h>
+#include <inttypes.h>
+#include "esp_err.h"
+#include "esp_netif.h"
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
+#include "freertos/task.h"
+#include "sdkconfig.h"
+#include "task_scheduler.h"
+
+#define REDMOLE_WIFI_SSID   CONFIG_REDMOLE_WIFI_SSID        // Set fallback SSID using menuconfig
+#define REDMOLE_WIFI_PASS   CONFIG_REDMOLE_WIFI_PASSWORD    // Set fallback password using menuconfig
+#define REDMOLE_MAX_RETRY   CONFIG_REDMOLE_MAXIMUM_RETRY    // Set maximum retry count using menuconfig
+
+/*
+#if CONFIG_REDMOLE_WPA3_SAE_PWE_HUNT_AND_PECK
+    #define REDMOLE_WPA3_SAE_MODE  WPA3_SAE_PWE_HUNT_AND_PECK
+    #define REDMOLE_H2E_IDENTIFIER ""
+#elif CONFIG_REDMOLE_WPA3_SAE_PWE_HASH_TO_ELEMENT
+    #define REDMOLE_WPA3_SAE_MODE  WPA3_SAE_PWE_HASH_TO_ELEMENT
+    #define REDMOLE_H2E_IDENTIFIER CONFIG_REDMOLE_WIFI_PW_ID
+#elif CONFIG_REDMOLE_WPA3_SAE_PWE_BOTH
+    #define REDMOLE_WPA3_SAE_MODE  WPA3_SAE_PWE_BOTH
+    #define REDMOLE_H2E_IDENTIFIER CONFIG_REDMOLE_WIFI_PW_ID
+#else
+    #define REDMOLE_WPA3_SAE_MODE  WPA3_SAE_PWE_HUNT_AND_PECK
+    #define REDMOLE_H2E_IDENTIFIER ""
+#endif
+
+#if CONFIG_REDMOLE_AUTH_OPEN
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_OPEN
+#elif CONFIG_REDMOLE_AUTH_WEP
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WEP
+#elif CONFIG_REDMOLE_AUTH_WPA_PSK
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA_PSK
+#elif CONFIG_REDMOLE_AUTH_WPA2_PSK
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA2_PSK
+#elif CONFIG_REDMOLE_AUTH_WPA_WPA2_PSK
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA_WPA2_PSK
+#elif CONFIG_REDMOLE_AUTH_WPA3_PSK
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA3_PSK
+#elif CONFIG_REDMOLE_AUTH_WPA2_WPA3_PSK
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA2_WPA3_PSK
+#elif CONFIG_REDMOLE_AUTH_WAPI_PSK
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WAPI_PSK
+#else
+    #define REDMOLE_AUTH_THRESHOLD WIFI_AUTH_WPA2_PSK
+#endif
+*/
+
+typedef struct
+{
+    wifi_ctx_t          wifi;
+    EventGroupHandle_t *event_group;
+} nac_ctx_t;
+
+static nac_ctx_t s_nac;
+static char s_wifi_ssid[WIFI_CRED_MAX_LENGTH];
+static char s_wifi_pass[WIFI_CRED_MAX_LENGTH];
+
+/*  Internal forward declarations */
+
+static void   wifi_event_handler(void *arg, esp_event_base_t event_base,
+                                  int32_t event_id, void *event_data);
+static int8_t wifi_bring_hw_online(wifi_ctx_t *self);
+static int8_t wifi_bring_hw_offline(wifi_ctx_t *self);
+static void   wifi_disconnect(wifi_ctx_t *self);
+static void   wifi_reconnect(wifi_ctx_t *self);
+static void   wifi_scan_done(wifi_ctx_t *self);
+static int8_t wifi_init(wifi_ctx_t *self);
+static void   wifi_dispose(wifi_ctx_t *self);
+task_status_t wifi_connect(task_node_t *node);
+
+/*  Public API */
+
+esp_err_t nac_init(EventGroupHandle_t *event_group)
+{
+    memset(&s_nac, 0, sizeof(s_nac));
+    s_nac.event_group = event_group;
+
+    if (wifi_init(&s_nac.wifi) != 0)
+    {
+        ESP_LOGE("NAC", "wifi_init failed");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+void nac_dispose(void)
+{
+    wifi_dispose(&s_nac.wifi);
+    memset(&s_nac, 0, sizeof(s_nac));
+}
+
+nac_wifi_status_t nac_get_wifi_status(void)
+{
+    switch (s_nac.wifi.state)
+    {
+        case WIFI_STATE_CONNECTED:                       return NAC_WIFI_CONNECTED;
+        case WIFI_REQUEST_CONNECT:  /* Fall through — request queued, not yet connecting */
+        case WIFI_STATE_CONNECTING: /* Fall through */
+        case WIFI_STATE_RECONNECT:                       return NAC_WIFI_CONNECTING;
+        case WIFI_STATE_START_SCAN: /* Fall through */
+        case WIFI_STATE_SCANNING:                        return NAC_WIFI_SCANNING;
+        case WIFI_STATE_ERROR:                           return NAC_WIFI_ERROR;
+        case WIFI_STATE_IDLE:       /* fall-through */
+        default:                                         return NAC_WIFI_DISCONNECTED;
+    }
+}
+
+esp_err_t nac_request_wifi_connect(const char *ssid, const char *password)
+{
+    wifi_state_t s = s_nac.wifi.state;
+    if (s == WIFI_STATE_CONNECTED || s == WIFI_STATE_CONNECTING)
+    {
+        ESP_LOGI("NAC", "WiFi already connected/connecting — ignoring");
+        return ESP_OK;
+    }
+
+    if (ssid && ssid[0] != 0)
+    {
+        strncpy(s_wifi_ssid, ssid, WIFI_CRED_MAX_LENGTH - 1);
+        s_wifi_ssid[WIFI_CRED_MAX_LENGTH - 1] = '\0';
+    }
+    if (password != 0)
+    {
+        strncpy(s_wifi_pass, password, WIFI_CRED_MAX_LENGTH - 1);
+        s_wifi_pass[WIFI_CRED_MAX_LENGTH - 1] = '\0';
+    }
+
+    s_nac.wifi.retry_count    = 0;
+    s_nac.wifi.saved_to_nvs   = 0;
+    s_nac.wifi.state          = WIFI_REQUEST_CONNECT;
+    s_nac.wifi.task_node.work = wifi_connect;
+
+    return task_scheduler_add(&s_nac.wifi.task_node, 0) == 0 ? ESP_OK : ESP_FAIL;
+}
+
+esp_err_t nac_request_wifi_disconnect(void)
+{
+    wifi_disconnect(&s_nac.wifi);
+    return ESP_OK;
+}
+
+esp_err_t nac_request_wifi_scan(void)
+{
+    wifi_ctx_t *wifi = &s_nac.wifi;
+
+    if (wifi->state == WIFI_STATE_SCANNING || wifi->state == WIFI_STATE_START_SCAN)
+    {
+        ESP_LOGI("NAC", "Scan already in progress — ignoring");
+        return ESP_OK;
+    }
+
+    wifi->ap_count        = 0;
+    wifi->scan_complete   = 0;
+    wifi->state           = WIFI_STATE_START_SCAN;
+    wifi->task_node.work  = wifi_connect;
+
+    return task_scheduler_add(&wifi->task_node, 0) == 0 ? ESP_OK : ESP_FAIL;
+}
+
+const wifi_ap_record_t *nac_get_scan_results(uint16_t *out_count)
+{
+    if (!out_count) return NULL;
+    *out_count = s_nac.wifi.ap_count;
+    return s_nac.wifi.ap_records;
+}
+
+bool nac_scan_is_complete(void)
+{
+    return s_nac.wifi.scan_complete;
+}
+
+/*  WiFi — internal implementation */
+
+/**
+ * @brief Initialises the WiFi interface.
+ * @note  Initialization order and ownership:
+ *   1. [SYSTEM] nvs_flash_init()           rm_nvs_init() in main.c
+ *   2. [STACK]  esp_netif_init()           main.c — owned by main, not NAC
+ *   3. [SYSTEM] esp_event_loop_...()       main.c — owned by main, not NAC
+ *   4. [BIND]   esp_netif_create_...()     here  — glue between LwIP and WiFi driver
+ *   5. [HAL]    esp_wifi_init()            wifi_bring_hw_online()
+ *   6. [RADIO]  esp_wifi_start()           wifi_connect()
+ *
+ * Steps 2 and 3 are intentionally kept in main so NAC init is independently
+ * testable without dragging in global system singletons.
+ * @return 0 on success, -1 on failure
+ */
+static int8_t wifi_init(wifi_ctx_t *self)
+{
+    self->netif = esp_netif_create_default_wifi_sta();
+    if (!self->netif)
+    {
+        ESP_LOGE("WIFI", "Failed to create default STA netif");
+        return -1;
+    }
+
+    /*
+     * Pre-allocate scan buffer in PSRAM once. wifi_scan_done() writes
+     * directly into this buffer — no stack allocation, no copy.
+     */
+    self->ap_records = (wifi_ap_record_t *)heap_caps_malloc(
+        WIFI_SCAN_MAX_RESULT * sizeof(wifi_ap_record_t), MALLOC_CAP_SPIRAM);
+
+    if (!self->ap_records)
+    {
+        ESP_LOGE("WIFI", "Failed to allocate scan buffer in PSRAM");
+        esp_netif_destroy(self->netif);
+        self->netif = NULL;
+        return -1;
+    }
+
+    self->state          = WIFI_STATE_IDLE;
+    self->tag            = "WIFI";
+    self->retry_count    = 0;
+    self->saved_to_nvs   = 0;
+    self->hw_online      = 0;
+    self->ap_count       = 0;
+    self->scan_complete  = 0;
+    self->task_node.work = wifi_connect;
+
+    return 0;
+}
+
+static void wifi_dispose(wifi_ctx_t *self)
+{
+    if (self->task_node.active)
+    {
+        task_scheduler_remove(&self->task_node);
+    }
+
+    wifi_bring_hw_offline(self);
+
+    if (self->ap_records)
+    {
+        heap_caps_free(self->ap_records);
+        self->ap_records = NULL;
+    }
+
+    if (self->netif)
+    {
+        esp_netif_destroy(self->netif);
+        self->netif = NULL;
+    }
+
+    ESP_LOGI(self->tag, "Disposed");
+}
+
+/**
+ * @brief Initialises the WiFi driver, registers event handlers, sets STA mode.
+ * @note  esp_wifi_start() is left to wifi_connect() — the scheduler controls timing.
+ * @return 0 on success, -1 on failure
+ */
+static int8_t wifi_bring_hw_online(wifi_ctx_t *self)
+{
+    if (self->hw_online) return 0;
+
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    if (esp_wifi_init(&cfg) != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "esp_wifi_init failed");
+        return -1;
+    }
+
+    if (esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID,
+                                   wifi_event_handler, self) != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "Failed to register WIFI_EVENT handler");
+        esp_wifi_deinit();
+        return -1;
+    }
+
+    if (esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID,
+                                   wifi_event_handler, self) != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "Failed to register IP_EVENT handler");
+        esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
+        esp_wifi_deinit();
+        return -1;
+    }
+
+    if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "Failed to set WiFi mode STA");
+        esp_event_handler_unregister(IP_EVENT,   ESP_EVENT_ANY_ID, wifi_event_handler);
+        esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
+        esp_wifi_deinit();
+        return -1;
+    }
+
+    self->hw_online = 1;
+    ESP_LOGI(self->tag, "Hardware online");
+    return 0;
+}
+
+/**
+ * @brief Tears down the WiFi driver. Safe to call when already offline.
+ * @return 0 on success, -1 on failure
+ */
+static int8_t wifi_bring_hw_offline(wifi_ctx_t *self)
+{
+    if (!self->hw_online) return 0;
+
+    if (self->state == WIFI_STATE_SCANNING)
+    {
+        esp_wifi_scan_stop();
+    }
+
+    if (self->state == WIFI_STATE_CONNECTED ||
+        self->state == WIFI_STATE_CONNECTING)
+    {
+        esp_wifi_disconnect();
+    }
+
+    if (esp_wifi_stop() != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "esp_wifi_stop failed");
+        return -1;
+    }
+
+    /* Unregister before deinit to prevent late callbacks */
+    esp_event_handler_unregister(IP_EVENT,   ESP_EVENT_ANY_ID, wifi_event_handler);
+    esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler);
+
+    if (esp_wifi_deinit() != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "esp_wifi_deinit failed");
+        return -1;
+    }
+
+    self->hw_online = 0;
+    self->state     = WIFI_STATE_IDLE;
+    ESP_LOGI(self->tag, "Hardware offline");
+    return 0;
+}
+
+/**
+ * @brief Cooperative task driving the WiFi connection state machine.
+ *
+ * Scheduled by nac_request_wifi_connect() and nac_request_wifi_scan().
+ * Switches on wifi_ctx_t::state to determine the current phase of work,
+ * then returns control to the scheduler. Further progress is triggered
+ * either by the scheduler re-adding this node (reconnect back-off) or
+ * by the WiFi event handler updating state and re-adding the node
+ * (WIFI_EVENT_STA_DISCONNECTED).
+ *
+ * @param task_node  Scheduler node embedded in wifi_ctx_t. Recover the
+ *                   parent context with:
+ *                   container_of(task_node, wifi_ctx_t, task_node)
+ *
+ * @return TASK_DONE   Invocation complete; node removed from scheduler.
+ *                     Re-added automatically if reconnection is needed.
+ * @return TASK_ERROR  Driver failure or retry limit reached; node removed.
+ *                     Call nac_request_wifi_connect() to start over.
+ *
+ * @note TASK_RUN_AGAIN is used only for the WIFI_REQUEST_CONNECT → RECONNECT
+ *       handoff. All other rescheduling goes through task_scheduler_add()
+ *       so back-off delay is enforced explicitly.
+ */
+task_status_t wifi_connect(task_node_t *task_node)
+{
+    wifi_ctx_t *self = container_of(task_node, wifi_ctx_t, task_node);
+
+    switch (self->state)
+    {
+        /*  Initial connect or scheduled reconnect */
+        case WIFI_STATE_IDLE:
+        {
+            ESP_LOGI(self->tag, "WIFI statemachine idle and sleepy... ZzZZz.");
+            return TASK_DONE;
+        }
+        case WIFI_REQUEST_CONNECT: /* Fall through */
+        {
+            ESP_LOGI(self->tag, "WIFI request received!");
+            self->state = WIFI_STATE_RECONNECT;
+            return TASK_RUN_AGAIN;
+        }
+        case WIFI_STATE_RECONNECT:
+        {
+            if (self->retry_count >= REDMOLE_MAX_RETRY)
+            {
+                ESP_LOGE(self->tag, "Max retries (%d) reached — aborting", REDMOLE_MAX_RETRY);
+                self->retry_count = 0;
+                self->state       = WIFI_STATE_ERROR;
+                return TASK_ERROR;
+            }
+
+            if (self->hw_online)
+            {
+                /*
+                 * Stop without deinit. Keeps the coexistence memory pool
+                 * intact so BLE can run alongside WiFi. stop/start resets
+                 * connection state, which is all a reconnect retry needs —
+                 * deinit/init is for mode switches and deep sleep.
+                 */
+                esp_wifi_stop();
+            }
+            else if (wifi_bring_hw_online(self) != 0)
+            {
+                ESP_LOGE(self->tag, "Could not bring hardware online");
+                return TASK_ERROR;
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(50));
+
+            if (s_wifi_ssid[0] == '\0')
+            {
+                size_t ssid_len = WIFI_CRED_MAX_LENGTH;
+                size_t pass_len = WIFI_CRED_MAX_LENGTH;
+                rm_nvs_get_str("wifi_ssid", s_wifi_ssid, &ssid_len);
+                rm_nvs_get_str("wifi_pass", s_wifi_pass, &pass_len);
+            }
+
+            wifi_config_t wifi_config;
+            memset(&wifi_config, 0, sizeof(wifi_config));
+            //wifi_config.sta.threshold.authmode = REDMOLE_AUTH_THRESHOLD;
+            //wifi_config.sta.sae_pwe_h2e        = REDMOLE_WPA3_SAE_MODE;
+
+            const char *ssid = (s_wifi_ssid[0] != 0) ? s_wifi_ssid : REDMOLE_WIFI_SSID;
+            const char *pass = (s_wifi_pass[0] != 0) ? s_wifi_pass : REDMOLE_WIFI_PASS;
+
+            strlcpy((char *)wifi_config.sta.ssid,     ssid, sizeof(wifi_config.sta.ssid)     - 1);
+            strlcpy((char *)wifi_config.sta.password, pass, sizeof(wifi_config.sta.password) - 1);
+
+            if (esp_wifi_set_config(WIFI_IF_STA, &wifi_config) != ESP_OK)
+            {
+                ESP_LOGE(self->tag, "esp_wifi_set_config failed");
+                wifi_bring_hw_offline(self);
+                return TASK_ERROR;
+            }
+            ESP_LOGI(self->tag, "esp_wifi_set_config succeeded with ssid '%s' and pass '%s'", ssid, pass);
+
+            /*
+             * Set CONNECTING before esp_wifi_start(). The call posts
+             * WIFI_EVENT_STA_START to the event loop queue before returning.
+             * Once it returns, the event loop task can preempt us and dispatch
+             * the event before we get another instruction. Setting state first
+             * closes that window.
+             */
+            self->state = WIFI_STATE_CONNECTING;
+            self->retry_count++;
+            ESP_LOGI(self->tag, "Starting WiFi (attempt %d/%d)",
+                     self->retry_count, REDMOLE_MAX_RETRY);
+
+            if (esp_wifi_start() != ESP_OK)
+            {
+                ESP_LOGE(self->tag, "esp_wifi_start failed");
+                wifi_bring_hw_offline(self);
+                self->state = WIFI_STATE_IDLE;
+                return TASK_ERROR;
+            }
+
+            /* Disable modem sleep avoids latency spikes on the 7" display */
+            esp_wifi_set_ps(WIFI_PS_NONE);
+
+            return TASK_DONE;
+        }
+
+        /* ---- WiFi scan requested ---- */
+        case WIFI_STATE_START_SCAN:
+        {
+            if (!self->hw_online && wifi_bring_hw_online(self) != 0)
+            {
+                ESP_LOGE(self->tag, "Could not bring hardware online for scan");
+                return TASK_ERROR;
+            }
+
+            esp_err_t err = esp_wifi_start();
+            if (err != ESP_OK && err != ESP_ERR_WIFI_IF)
+            {
+                ESP_LOGE(self->tag, "esp_wifi_start failed: %s", esp_err_to_name(err));
+                return TASK_ERROR;
+            }
+
+            wifi_scan_config_t scan_cfg;
+            memset(&scan_cfg, 0, sizeof(scan_cfg));
+            scan_cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+
+            if (esp_wifi_scan_start(&scan_cfg, false) != ESP_OK)
+            {
+                ESP_LOGE(self->tag, "esp_wifi_scan_start failed");
+                return TASK_ERROR;
+            }
+
+            self->state = WIFI_STATE_SCANNING;
+            ESP_LOGI(self->tag, "Scan started");
+            return TASK_DONE;
+        }
+
+        /* ---- Entirely event-driven states ---- */
+        case WIFI_STATE_CONNECTING:
+            ESP_LOGD(self->tag, "Connection in progress");
+            return TASK_DONE;
+
+        case WIFI_STATE_SCANNING:
+            ESP_LOGD(self->tag, "Scan in progress");
+            return TASK_DONE;
+
+        case WIFI_STATE_CONNECTED:
+            self->retry_count = 0;
+            ESP_LOGD(self->tag, "Already connected");
+            return TASK_DONE;
+
+        default:
+            ESP_LOGW(self->tag, "Unhandled state %d in wifi_connect", (int)self->state);
+            return TASK_DONE;
+    }
+}
+
+/**
+ * @brief Explicit user-requested disconnect. Sets IDLE before tearing down
+ *        hardware so the resulting disconnect event is ignored by the handler.
+ */
+static void wifi_disconnect(wifi_ctx_t *self)
+{
+    self->state = WIFI_STATE_IDLE;
+    http_client_notify_network_down();
+    ESP_LOGI(self->tag, "Notified http client of incoming disconnect");
+    xEventGroupClearBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
+    ESP_LOGI(self->tag, "Notified event group of disconnect");
+
+    sntp_sync_stop();
+    ESP_LOGI(self->tag, "Stopped SNTP client");
+
+    if (wifi_bring_hw_offline(self) != 0)
+    {
+        ESP_LOGE(self->tag, "Failed to bring WiFi hardware offline");
+        return;
+    }
+    ESP_LOGI(self->tag, "Disconnected (user request)");
+}
+
+/**
+ * @brief Schedules the next connect attempt with exponential back-off.
+ *        Delay: 500 ms × 2^attempt, capped at 32 s.
+ */
+static void wifi_reconnect(wifi_ctx_t *self)
+{
+    uint8_t  exp      = (self->retry_count < 6) ? self->retry_count : 6;
+    uint32_t delay_ms = 500u * (1u << exp);
+
+    self->state = WIFI_STATE_RECONNECT;
+    ESP_LOGI(self->tag, "Reconnect in %" PRIu32 " ms (attempt %d/%d)",
+             delay_ms, self->retry_count, REDMOLE_MAX_RETRY);
+
+    task_scheduler_add(&self->task_node, delay_ms);
+}
+
+/**
+ * @brief Reads AP records from the driver into the pre-allocated PSRAM buffer.
+ *        No stack allocation, no copy.
+ */
+static void wifi_scan_done(wifi_ctx_t *self)
+{
+    self->ap_count = WIFI_SCAN_MAX_RESULT;
+
+    if (esp_wifi_scan_get_ap_records(&self->ap_count, self->ap_records) != ESP_OK)
+    {
+        ESP_LOGE(self->tag, "esp_wifi_scan_get_ap_records failed");
+        self->ap_count = 0;
+        self->state    = WIFI_STATE_IDLE;
+        return;
+    }
+
+    self->scan_complete = 1;
+    self->state         = WIFI_STATE_IDLE;
+    ESP_LOGI(self->tag, "Scan complete: %" PRIu16 " AP(s) found", self->ap_count);
+}
+
+/**
+ * @brief Event handler for WIFI_EVENT and IP_EVENT. arg is always wifi_ctx_t *.
+ */
+static void wifi_event_handler(void *arg, esp_event_base_t event_base,
+                               int32_t event_id, void *event_data)
+{
+    wifi_ctx_t *self = (wifi_ctx_t *)arg;
+
+    if (event_base == WIFI_EVENT)
+    {
+        switch (event_id)
+        {
+            case WIFI_EVENT_STA_START:
+            {
+                /*
+                 * Only call esp_wifi_connect() if we asked for a connection.
+                 * A scan also triggers STA_START but state will be SCANNING,
+                 * not CONNECTING, so we correctly skip here in that case.
+                 */
+                if (self->state == WIFI_STATE_CONNECTING)
+                {
+                    esp_err_t err = esp_wifi_connect();
+                    if (err != ESP_OK && err != ESP_ERR_WIFI_CONN)
+                    {
+                        ESP_LOGE(self->tag, "esp_wifi_connect failed: 0x%x", err);
+                    }
+                }
+                break;
+            }
+
+            case WIFI_EVENT_STA_DISCONNECTED:
+            {
+                /*
+                 * Reconnect only from active states. IDLE means the disconnect
+                 * was intentional (wifi_disconnect() sets IDLE before tearing
+                 * down hardware), so we leave it alone.
+                 */
+                if (self->state == WIFI_STATE_CONNECTING ||
+                    self->state == WIFI_STATE_CONNECTED  ||
+                    self->state == WIFI_STATE_RECONNECT)
+                {
+                    wifi_event_sta_disconnected_t *d =
+                        (wifi_event_sta_disconnected_t *)event_data;
+                    ESP_LOGW(self->tag, "Disconnected, reason: %d — scheduling reconnect",
+                             d->reason);
+                    wifi_reconnect(self);
+                }
+                else
+                {
+                    ESP_LOGI(self->tag, "Disconnect event ignored (state = %d)",
+                             (int)self->state);
+                }
+                break;
+            }
+
+            case WIFI_EVENT_SCAN_DONE:
+                wifi_scan_done(self);
+                break;
+
+            default:
+                break;
+        }
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        ESP_LOGI(self->tag, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+        self->state       = WIFI_STATE_CONNECTED;
+        self->retry_count = 0;
+
+        http_client_notify_network_up();
+        ESP_LOGI(self->tag, "Notified http client that we got an IP");
+
+        sntp_sync_start();
+        ESP_LOGI(self->tag, "Started SNTP client");
+        xEventGroupSetBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
+        ESP_LOGI(self->tag, "Notified event group of connect");
+        if (self->saved_to_nvs == 0 && s_wifi_ssid[0] != '\0')
+        {
+            rm_nvs_set_str("wifi_ssid", s_wifi_ssid);
+            rm_nvs_set_str("wifi_pass", s_wifi_pass);
+            self->saved_to_nvs = 1;
+        }
+    }
+}
+
+void nac_connect_to_saved_wifi(const char *ssid, const char *password)
+{
+    // call sites check if strings empty before calling this
+    if (wifi_bring_hw_online(&s_nac.wifi) != 0)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: hw online failed");
+        return;
+    }
+
+    esp_err_t err = esp_wifi_start();
+    if (err != ESP_OK && err != ESP_ERR_WIFI_IF)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: esp_wifi_start failed: %s", esp_err_to_name(err));
+        s_nac.wifi.state = WIFI_STATE_IDLE;
+        wifi_bring_hw_offline(&s_nac.wifi);
+        return;
+    }
+
+    s_nac.wifi.scan_complete = 0;
+    s_nac.wifi.ap_count      = 0;
+
+    wifi_scan_config_t scan_cfg;
+    memset(&scan_cfg, 0, sizeof(scan_cfg));
+    scan_cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+
+    if (esp_wifi_scan_start(&scan_cfg, true) != ESP_OK)
+    {
+        ESP_LOGE("NAC", "nac_connect_to_saved_wifi: scan failed");
+        s_nac.wifi.state = WIFI_STATE_IDLE;
+        wifi_bring_hw_offline(&s_nac.wifi);
+        return;
+    }
+
+    /*
+     * esp_wifi_scan_start(block=true) returns when hardware finishes, but
+     * WIFI_EVENT_SCAN_DONE is dispatched asynchronously by the event loop task.
+     * wifi_scan_done() consumes esp_wifi_scan_get_ap_records() — if it runs
+     * first our direct call would get count=0. Poll for the event handler to
+     * populate ap_records; fall back to a direct read if it doesn't fire in time.
+     */
+    for (int i = 0; i < 50 && !s_nac.wifi.scan_complete; i++)
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    if (!s_nac.wifi.scan_complete)
+    {
+        ESP_LOGW("NAC", "SCAN_DONE event not received — reading records directly");
+        s_nac.wifi.ap_count = WIFI_SCAN_MAX_RESULT;
+        esp_wifi_scan_get_ap_records(&s_nac.wifi.ap_count, s_nac.wifi.ap_records);
+    }
+
+    uint16_t count = s_nac.wifi.ap_count;
+
+    bool found = false;
+    for (uint16_t i = 0; i < count; i++)
+    {
+        if (strcmp((const char *)s_nac.wifi.ap_records[i].ssid, ssid) == 0)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    s_nac.wifi.state = WIFI_STATE_IDLE;
+
+    if (found)
+    {
+        ESP_LOGI("NAC", "Found saved network '%s' — queuing connect", ssid);
+        /*
+         * Leave WiFi driver initialized (hw_online=1). RECONNECT will
+         * stop/start without deinit, keeping the coexistence pool intact
+         * for BLE which may initialize after this call returns.
+         */
+        nac_request_wifi_connect(ssid, password);
+    }
+    else
+    {
+        ESP_LOGI("NAC", "Saved network '%s' not in range — staying idle", ssid);
+        wifi_bring_hw_offline(&s_nac.wifi);
+    }
+}

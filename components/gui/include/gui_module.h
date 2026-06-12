@@ -1,15 +1,342 @@
 #ifndef GUI_MODULE_H
 #define GUI_MODULE_H
 
+/**
+ * @file gui_module.h
+ * @brief Public lifecycle and state API for the GUI module.
+ *
+ * Callers allocate the GUI context, initialize it once, and then use this API
+ * to publish application state into the LVGL-backed view model.
+ */
+
+#include <stdbool.h>
 #include "freertos/FreeRTOS.h"
 
-typedef struct {
-    bool is_ready;
-    void *frame_buffer; // Pointer to PSRAM allocated memory
+#include "gui_types.h"
+
+/**
+ * @brief Opaque-like context owned by the caller and initialized by the GUI module.
+ */
+typedef struct gui_ctx {
+    bool is_ready;     /*!< True after gui_init() succeeds and before gui_deinit(). */
+    void *frame_buffer; /*!< Reserved platform frame buffer pointer, owned by the GUI module. */
+    void *module_state; /*!< Internal runtime pointer, owned by the GUI module. */
 } gui_ctx_t;
 
-void gui_init(gui_ctx_t *self);
-void gui_run(gui_ctx_t *self); // Task to process LVGL timers and render
+/**
+ * @brief Optional startup overrides applied before the first GUI render.
+ *
+ * Each has_* flag controls whether the paired value should override the GUI
+ * default during gui_init(). The struct may be zero-initialized when no
+ * override is needed.
+ */
+typedef struct {
+    bool has_theme;                  /*!< True when theme contains a startup override. */
+    gui_view_theme_t theme;          /*!< Theme to apply before the first render. */
+    bool has_background_image;       /*!< True when show_background_image contains an override. */
+    bool show_background_image;      /*!< True to show the selected theme background image. */
+    bool has_night_variant;          /*!< True when night_variant_enabled contains an override. */
+    bool night_variant_enabled;      /*!< True to use a theme night variant when available. */
+    bool has_brightness;             /*!< True when brightness_percent contains an override. */
+    int32_t brightness_percent;      /*!< Initial brightness percentage, clamped to the GUI range. */
+} gui_init_config_t;
+
+/**
+ * @brief Callback bindings used to connect GUI interactions to application logic.
+ *
+ * gui_set_bindings() copies this table. Function pointers may be NULL to leave
+ * an interaction unhandled. The GUI passes user_data back unchanged.
+ */
+typedef struct {
+    void *user_data; /*!< Caller-owned pointer forwarded to every registered callback. */
+    void (*on_panel_changed)(gui_ctx_t *self, gui_panel_id_t panel, void *user_data); /*!< Called after the active panel changes. */
+    bool (*on_wifi_scan_requested)(gui_ctx_t *self, void *user_data); /*!< Called when the user requests a Wi-Fi scan. */
+    void (*on_wifi_network_selected)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data); /*!< Called with a GUI-owned scanned network snapshot. */
+    bool (*on_wifi_known_network_requested)(gui_ctx_t *self, const gui_wifi_network_t *network, void *user_data); /*!< Called when the user selects a known network. */
+    bool (*on_wifi_connect_requested)(gui_ctx_t *self, const char *ssid, const char *password, void *user_data); /*!< Called with GUI-owned SSID/password strings for a connect request. */
+    bool (*on_wifi_disconnect_requested)(gui_ctx_t *self, void *user_data); /*!< Called when the user requests Wi-Fi disconnect. */
+    void (*on_reset_requested)(gui_ctx_t *self, void *user_data); /*!< Called when the user requests factory-default GUI settings. */
+} gui_module_bindings_t;
+
+/**
+ * @brief Initialize the GUI module and its backing runtime state.
+ *
+ * Initializes display hardware, creates the LVGL screen tree, and starts the
+ * refresh timer. Calling this on an already-ready context is a no-op.
+ *
+ * @param self GUI context to initialize, must not be NULL.
+ * @param config Optional startup overrides applied before the first render; NULL uses defaults.
+ */
+void gui_init(gui_ctx_t *self, const gui_init_config_t *config);
+
+/**
+ * @brief Run one GUI processing iteration.
+ *
+ * Currently reserved for loop integration. Periodic refresh work is driven by
+ * the GUI platform timer.
+ *
+ * @param self Initialized GUI context; currently unused and may be NULL.
+ */
+void gui_run(gui_ctx_t *self);
+
+/**
+ * @brief Tear down the GUI module and release owned resources.
+ *
+ * Stops the refresh timer and clears the public context fields. Repeated calls
+ * are safe.
+ *
+ * @param self GUI context to deinitialize; NULL is ignored.
+ */
 void gui_deinit(gui_ctx_t *self);
+
+/**
+ * @brief Check whether the GUI runtime is initialized and actively processing.
+ *
+ * @param self GUI context to inspect; NULL returns false.
+ * @return True when the GUI is ready and its refresh heartbeat is recent.
+ */
+bool gui_is_active(gui_ctx_t *self);
+
+/**
+ * @brief Register or replace the application callbacks used by the GUI.
+ *
+ * Passing NULL clears the current bindings.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param bindings Callback table copied by the GUI module, or NULL to clear.
+ */
+void gui_set_bindings(gui_ctx_t *self, const gui_module_bindings_t *bindings);
+
+/**
+ * @brief Resolve a theme to one supported by the current GUI build.
+ *
+ * Disabled, out-of-range, or otherwise unavailable theme values resolve to
+ * the GUI default theme.
+ *
+ * @param theme Requested theme value.
+ * @return Theme value that can be applied and persisted safely.
+ */
+gui_view_theme_t gui_resolve_available_theme(gui_view_theme_t theme);
+
+/**
+ * @brief Force the GUI to rebuild and apply its current view model.
+ *
+ * Takes the LVGL port lock while rendering.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ */
+void gui_refresh(gui_ctx_t *self);
+
+/**
+ * @brief Set the currently visible top-level panel.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param panel Panel identifier to show.
+ */
+void gui_set_active_panel(gui_ctx_t *self, gui_panel_id_t panel);
+
+/**
+ * @brief Read back the currently visible top-level panel.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param panel Output pointer that receives the active panel on success, must not be NULL.
+ * @return True when the context is ready and the active panel was written.
+ */
+bool gui_get_active_panel(gui_ctx_t *self, gui_panel_id_t *panel);
+
+/**
+ * @brief Update the latest sensor values used by the GUI.
+ *
+ * Copies the snapshot and refreshes the view when the stored value changes.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param sensor Sensor values to copy into the GUI state, must not be NULL.
+ */
+void gui_set_sensor_state(gui_ctx_t *self, const gui_sensor_state_t *sensor);
+
+/**
+ * @brief Read back the current sensor values stored by the GUI.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param sensor Output pointer that receives the current sensor state on success, must not be NULL.
+ * @return True when the context is ready and the sensor state was written.
+ */
+bool gui_get_sensor_state(gui_ctx_t *self, gui_sensor_state_t *sensor);
+
+/**
+ * @brief Update the latest energy plan values used by the GUI.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param energy_plan Energy plan values to copy into the GUI state, must not be NULL.
+ */
+void gui_set_energy_plan_state(gui_ctx_t *self, const gui_energy_plan_t *energy_plan);
+
+/**
+ * @brief Read back the current energy plan values stored by the GUI.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param energy_plan Output pointer that receives the current energy plan state on success, must not be NULL.
+ * @return True when the context is ready and the energy plan state was written.
+ */
+bool gui_get_energy_plan_state(gui_ctx_t *self, gui_energy_plan_t *energy_plan);
+
+/**
+ * @brief Update the latest forecast values used by the GUI.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param forecast Forecast values to copy into the GUI state, must not be NULL.
+ */
+void gui_set_forecast_state(gui_ctx_t *self, const gui_forecast_state_t *forecast);
+
+/**
+ * @brief Read back the current forecast values stored by the GUI.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param forecast Output pointer that receives the current forecast state on success, must not be NULL.
+ * @return True when the context is ready and the forecast state was written.
+ */
+bool gui_get_forecast_state(gui_ctx_t *self, gui_forecast_state_t *forecast);
+
+/**
+ * @brief Replace the Wi-Fi settings model consumed by the GUI.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param wifi Wi-Fi settings snapshot to copy, must not be NULL.
+ */
+void gui_set_wifi_settings(gui_ctx_t *self, const gui_wifi_settings_t *wifi);
+
+/**
+ * @brief Read back the Wi-Fi settings currently stored by the GUI.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param wifi Output pointer that receives the current Wi-Fi settings on success, must not be NULL.
+ * @return True when the context is ready and the Wi-Fi settings were written.
+ */
+bool gui_get_wifi_settings(gui_ctx_t *self, gui_wifi_settings_t *wifi);
+
+/**
+ * @brief Update the sidebar Wi-Fi status indicator state.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param state New Wi-Fi status value.
+ */
+void gui_set_wifi_state(gui_ctx_t *self, gui_wifi_state_t state);
+
+/**
+ * @brief Read back the current sidebar Wi-Fi status indicator state.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param state Output pointer that receives the current Wi-Fi state on success, must not be NULL.
+ * @return True when the context is ready and the Wi-Fi state was written.
+ */
+bool gui_get_wifi_state(gui_ctx_t *self, gui_wifi_state_t *state);
+
+/**
+ * @brief Update the sidebar Bluetooth status indicator state.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param state New Bluetooth status value.
+ */
+void gui_set_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t state);
+
+/**
+ * @brief Read back the current sidebar Bluetooth status indicator state.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param state Output pointer that receives the current Bluetooth state on success, must not be NULL.
+ * @return True when the context is ready and the Bluetooth state was written.
+ */
+bool gui_get_bluetooth_state(gui_ctx_t *self, gui_bluetooth_state_t *state);
+
+/**
+ * @brief Update the sidebar SD card status indicator state.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param state New SD card status value.
+ */
+void gui_set_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t state);
+
+/**
+ * @brief Read back the current sidebar SD card status indicator state.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param state Output pointer that receives the current SD card state on success, must not be NULL.
+ * @return True when the context is ready and the SD card state was written.
+ */
+bool gui_get_sd_card_state(gui_ctx_t *self, gui_sd_card_state_t *state);
+
+/**
+ * @brief Update the user-facing appearance settings.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param appearance Appearance settings snapshot to copy, must not be NULL.
+ */
+void gui_set_appearance_settings(gui_ctx_t *self, const gui_appearance_settings_t *appearance);
+
+/**
+ * @brief Read back the current appearance settings.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param appearance Output pointer that receives the current appearance settings on success, must not be NULL.
+ * @return True when the context is ready and the appearance settings were written.
+ */
+bool gui_get_appearance_settings(gui_ctx_t *self, gui_appearance_settings_t *appearance);
+
+/**
+ * @brief Update the user-editable location settings.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param location Location settings snapshot to copy, must not be NULL.
+ */
+void gui_set_location_settings(gui_ctx_t *self, const gui_location_settings_t *location);
+
+/**
+ * @brief Read back the current location settings.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param location Output pointer that receives the current location settings on success, must not be NULL.
+ * @return True when the context is ready and the location settings were written.
+ */
+bool gui_get_location_settings(gui_ctx_t *self, gui_location_settings_t *location);
+
+/**
+ * @brief Set the display brightness used by the GUI platform layer.
+ *
+ * Values outside the supported GUI range are clamped before hardware update.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param brightness_percent Brightness percentage, clamped to 5-100.
+ */
+void gui_set_brightness(gui_ctx_t *self, int32_t brightness_percent);
+
+/**
+ * @brief Read back the current display brightness setting.
+ *
+ * @param self Initialized GUI context.
+ * @param brightness_percent Output pointer that receives the current brightness on success, must not be NULL.
+ * @return True when the context is ready and the brightness value was written.
+ */
+bool gui_get_brightness(gui_ctx_t *self, int32_t *brightness_percent);
+
+/**
+ * @brief Show the Wi-Fi network selection dialog.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ */
+void gui_show_wifi_network_dialog(gui_ctx_t *self);
+
+/**
+ * @brief Show the Wi-Fi password entry dialog.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ */
+void gui_show_wifi_password_dialog(gui_ctx_t *self);
+
+/**
+ * @brief Hide any active Wi-Fi-related modal dialogs.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ */
+void gui_hide_wifi_dialogs(gui_ctx_t *self);
 
 #endif // GUI_MODULE_H

@@ -1,14 +1,12 @@
 idf_component_register(
-    # 1. List ALL source files inside the main folder
     SRCS "main.c"
-         "src/app_module.c"
-
-    # 2. Where the app_module.h header lives
+         "src/app_gui_bindings.c"
+         "src/app_gui_bindings/app_gui_forecast.c"
+         "src/app_gui_bindings/app_gui_leop.c"
+         "src/app_gui_bindings/app_gui_settings_store.c"
+         "src/app_gui_bindings/app_gui_sync.c"
+         "src/app_gui_bindings/app_gui_time.c"
+         "src/app_gui_bindings/app_gui_wifi.c"
     INCLUDE_DIRS "include"
-
-    # 3. Dependencies
-    # In ESP-IDF, the 'main' component automatically depends on ALL custom
-    # components in the /components folder. However, it's good practice
-    # to explicitly list the standard IDF libraries your main.c uses directly.
-    REQUIRES nvs_flash log freertos wifi
+    REQUIRES log freertos board_i2c environment_measurements nvs gui esp_netif esp_event nac task_scheduler http_client uart_mole espressif__cjson sdcard bt blufi
 )
