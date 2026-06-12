@@ -221,7 +221,7 @@ void app_main(void) {
     }
     */
 
-    /* Try connecting to saved WiFi credentials via scan and match */
+    /* Queue a connection attempt using saved WiFi credentials. */
     rm_nvs_get_str("wifi_ssid", s_ssid, &s_ssid_len);
     rm_nvs_get_str("wifi_pass", s_password, &s_password_len);
     if (s_ssid[0] != '\0' && s_password[0] != '\0') {

@@ -54,6 +54,12 @@ bool              nac_scan_is_complete(void);
 
 `nac_request_wifi_connect()` queues a connect task via the task scheduler. SSIDs longer than 32 bytes and passphrases longer than 64 bytes are truncated. Pass `""` as the password for open networks. Credentials are persisted to NVS on successful connection.
 
+Saved credentials are connected directly through the same asynchronous state
+machine. Connection is not gated on an AP scan because hidden or temporarily
+missed networks are valid connection targets. Exhausting association retries
+returns NAC to `NAC_WIFI_DISCONNECTED`, allowing a later GUI or BLUFI
+connection request without rebooting.
+
 ### Scanning
 
 ```c

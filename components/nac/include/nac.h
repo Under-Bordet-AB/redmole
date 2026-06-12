@@ -145,11 +145,13 @@ const wifi_ap_record_t *nac_get_scan_results(uint16_t *out_count);
 bool nac_scan_is_complete(void);
 
 /**
- * @brief Check if saved SSID is equal to ap records and connects to wifi
- * if found.
+ * @brief Queue a connection attempt using saved WiFi credentials.
  *
- * @param SSID to search for
- * @param password to use if SSID is found
+ * The connection is attempted directly; it is not gated on scan results.
+ * Association failures are retried asynchronously by the NAC state machine.
+ *
+ * @param ssid Saved SSID to connect to.
+ * @param password Saved password, or an empty string for an open network.
  */
 void nac_connect_to_saved_wifi(const char *ssid, const char *password);
 
