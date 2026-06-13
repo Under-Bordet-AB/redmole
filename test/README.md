@@ -179,9 +179,9 @@ booted on the ESP32-S3.
 Typical successful output:
 
 ```text
-Running environment measurements test harness works...
+Running sim producer returns three measurements...
 components/environment_measurements/test/test_sim_producer.cpp:3:
-environment measurements test harness works:PASS
+sim producer returns three measurements:PASS
 
 -----------------------
 1 Tests 0 Failures 0 Ignored
@@ -328,20 +328,32 @@ idf_component_register(
 The test uses C++ because `SimProducer` is a C++ class. The private `src/`
 include directory allows this focused module test to include internal headers.
 
-### Step 6: Add A Harness Test
+### Step 6: Add A Focused Unit Test
 
 Create `components/environment_measurements/test/test_sim_producer.cpp`:
 
 ```cpp
 #include "unity.h"
 
-TEST_CASE("environment measurements test harness works", "[environment_measurements]")
-{
-    TEST_ASSERT_TRUE(true);
+#include "sim/sim_producer.hpp"
+
+using redmole::environment::MeasurementBatch;
+using redmole::environment::MeasurementChannel;
+using redmole::environment::sim::SimProducer;
+
+TEST_CASE("sim producer returns three measurements", "[environment_measurements][unit][sim]") {
+    SimProducer producer(MeasurementChannel::IndoorAmbientTemperature,
+                         MeasurementChannel::IndoorRelativeHumidity,
+                         MeasurementChannel::IndoorPressure);
+    MeasurementBatch batch = {};
+
+    TEST_ASSERT_EQUAL(ESP_OK, producer.init());
+    TEST_ASSERT_EQUAL(ESP_OK, producer.read(batch));
+    TEST_ASSERT_EQUAL_UINT32(3U, static_cast<uint32_t>(batch.count));
 }
 ```
 
-This placeholder proves the complete test path works:
+This focused unit test proves both the test path and one production behavior:
 
 ```text
 test source compiles
@@ -349,11 +361,8 @@ test source compiles
 -> test firmware links
 -> board boots
 -> Unity runs the test
--> assertion passes
+-> simulated producer returns one complete three-value batch
 ```
-
-Replace placeholder tests with meaningful behavior tests as soon as the
-harness is proven.
 
 ### Step 7: Configure And Build The Test Project
 

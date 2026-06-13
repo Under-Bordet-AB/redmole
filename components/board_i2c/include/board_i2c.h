@@ -100,6 +100,9 @@ bool board_i2c_bme280_present(void);
  *
  * Ownership of the returned handle belongs to the caller. This function creates
  * a new handle, so callers must avoid registering the same address repeatedly.
+ * ESP-IDF stores the speed per device handle and applies it for that device's
+ * transactions, allowing devices with different supported speeds to share the
+ * bus.
  *
  * @param address 7-bit I2C address.
  * @param speed_hz Device bus speed, or 0 to use BOARD_I2C_DEFAULT_SPEED_HZ.

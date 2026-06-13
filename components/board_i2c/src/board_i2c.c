@@ -135,9 +135,11 @@ bool board_i2c_bme280_present(void) {
 }
 
 esp_err_t board_i2c_add_device(uint16_t address, uint32_t speed_hz, i2c_master_dev_handle_t* out) {
-    if (out == NULL) {
+    if ((out == NULL) || (address > 0x7FU)) {
         return ESP_ERR_INVALID_ARG;
     }
+
+    *out = NULL;
 
     _lock_acquire(&s_lifecycle_lock);
     esp_err_t rv = board_i2c_init_locked();

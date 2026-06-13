@@ -214,6 +214,9 @@ esp_err_t Bme280Sensor::read(Bme280Reading& out) {
     Bme280RawSample raw = {};
     esp_err_t result;
 
+    // A failed acquisition must never leave an earlier reading looking usable.
+    out = {};
+
     if (!ready_for_reads_) {
         // Any earlier failure requests the complete probe/reset/calibration sequence.
         result = init();

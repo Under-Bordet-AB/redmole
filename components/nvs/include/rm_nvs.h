@@ -23,7 +23,9 @@
  * ESP_ERR_INVALID_STATE.
  *
  * @warning Recovery from ESP_ERR_NVS_NO_FREE_PAGES or
- *          ESP_ERR_NVS_NEW_VERSION_FOUND erases the default NVS partition.
+ *          ESP_ERR_NVS_NEW_VERSION_FOUND calls nvs_flash_erase(). This erases
+ *          every namespace and all persisted data in the default NVS
+ *          partition, including data owned by other application components.
  *
  * @param default_namespace Non-empty namespace no longer than 15 characters;
  *                          must not be NULL.

@@ -89,7 +89,7 @@ endmenu
     config REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC
         int "Environment reading interval in seconds"
         default 1
-        range 1 3600
+        range 1 60
         help
             Period used to read and publish environment measurements.
 

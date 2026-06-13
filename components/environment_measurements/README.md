@@ -146,7 +146,7 @@ and BME280 settings are grouped under `Indoor sensor`.
 | Setting | Meaning | Default |
 |---|---|---|
 | `REDMOLE_INDOOR_ENVIRONMENT_SOURCE_BME280` / `SIMULATED` | Select the real BME280 or deterministic simulated measurements for the indoor environment. | BME280 |
-| `REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC` | Delay between polling attempts, from 1 to 3600 seconds. | `1` |
+| `REDMOLE_ENVIRONMENT_READING_INTERVAL_SEC` | Delay between polling attempts, from 1 to 60 seconds. | `1` |
 | `REDMOLE_INDOOR_BME280_ADDRESS_0X76` / `0X77` | Indoor BME280 I2C address. | `0x77` |
 | `REDMOLE_INDOOR_BME280_MODE` | `0` sleep, `1` forced, `2` alternate forced, `3` normal. | `1` |
 | `REDMOLE_INDOOR_BME280_OVERSAMPLING_TEMPERATURE` | Temperature oversampling, `1` through `5` for x1 through x16. | `1` |
