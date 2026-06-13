@@ -47,61 +47,27 @@ sequenceDiagram
 
 ## MODUL: `environment_measurements`
 
-**Data in: producenter till lagrade kanaler**
+**Dataflöde: från sensorproducent till lagrade kanaler**
 
 ```mermaid
 sequenceDiagram
-    participant BME as fysisk BME280
-    participant S as Bme280Sensor
-    participant P as Bme280Producer
-    participant M as MeasurementsManager
-    participant Store as MeasurementStore
-
-    BME-->>S: rå temperatur, fukt och tryck
-    S-->>P: Bme280Reading med kompenserade sensorvärden
-    P-->>M: MeasurementBatch med logiska kanaler
-    M->>Store: validerad batch och tidsstämpel
-    Note over Store: lagrar senaste värdet per kanal
-```
-
-**Alternativ Data in: funktionsanrop genom modulerna**
-
-```mermaid
-sequenceDiagram
-    participant M as MeasurementsManager
+    participant M as MeasurementsManager<br/>polling-task
     participant P as Bme280Producer
     participant S as Bme280Sensor
     participant Store as MeasurementStore
 
     M->>P: read(batch)
     P->>S: read(reading)
+    S->>S: läs, kalibrera och kompensera
     S-->>P: Bme280Reading
-    P-->>M: MeasurementBatch
-    M->>Store: publish_batch(batch, now_ms())
-    Store-->>M: resultat
+    P->>P: översätt till logiska kanaler
+    P-->>M: MeasurementBatch med tre kanaler
+    M->>M: validera batch och skapa tidsstämpel
+    M->>Store: publish_batch(batch, timestamp)
+    Store->>Store: lås mutex och uppdatera alla kanaler
 ```
 
-## MODUL: `environment_measurements`
-
-**Data ut: lagrade kanaler till C-API**
-
-```mermaid
-sequenceDiagram
-    participant Store as MeasurementStore
-    participant A as C-API
-    participant G as GUI / UART
-
-    G->>A: environment_measurements_get_latest()
-    A->>Store: copy_channels(temperatur, fukt, tryck)
-    Store-->>A: sammanhängande snapshot
-    Note over A: bygger environment_measurement_sample_t
-    A-->>G: temperatur, fukt, tryck
-```
-
-- Producenter översätter olika datakällor till logiska kanaler.
-- De tre kanalerna är temperatur, luftfuktighet och tryck. Kanaltyperna
-  definieras i `src/measurement_types.hpp`, medan kanaluppsättningen som den
-  nuvarande C-API-funktionen hämtar definieras i `src/environment_measurements.cpp`.
-- Kanalerna transporteras tillsammans i en `MeasurementBatch`.
-- Store lagrar senaste värdet separat för varje kanal.
-- C-API:t hämtar en sammanhängande snapshot och bygger en enkel sample.
+- Producenter översätter datakällor till logiska mätkanaler.
+- `MeasurementProducer` ger riktiga och simulerade producenter samma interface.
+- `MeasurementStore` lagrar senaste värdet och metadata per kanal.
+- C-API:t väljer och kombinerar kanaler efter konsumentens behov.
