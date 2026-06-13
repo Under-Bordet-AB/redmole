@@ -5,8 +5,9 @@
  * @file
  * @brief Public API for board-local environment measurements.
  *
- * The module owns and polls the configured indoor BME280 and exposes its latest
- * complete temperature, humidity, and pressure sample.
+ * The module owns and polls the configured indoor measurement producer, either
+ * a BME280 or the simulator, and exposes its latest complete temperature,
+ * humidity, and pressure sample.
  */
 
 #include <stdbool.h>

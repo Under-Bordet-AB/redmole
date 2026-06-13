@@ -8,6 +8,9 @@ thread-safe C API.
 The component stores only the latest sample. It does not keep measurement
 history or expose the BME280 driver directly to application code.
 
+For the project-level rationale and reflection, see
+[Jimmy Jordan's reflection](../../docs/reflektion_jimmy_jordan.md).
+
 ## Responsibilities
 
 The component:
@@ -161,6 +164,32 @@ cadence. Sleep mode deliberately produces no successful samples.
 The simulated indoor source does not access the BME280. It publishes a
 repeating 21-sample ramp around 23.0 C, 45.0 percent relative humidity, and
 101325 Pa so GUI updates can be tested without sensor hardware.
+
+## Design Rationale And Tradeoffs
+
+The component is organized around the application responsibility of environment
+measurements rather than around one BME280-shaped sample structure. Producers
+adapt physical or simulated sources into logical channels, while polling,
+storage, and the public API remain independent of the concrete sensor protocol.
+
+This adds more types and layers than a direct BME280-to-application path. The
+design intentionally stops short of a general event framework: it uses one
+polling task, fixed-capacity batches, static resources, and one latest-value
+store because those are sufficient for the current product.
+
+The source is still selected at compile time, and the public API currently
+exposes only one indoor sample. Timestamps are monotonic milliseconds since
+boot, so they support freshness checks but not wall-clock history or comparison
+between boots.
+
+## Verification
+
+The Unity unit test `"sim producer returns three measurements"` runs in the
+separate test firmware on the ESP32-S3 target. It verifies that the simulated
+producer initializes and returns one three-value batch without accessing an
+attached sensor. It does not yet verify channel identities and values, manager
+task behavior, atomic store snapshots, freshness checks, real BME280
+communication and compensation, or recovery after a target-side failure.
 
 ## Implementation
 

@@ -7,6 +7,9 @@ helpers through a thread-safe C API.
 The component owns bus configuration and lifecycle only. Device-specific
 protocols and behavior remain in their own drivers.
 
+For the project-level rationale and reflection, see
+[Jimmy Jordan's reflection](../../docs/reflektion_jimmy_jordan.md).
+
 ## Responsibilities
 
 The component:
@@ -121,6 +124,31 @@ Raw bus users returned by `board_i2c_get_bus()` are not covered by the lifecycle
 lock after that function returns. They remain protected from concurrent physical
 transactions by the ESP-IDF driver, but teardown must be coordinated by the
 application.
+
+## Design Rationale And Tradeoffs
+
+The bus is treated as one shared physical resource with one owner. Keeping
+device-specific protocols outside this component lets `board_i2c` control
+transport and synchronization without becoming a central manager for every
+attached device.
+
+The current design intentionally serializes short synchronous transactions
+instead of introducing a queued bus-manager task. This is sufficient for the
+current devices and keeps the API small, but it provides no priority policy
+between slow and time-sensitive users.
+
+Returning the raw bus handle is a deliberate compatibility compromise for
+ESP-IDF integrations. It enables required drivers, but weakens the component's
+ability to control teardown and the complete bus lifecycle.
+
+## Verification
+
+The Unity unit test `"board I2C rejects invalid transaction arguments"` runs in
+the separate test firmware on the ESP32-S3 target. It verifies that invalid
+handles, buffers, lengths, and addresses are rejected before a physical bus
+transaction is attempted. It does not prove communication with an attached
+device, timeout behavior, recovery from a locked bus, or correctness under
+concurrent target use.
 
 ## Implementation
 

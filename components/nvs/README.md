@@ -7,6 +7,9 @@ The component wraps ESP-IDF NVS but does not own the complete default NVS
 partition. Other ESP-IDF components, including Wi-Fi, may use that partition
 independently.
 
+For the project-level rationale and reflection, see
+[Jimmy Jordan's reflection](../../docs/reflektion_jimmy_jordan.md).
+
 ## Responsibilities
 
 The component:
@@ -101,6 +104,23 @@ Immediate read-after-write verifies the current operation but does not prove
 cross-boot persistence. Persistence is proven only after reboot and successful
 readback.
 
+## Design Rationale And Tradeoffs
+
+The wrapper deliberately centralizes storage policy instead of allowing every
+application module to use ESP-IDF NVS directly. This gives the application one
+place to control namespaces, validation, commits, recovery, and future storage
+policy changes.
+
+Opening and closing a handle for every operation costs more than retaining one
+process-lifetime handle, but keeps ownership and failure handling simple.
+Similarly, immediate commits make persistence behavior predictable at the cost
+of additional flash writes. Callers should therefore write only when values
+actually change.
+
+Recovery from selected initialization errors follows the ESP-IDF erase-and-
+retry flow. This favors successful startup, but may erase values owned by this
+application and other users of the default partition.
+
 ## Thread Safety
 
 A lifecycle lock serializes initialization, deinitialization, and access to the
@@ -120,6 +140,11 @@ which the next run removes before testing.
 
 The self-test proves wrapper behavior in the current boot. It does not prove
 cross-boot persistence.
+
+The Unity integration test `"NVS stores reads and erases a u8 value"` verifies
+one complete typed-value lifecycle on the target. It does not yet cover every
+supported type, concurrent callers, commit failures, or persistence across a
+reboot.
 
 ## Implementation
 
