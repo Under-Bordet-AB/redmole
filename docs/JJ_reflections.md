@@ -478,33 +478,34 @@ Så här i efterhand är jag glad att jag höll modulen så enkel som möjligt, 
 
 # MODUL: `environment_measurements`
 
-### Från första lösning till nuvarande modul
+### Första lösningen
 
-Jag började med att bygga miljömätningarna som en enkel C-baserad kedja med komponenterna `bme280`, `local_sensor_service` och `sensor_data`. Målet var först bara att läsa temperatur, luftfuktighet och tryck från en BME280 och göra värdena tillgängliga för resten av systemet. Den första lösningen fungerade och var enkel att förstå så länge systemet bara hade den sensorn.
+Jag började med att bygga miljömätningarna som ett gäng c moduler:  `bme280`, `local_sensor_service` och `sensor_data`. Målet var först bara att läsa temperatur, luftfuktighet och tryck från en BME280 och göra värdena tillgängliga för resten av systemet. Den första lösningen fungerade, men efterhand började jag däremot se problem med designen. Samma tre mätvärden kopierades mellan flera fasta strukturer, och hela kedjan från fysisk sensor till applikation hade BME280:s form inbyggd i koden. Uppdelningen i tre moduler såg flexibel ut, men i praktiken var de så beroende av samma sensor och datastruktur att de nästan lika gärna kunde ha varit en enda modul, exempelvis `bme280_measurements`.
 
-Efter hand började jag däremot se problem med designen. Samma tre mätvärden kopierades mellan flera fasta strukturer, och hela kedjan från fysisk sensor till applikation hade BME280:s form inbyggd i koden. Uppdelningen i tre moduler såg flexibel ut, men i praktiken var de så beroende av samma sensor och datastruktur att de nästan lika gärna kunde ha varit en enda modul, exempelvis `bme280_measurements`.
-
-Jag började därför fråga mig varför systemet skulle låsas till en typ av sensor. Ett verkligt system skulle rimligtvis kunna behöva en noggrannare separat temperatursensor eller en extern sensor för utomhusmätningar. Med den första designen skulle sådana ändringar påverka nästan hela kedjan, trots att applikationen fortfarande bara behöver temperatur, luftfuktighet och tryck.
-
-Samtidigt upptäckte jag att jag hade missförstått kurskraven och att C++ behövde vara en del av lösningen. Jag bestämde mig därför för att börja om med utgångspunkt i ansvarsområdet i stället för implementationsdetaljerna. Jag frågade mig: vad är det denna del av systemet faktiskt gör? Svaret är att det mäter miljön. Miljömätningar fick därför bli modulens ansvarsområde, snarare än en viss sensor och en viss datastruktur. Problemet var inte egentligen hur BME280 skulle läsas, utan hur applikationen skulle hantera miljömätningar oberoende av vilken sensor som producerade dem.
-
-Jag skrev därför om lösningen till den nuvarande `environment_measurements`-modulen. C++ används internt för tydliga typer, interface och objektrelationer, samtidigt som resten av applikationen fortfarande använder ett stabilt C-API. Omskrivningen uppfyller därmed förhoppningsvis kurskravet, men det blev också en möjlighet att förbättra designen i stället för att bara byta språk.
-[FORTSÄTT HÄR]
-Den första lösningen såg i praktiken ut så här:
+Den första lösningen såg ut så här:
 
 - BME280-lagret producerade en fast struktur med temperatur, luftfuktighet och tryck.
 - `local_sensor_service` kopierade manuellt samma tre fält.
 - `sensor_data` lagrade ännu en fast struktur med samma form.
 - Simulatorbackend använde dynamisk allokering med `calloc()` och `free()`.
+- Simulering eller verklig sensor valdes med en kompilatorflagga.
+
+Begränsningen med de fasta strukturerna var inte främst att samma data kopierades flera gånger, utan att varje förändring av mätmodellen behövde göras på flera ställen. Om exempelvis en separat utomhustemperatur skulle läggas till behövde strukturerna, kopieringskoden och konsumenterna ändras tillsammans. Det skapade stark koppling mellan lager som egentligen skulle ha olika ansvar.
+
+Den dynamiska allokeringen i simulatorbackend gav dessutom en livscykel som resten av lösningen behövde hantera korrekt. Varje allokering kunde misslyckas och varje skapad instans behövde frigöras exakt en gång. För en liten inbyggd produkt med ett känt antal sensorkällor gav detta mer felhantering och risk för minnesläckor eller heapfragmentering, utan att systemet faktiskt behövde kunna skapa producenter dynamiskt under drift.
+
+Kompilatorflaggan gjorde det möjligt att testa utan fysisk sensor, men valet blev globalt och låst vid kompilering. Samma firmware kunde därför inte använda en verklig och en simulerad källa samtidigt, och simulatorn kunde inte enkelt injiceras i tester av enskilda delar. Flaggan bytte implementation, men skapade ingen gemensam abstraktion som flera producenter kunde implementera.
+
+### Nuvarande lösning
+
+När jag började om utgick jag från ansvarsområdet i stället för implementationsdetaljerna. Jag frågade mig vad denna del av systemet faktiskt gör, och svaret var att den mäter miljön. Miljömätningar fick därför bli modulens ansvarsområde, snarare än en viss sensor och en viss datastruktur. Problemet var inte egentligen hur BME280 skulle läsas, utan hur applikationen skulle hantera miljömätningar oberoende av vilken sensor som producerade dem.
+
+Samtidigt upptäckte jag att jag hade missförstått kurskraven och att C++ behövde vara en del av lösningen. Jag skrev därför om lösningen till `environment_measurements`, där C++ används internt för tydliga typer, interface och objektrelationer, medan resten av applikationen fortfarande använder ett stabilt C-API. Omskrivningen uppfyllde därmed kurskravet, men blev också en möjlighet att förbättra designen i stället för att bara byta språk.
+
+Produktkompositionen väljs fortfarande vid kompilering via menuconfig, men både `Bme280Producer` och `SimProducer` följer samma interface och hanteras av samma manager.
 
 ```mermaid
 flowchart LR
-    subgraph Old["Tidigare C-baserad kedja"]
-        OBME["bme280<br/>fast BME280-struktur"]
-        SERVICE["local_sensor_service<br/>manuell fältkopiering"]
-        DATA["sensor_data<br/>fast sample-struktur"]
-        OBME --> SERVICE --> DATA
-    end
 
     subgraph Current["Nuvarande environment_measurements"]
         SENSOR["Bme280Sensor<br/>hårdvaruprotokoll"]
@@ -518,7 +519,7 @@ flowchart LR
 
 ### Ansvarsuppdelning
 
-Den nuvarande modulen är uppdelad efter logiskt ansvar:
+Modulen är uppdelad efter logiskt ansvar:
 
 - `Bme280Sensor` känner till BME280:s register, kalibrering, konfiguration och konverteringsformler.
 - `Bme280Producer` anpassar en fysisk BME280-avläsning till logiska `MeasurementChannel`-värden.
@@ -527,7 +528,6 @@ Den nuvarande modulen är uppdelad efter logiskt ansvar:
 - `MeasurementStore` lagrar senaste värde per kanal och skyddar sammanhängande publicering och kopiering med mutex.
 - C-API:t väljer de kanaler som ska ingå i den publika mätningen, kontrollerar färskhet och konverterar enheter.
 
-Det är viktigt att urvalet sker precis innan publicering genom C-API:t. Kanalerna själva väljer eller prioriterar ingenting. De är identifierare som gör datan mindre beroende av vilken fysisk sensor som producerade den.
 
 ### Nuvarande produktkomposition
 
@@ -665,7 +665,7 @@ sequenceDiagram
         Manager->>Producer: producer.read(batch)
         Producer->>Sensor: sensor_.read(reading)
         Sensor->>Sensor: out = {}
-        alt sensorn inte är redo
+        alt sensorn är inte redo
             Sensor->>Sensor: init()
         end
         opt forced mode
@@ -736,6 +736,12 @@ De interna värdena behåller högre precision. Enhetskonvertering och avrundnin
 
 Det gör att framtida konsumenter kan använda den interna precisionen utan att producenterna behöver ändras.
 
+### Tidsstämplar och begränsningar
+
+Mätningarnas tidsstämplar baseras på monoton tid sedan systemets uppstart. De används för att beräkna hur gammal en mätning är och avgöra om den fortfarande är färsk, men representerar inte verkligt datum eller klockslag.
+
+Jag hann inte implementera synkronisering mot exempelvis NTP eller en extern realtidsklocka. Tidsstämplarna kan därför inte användas för att avgöra när en mätning gjordes i kalendertid eller för att jämföra mätningar från olika uppstarter. Vid varje omstart börjar tidsbasen om från noll.
+
 ### Stopp och återstart
 
 ```mermaid
@@ -782,8 +788,6 @@ Miljömodulen använder flera mekanismer med olika ansvar:
 - En binär semafor bekräftar att stoppbegäran har observerats.
 - Den underliggande I2C-modulen serialiserar varje busstransaktion.
 
-Detta visar att synkronisering inte bör läggas på ett enda ställe utan där respektive delad resurs ägs.
-
 Sensorläsningarna blockerar miljömodulens egen polling-task medan de pågår. Det påverkar därför normalt inte andra tasks, och tasken väntar utan att använda CPU mellan mätningarna. Publika anrop som hämtar senaste mätningen behöver bara vänta kort på store-mutexen medan en snapshot kopieras.
 
 ### Test
@@ -799,191 +803,26 @@ Testet är litet och hårdvaruoberoende. Det bevisar producentkontraktets grundf
 
 Den största förbättringen jämfört med den tidigare lösningen är att modulen inte längre antar att alla sensorer producerar exakt samma fasta tre fält. Sensor, produktion, lagring och publik representation är separata beslut.
 
-Samtidigt har flexibiliteten en kostnad. Fler lager och typer gör koden större och kräver tydligare dokumentation. Jag bedömer ändå att uppdelningen är motiverad eftersom den följer verkliga förändringspunkter i systemet. Jag har undvikit dynamisk allokering i mätflödet och har inte infört en generell event- eller meddelandearkitektur innan den faktiskt behövs.
+Samtidigt har flexibiliteten en kostnad. Fler lager och typer gör koden större och kräver tydligare dokumentation. Mitt mål var därför att ta minsta möjliga steg från en helt rigid modell, styrd av BME280-sensorns form, till en lösning som är enklare att bygga ut och testa. Kanalmodellen och producentinterfacet ger denna flexibilitet till en billig kostnad.
 
-[DU BEHÖVER KOMPLETTERA MED HUR DET KÄNDES ATT KASTA ELLER ERSÄTTA DEN FÖRSTA FUNGERANDE C-LÖSNINGEN HÄR]
+Det var svårt att så sent i kursen ersätta en fungerande C-lösning och gå över till C++. På tidigare lärares råd hade jag främst fokuserat på C, så övergången till C++ blev ganska brutal för mig. Jag har arbetat lite med språket i min ungdom, men uppförsbacken var ändå brant och jag känner mig fortfarande inte helt säker på all C++-syntax som jag har använt. Det kändes riskabelt att börja om när tiden var begränsad, särskilt eftersom jag förstod koncepten bakom interface och klasser bättre än jag behärskade syntaxen. Utan återkommande hjälp från AI med syntax och språkdetaljer hade jag sannolikt inte hunnit slutföra omskrivningen.
 
-[DU BEHÖVER KOMPLETTERA MED VILKET DESIGNBESLUT I MILJÖMODULEN DU ÄR MEST NÖJD MED OCH VARFÖR HÄR]
+I efterhand tycker jag ändå att bytet förbättrade lösningen. Producentinterfacet gjorde beroendena tydligare och gjorde det möjligt att behandla verkliga och simulerade sensorer på samma sätt. Abstraktionen har en viss kostnad, men jag bedömer den som försumbar i detta fall jämfört med I2C-bussens hastighet och det långa intervallet mellan mätningarna.
+
+Det designbeslut jag är mest nöjd med är balansen som kanalmodellen ger. Producenterna översätter sensorspecifika avläsningar till generella kanaler. Därför kan modulens centrala delar, som `MeasurementsManager` och `MeasurementStore`, i stor utsträckning förbli oförändrade när nya sensorer eller mätvärden tillkommer. Förändringarna hamnar främst vid modulens kanter: i hårdvarudrivrutiner och producenter som skapar kanalerna samt i C-API-funktioner som väljer och kombinerar dem för olika konsumenter.
 
 ---
 
-## Hur modulerna stödjer varandra under drift
-
-Följande diagram visar den viktigaste sammanhängande kedjan från miljötasken till GUI:t:
-
-```mermaid
-sequenceDiagram
-    participant EnvTask as MeasurementsManager::task_loop()
-    participant Sensor as Bme280Sensor::read()
-    participant I2C as board_i2c
-    participant Store as MeasurementStore
-    participant Main as app_main() loop
-    participant GUI as app_gui_bindings_sync()
-    participant API as environment_measurements_get_latest()
-
-    EnvTask->>Sensor: Bme280Producer::read() -> Bme280Sensor::read()
-    Sensor->>I2C: board_i2c_read_reg()/board_i2c_write_reg()
-    I2C->>I2C: serialisera busstransaktionen
-    Sensor-->>EnvTask: mätvärden
-    EnvTask->>Store: publish_batch(batch, now_ms())
-    Store->>Store: mutexskyddad publicering
-
-    loop var 30 ms
-        Main->>GUI: app_gui_bindings_sync(&s_gui)
-        GUI->>API: environment_measurements_get_latest(&sample)
-        API->>Store: copy_channels(...)
-        Store->>Store: mutexskyddad snapshot
-        Store-->>API: senaste kanaler
-        API-->>GUI: sammansatt C-sample
-    end
-```
-
-NVS ligger bredvid detta kontinuerliga mätflöde och används när beständiga inställningar behöver läsas eller skrivas. Det är avsiktligt separerat från miljömodulens temporära latest-value-store.
-
-## Reflektion mot kursmål 1–5
-
-Den individuella skriftliga reflektionen examinerar främst kunskapsmålen 1–5. Nedan kopplar jag därför mina konkreta designval till den teori som målen kräver.
-
-### Kursmål 1: inbyggda system jämfört med traditionell programutveckling
-
-Ett inbyggt system är kopplat till fysisk hårdvara och måste hantera begränsade resurser, timing och driftsäkerhet. I en vanlig desktop- eller serverapplikation är det ofta rimligt att skapa fler objekt dynamiskt, låta operativsystemet hantera resurser och acceptera att en operation ibland tar lite längre tid. I detta system kan samma val påverka fysisk kommunikation, minnesstabilitet och om sensordata fortfarande är användbar.
-
-Mina moduler visar detta på flera sätt:
-
-- Miljötasken, dess stack, mutex och semafor skapas statiskt. Mätdata lagras i fasta arrayer och mätflödet gör inga dynamiska allokeringar.
-- I2C-bussen behandlas som en begränsad fysisk resurs som bara kan utföra en transaktion åt gången.
-- BME280-konfiguration verifieras med readback innan sensorn betraktas som redo.
-- Misslyckade miljömätningar ogiltigförklaras direkt så att gammal data inte presenteras som aktuell.
-- NVS-skrivningar committas direkt för tydlig beständighet, men detta vägs mot flash-slitage.
-
-Jag har därmed behövt tänka mer på ägarskap, livslängd och felvägar än jag normalt hade behövt för vanlig applikationskod. Copy-out-designen är ett exempel: det kostar en liten kopiering, men ger tydligt ägarskap och gör att konsumenten inte håller en intern mutex eller pekare efter anropet.
-
-Systemet är inte ett hard real-time-system där en missad deadline innebär katastrof. Miljömätningarna är soft real-time: en sen mätning försämrar aktualiteten, men systemet kan fortsätta fungera. Därför kontrolleras färskhet och ogiltig data avvisas i stället för att försöka garantera en mycket hård deadline.
-
-[DU BEHÖVER KOMPLETTERA MED HUR DIN SYN PÅ INBYGGD PROGRAMMERING SKILJER SIG FRÅN INNAN KURSEN HÄR]
-
-### Kursmål 2: RTOS, schemaläggning, synkronisering och realtidskrav
-
-FreeRTOS delar upp systemets arbete i tasks som schemaläggs preemptivt efter prioritet. En högre prioriterad task som blir ready kan avbryta en lägre prioriterad task. Därför räcker det inte att kod fungerar vid sekventiell körning; delade resurser måste skyddas även när tasks kan växla vid olämpliga tidpunkter.
-
-Jag valde en enda polling-task för miljömodulen eftersom producenterna är långsamma och kan läsas sekventiellt. Att skapa en task per sensor hade krävt fler stackar, mer synkronisering och mer komplicerad sammansättning av mätdata utan att ge en tydlig nytta i nuvarande system.
-
-Synkroniseringsmekanismerna har olika roller:
-
-- `MeasurementStore` använder mutex för att skydda delat mätdata och ge konsumenter en sammanhängande snapshot.
-- `board_i2c` använder lock för att serialisera den delade fysiska bussen och dess livscykel.
-- `stop_requested_` är atomisk eftersom en task skriver värdet och miljötasken läser det.
-- Task notifications väcker miljötasken och fungerar samtidigt som tidsstyrd väntan mellan pollningar.
-- Den binära semaforen `stopped_` används som bekräftelse på att tasken faktiskt har observerat ett stopp.
-
-Tasken befinner sig huvudsakligen i blocked-läge medan den väntar med `ulTaskNotifyTake()`. Det gör att den inte använder CPU-tid genom aktiv polling. Lösningen använder ett intervall efter varje genomförd pollning. Om exakt period mellan starttidpunkter blev ett krav skulle `vTaskDelayUntil()` eller motsvarande absolut tidsstyrning vara lämpligare eftersom nuvarande period även inkluderar tiden det tar att läsa sensorerna.
-
-Lock och mutex kan orsaka väntan och i vissa system även priority inversion. Store-mutexens kritiska sektioner är korta, medan I2C-locken avsiktligt hålls under hela transaktionen och därför kan blockera fram till transaktionens timeout. Hårdare realtidskrav skulle kräva mätning och analys av värsta exekveringstid, taskprioriteter och blockeringstider.
-
-Modulerna hanterar inga egna avbrott. Om en framtida sensor använder interrupt ska dess ISR vara kort och flytta tyngre arbete till en task genom ett `FromISR`-anrop, en notification eller en kö.
-
-[DU BEHÖVER KOMPLETTERA MED VAD SOM VAR SVÅRAST ATT FÖRSTÅ ELLER IMPLEMENTERA KRING RTOS OCH SYNKRONISERING HÄR]
-
-### Kursmål 3: UART, SPI och I2C i industriella miljöer
-
-Mitt arbete med dessa tre moduler visar framför allt I2C. I2C är en synkron, adressbaserad tvåtrådsbuss med SDA och SCL. Flera enheter kan dela ledningarna och väljs med sjubitarsadresser. Varje transaktion använder start, adress, ACK eller NACK, data och stop. Eftersom ledningarna normalt är open-drain behövs pull-up-motstånd.
-
-I2C passar BME280 och övriga kortenheter eftersom de har relativt låg datamängd och kan dela samma buss. Nackdelen med en delad buss är att en långsam eller felande enhet kan påverka andra enheter. Därför har `board_i2c` gemensam initiering, timeout och serialisering.
-
-Valet av `i2c_master_transmit_receive()` för registerläsning gör skrivningen av registeradressen och den efterföljande läsningen till en sammanhängande drivertransaktion. Det är säkrare än två separata publika wrapper-anrop där en annan task skulle kunna använda bussen mellan anropen.
-
-Jämfört med I2C är UART normalt asynkront och punkt-till-punkt med överenskommen baud rate, databitar, paritet och stoppbitar. SPI är synkront, vanligtvis snabbare och full duplex, men kräver fler signaler och normalt en separat chip-select per enhet. Mina tre moduler bevisar inte att jag har implementerat alla tre protokollen; de visar en fördjupad lösning för I2C och hur en delad buss skyddas i ett RTOS-system.
-
-I en industriell miljö behöver man även ta hänsyn till kabellängd, elektriska störningar, jordning, pull-ups, timeouter, felåterhämtning och diagnostik. Nuvarande lösning har timeouter och felkoder, men den verifierar ännu inte sådana elektriska egenskaper eller återhämtning från en låst buss.
-
-[DU BEHÖVER KOMPLETTERA MED NÅGOT KONKRET I2C-PROBLEM DU SÅG PÅ RIKTIG HÅRDVARA, OM DU HADE ETT, HÄR]
-
-### Kursmål 4: strukturerad och prestandaeffektiv C++ i resursbegränsade system
-
-Jag valde C++ internt i miljömodulen för att kunna uttrycka ansvar och beroenden tydligare än i den tidigare hårdvarubundna C-kedjan. `Bme280Sensor`, `Bme280Producer`, `SimProducer`, `MeasurementsManager` och `MeasurementStore` har separata ansvar. Producenterna anpassar olika datakällor till samma logiska kontrakt, medan manager och store inte behöver känna till den konkreta sensorhårdvaran.
-
-Designen använder flera C++-egenskaper som passar ett inbyggt system:
-
-- Starka typer och `enum class` minskar risken att blanda kanaler, lägen och inställningar.
-- Konstruktorinjektion gör beroenden tydliga och gör simulatorproducenten möjlig.
-- `constexpr` och fasta `std::array` beskriver data som har känd storlek vid kompilering.
-- Fel rapporteras med `esp_err_t` i stället för exceptions.
-- Task, stack och synkroniseringsobjekt har statisk eller process-lång livstid.
-- Ett stabilt `extern "C"`-API gör att övrig C-kod inte kopplas till de interna C++-typerna.
-
-Jag använder inte RAII för hela modulens livscykel. De publika modulerna har process-långa resurser och explicit `init()`, `start()` och `stop()`, vilket passar ESP-IDF-projektets nuvarande struktur. Det är därför mer korrekt att beskriva designen som strukturerad C++ med tydligt ägarskap än som en fullständig RAII-design.
-
-C++ löser inte automatiskt designproblem. Den nya lösningen har fler typer och lager än den gamla och kräver mer dokumentation. Vinsten uppstår först när gränserna motsvarar verkliga förändringspunkter och när abstraktionerna inte medför onödig dynamisk allokering eller dold kostnad.
-
-[DU BEHÖVER KOMPLETTERA MED VAD DU PERSONLIGEN LÄRDE DIG AV ATT GÅ FRÅN DEN C-BASERADE KEDJAN TILL C++-DESIGNEN HÄR]
-
-### Kursmål 5: automatisering, CI, testbarhet och driftsäkerhet
-
-Automatisering gör verifiering repeterbar och minskar risken att manuella steg glöms. En CI-pipeline kan bygga projektet, köra format- eller statiska kontroller och starta tester vid varje ändring. Det förhindrar inte alla fel, men gör regressioner synliga tidigare och ger samma grundkontroll för varje utvecklare.
-
-Varje modul har fått ett litet Unity-test som bevisar ett centralt kontrakt:
-
-- NVS-testet är ett target integration test som skriver, läser och raderar ett verkligt beständigt värde.
-- I2C-testet är hårdvaruoberoende och verifierar att ogiltiga transaktionsargument avvisas.
-- Simulatorproducentens test verifierar att initiering och läsning lyckas och att batchen innehåller tre mätningar.
-
-Testtyperna har olika styrkor. Ett enhetstest kan snabbt verifiera avgränsad logik utan hårdvara. Ett target integration test kan hitta problem som bara uppstår med ESP-IDF eller riktig flash. Ett framtida HIL-test skulle kunna kontrollera verklig I2C-kommunikation, timeouter och sensorns mätvärden. Test coverage kan visa vad som exekverats, men bevisar inte att alla krav eller felvägar är korrekta.
-
-Nuvarande tester är medvetet små och utgör inte fullständig verifiering. Särskilt miljömodulens store, färskhetskontroll, felåterhämtning och samtidighet behöver fler tester. Automatiserad byggverifiering är också värdefull eftersom fel i C/C++-gränser, Kconfig och komponentberoenden annars kan upptäckas sent.
-
-[DU BEHÖVER KOMPLETTERA MED VILKEN CI ELLER AUTOMATISK TESTKÖRNING PROJEKTET FAKTISKT HAR OCH VAD DU SJÄLV BIDROG MED HÄR]
-
-[DU BEHÖVER KOMPLETTERA MED ETT EXEMPEL PÅ NÄR ETT TEST ELLER EN AUTOMATISK BUILD HITTADE ETT FEL, OM DET HAR HÄNT, HÄR]
-
-### Praktiska färdighetsmål 6–11
-
-Även om den individuella reflektionen främst examinerar mål 1–5 fungerar dokumentet som bevis för flera praktiska färdighetsmål:
-
-- **Mål 6, RTOS-system:** miljötask, timing, mutex, semafor, notifications och robust felhantering.
-- **Mål 7, hårdvarunära kommunikation:** initiering och användning av den delade I2C-bussen samt BME280:s registerprotokoll.
-- **Mål 8, C++-komponenter:** tydliga objektansvar, fasta resurser, felkoder och testbar simulator.
-- **Mål 9, felsökning:** dokumentet beskriver diagnostik och felvägar, men mitt konkreta användande av debugger eller mätinstrument behöver beskrivas personligt.
-- **Mål 10, testautomation:** Unity-tester finns, men faktisk automatiserad körning och skript behöver redovisas utifrån projektets CI.
-- **Mål 11, dokumentation:** publika API-kontrakt, README-filer och denna reflektions exakta system- och sekvensdiagram.
-
-[DU BEHÖVER KOMPLETTERA MED VILKA DEBUGGER-, LOGG-, LOGIKANALYSATOR- ELLER ANDRA HÅRDVARUNÄRA VERKTYG DU SJÄLV ANVÄNDE HÄR]
-
-### Dokumentation som designverktyg
-
-Modulerna har publika API-kontrakt och README-dokumentation. Den här reflektionen beskriver dessutom verkliga anropsflöden, ägarskap, avvägningar och begränsningar. När jag ritade de exakta flödena blev det möjligt att kontrollera om påståenden om exempelvis lock, taskägarskap och urval faktiskt stämde med koden.
-
-En professionell design handlar inte om att dölja begränsningar, utan om att göra dem kända och kontrollerbara. Exempel är att NVS-locken inte täcker hela lagringsoperationen, att `board_i2c_get_bus()` försvagar livscykelkontrollen och att framtida kanalurval ännu bara är teori.
-
-## Kritisk utvärdering och nästa steg
-
-Lösningen är anpassad till nuvarande produkt och visar tydliga modulgränser, men den är inte färdig för alla tänkbara krav.
-
-För NVS skulle nästa steg vara tester för fler datatyper, fel vid commit och samtidiga anrop. Om flera inställningar måste sparas atomiskt kan ett särskilt transaktions-API behövas för att minska både risken för delvis sparade inställningar och antalet commits.
-
-För I2C skulle hårdvarutester behöva verifiera timeouter, samtidiga användare och återhämtning efter bussfel. Om systemet växer kan en device-registry eller köad bus manager ge starkare kontroll än dagens wrapper och råa busshandle.
-
-För miljömodulen är de viktigaste nästa testerna:
-
-- `MeasurementStore` publicerar och kopierar en sammanhängande batch,
-- gammal data avvisas av `environment_measurements_get_latest()`,
-- en misslyckad producent ogiltigförklaras och kan senare återhämta sig,
-- BME280:s råvärden och kalibrering ger förväntade mätvärden,
-- stop och start fungerar under verklig task-körning.
-
-Det framtida urvalet mellan flera alternativa sensorkällor är ännu bara teori. Nuvarande kod har däremot placerat urvalspunkten på rätt plats: precis vid produktens publika C-API, efter att producenterna har publicerat sina separata kanaler.
-
-[DU BEHÖVER KOMPLETTERA MED VILKEN AV DESSA FÖRBÄTTRINGAR DU SJÄLV SKULLE PRIORITERA FÖRST OCH VARFÖR HÄR]
-
 ## Slutsats
 
-De tre modulerna visar samma grundidé på olika nivåer: en modul ska äga sitt tillstånd, skydda sina delade resurser och exponera ett begränsat kontrakt.
+De tre modulerna jag har byggt visar samma grundidé på olika nivåer: en modul ska äga sitt tillstånd, skydda sina resurser och exponera ett begränsat kontrakt.
 
 NVS-modulen centraliserar lagringspolicy. `board_i2c` centraliserar ägarskap och icke-samtidig åtkomst till den fysiska bussen. Miljömodulen separerar hårdvaruprotokoll, datakällor, schemaläggning, lagring och publik representation.
 
-Den viktigaste lärdomen från arbetet är att framtidssäkring inte betyder att implementera alla framtida funktioner i förväg. Det betyder att identifiera sannolika förändringspunkter och placera tydliga gränser där. I den nuvarande lösningen är kanalerna, producentgränssnittet och C-API:ts urvalspunkt exempel på sådana gränser.
+Den viktigaste lärdomen från arbetet är att hitta en balans mellan framtidssäkring och att först få något fungerande. Ett arbetssätt som fungerade bra för mig var att först lösa det aktuella problemet och därefter fråga vilka små och billiga generaliseringar som kunde förbättra testbarheten eller stödja sannolika nästa utvecklingssteg. På så sätt behövde jag inte försöka utforma hela lösningen i förväg, utan designen kunde växa fram iterativt medan jag själv lärde mig området. Kanalerna, producentgränssnittet och C-API:ts urvalspunkt är exempel på gränser som växte fram genom detta arbetssätt.
 
-Arbetet har även gjort skillnaden mellan datadelning och dataägarskap tydligare för mig. Att en C-funktion tar en pekare betyder inte automatiskt att modulen delar sitt interna tillstånd. Genom copy-out kan modulen behålla ägarskapet, skydda en snapshot kortvarigt och sedan låta konsumenten arbeta självständigt med sin kopia.
+Arbetet har även gjort skillnaden mellan datadelning och dataägarskap tydligare för mig. Genom copy-out kan modulen behålla ägarskapet, skydda en snapshot kortvarigt och sedan låta konsumenten arbeta självständigt med sin kopia.
 
-Jag har också lärt mig att synkronisering måste placeras där den delade resursen ägs. I2C-bussen och senaste mätdata är två olika delade resurser och behöver därför olika skydd. En enda global lock hade varit enklare att beskriva men hade gett sämre ansvarsfördelning och onödig blockering.
+Jag har också lärt mig att synkronisering måste placeras där den delade resursen ägs. I2C-bussen och senaste mätdata är två olika delade resurser och behöver därför olika skydd. Ett enda globalt lock hade varit enklare att beskriva, men hade gett sämre ansvarsfördelning och onödig blockering.
 
-[DU BEHÖVER KOMPLETTERA MED EN KORT PERSONLIG SLUTSATS OM HUR DU UTVECKLATS UNDER KURSEN OCH VAD DU TAR MED DIG TILL NÄSTA PROJEKT HÄR]
+Jag gick in i kursen utan tidigare kunskap om inbyggda system och har byggt upp en betydligt större förståelse för området. Att i ett verkligt projekt få designa en relativt avancerad C++-modul som hanterar hårdvara, tasks, synkronisering och fel, men samtidigt erbjuder ett enkelt API till resten av programmet, var särskilt utvecklande. Till nästa projekt tar jag framför allt med mig vikten av att tidigt identifiera ansvar och ägarskap, men också att låta designen utvecklas stegvis utifrån verkliga behov i stället för att försöka förutse allt från början.
