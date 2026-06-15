@@ -30,6 +30,7 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include "freertos/idf_additions.h"
+#include "freertos/task.h"
 #include "task_scheduler.h"
 
 /** @brief Selection bitmask for STATUS packet type. */
@@ -143,18 +144,39 @@ typedef struct __attribute__ ((packed))
     uint16_t crc16;       /*!< CRC-16/X25 over the payload bytes. */
 } uart_restart_pkg_t;
 
+/** @brief Maximum number of FreeRTOS tasks captured in a single DIAG packet. */
+#define UART_DIAG_MAX_TASKS 24
+
 /**
- * @brief Response packet for a DIAGNOSTICS command.
+ * @brief Per-task record within a DIAG packet.
+ *
+ * Matches the fields returned by uxTaskGetSystemState(). runtime_counter is an
+ * absolute tick count; divide by total_runtime in uart_diag_pkg_t to get CPU%.
  */
 typedef struct __attribute__ ((packed))
 {
-    uint8_t  tag_bit;         /*!< Packet type tag; always UART_DIAG_PKG. */
-    uint16_t data_len;        /*!< Byte length of the payload following this field. */
-    uint8_t  number_of_tasks; /*!< Number of active FreeRTOS tasks at time of sampling. */
-    uint32_t stack_hw;        /*!< High-water mark of the listener task stack in bytes. */
-    uint32_t stack_used;      /*!< Bytes of stack currently in use by the listener task. */
-    uint32_t timestamp_s;     /*!< Unix timestamp in seconds at time of transmission. */
-    uint16_t crc16;           /*!< CRC-16/X25 over the payload bytes. */
+    char     name[16];         /*!< Task name, null-terminated (configMAX_TASK_NAME_LEN). */
+    uint8_t  state;            /*!< eTaskState: 0=running,1=ready,2=blocked,3=suspended,4=deleted. */
+    uint32_t stack_hw_bytes;   /*!< Stack high-water mark in bytes (minimum free stack seen). */
+    uint32_t runtime_counter;  /*!< Absolute runtime ticks consumed by this task. */
+} uart_diag_task_record_t;
+
+/**
+ * @brief Response packet for a DIAGNOSTICS command.
+ *
+ * Contains a snapshot of all FreeRTOS tasks via uxTaskGetSystemState().
+ * Only the first task_count entries in tasks[] are valid; the rest are zeroed.
+ * Divide a task's runtime_counter by total_runtime to get its CPU utilisation.
+ */
+typedef struct __attribute__ ((packed))
+{
+    uint8_t  tag_bit;                          /*!< Packet type tag; always UART_DIAG_PKG. */
+    uint16_t data_len;                         /*!< Byte length of the payload following this field. */
+    uint8_t  task_count;                       /*!< Number of valid entries in tasks[]. */
+    uint32_t total_runtime;                    /*!< Total runtime ticks since boot, all tasks combined. */
+    uart_diag_task_record_t tasks[UART_DIAG_MAX_TASKS]; /*!< Per-task records; task_count entries are valid. */
+    uint32_t timestamp_s;                      /*!< Unix timestamp in seconds at time of transmission. */
+    uint16_t crc16;                            /*!< CRC-16/X25 over the payload bytes. */
 } uart_diag_pkg_t;
 
 /**
@@ -190,6 +212,7 @@ typedef struct uart_ctx
     uint32_t           uart_mole_baud_rate;   /*!< UART baud rate in bits per second. */
     uart_pkg_tag_t     pkg_tag;               /*!< Tag of the packet currently being assembled. */
     char               *json_buf;             /*!< PSRAM buffer for JSON server data; owned by this struct. */
+    TaskStatus_t       *task_array;           /*!< PSRAM buffer for uxTaskGetSystemState(); allocated once at init. */
     union
     {
         uart_status_pkg_t  status;

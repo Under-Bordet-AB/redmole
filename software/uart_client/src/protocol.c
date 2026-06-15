@@ -172,25 +172,82 @@ void protocol_decode_test(const uint8_t *payload, uint16_t data_len)
 
 void protocol_decode_diag(const uint8_t *payload, uint16_t data_len)
 {
-    if (data_len < 15) { fprintf(stderr, "decode_diag: short payload\n"); return; }
+/* Per-task record layout (25 bytes, packed):
+ *   name[16]  state(1)  stack_hw_bytes(4)  runtime_counter(4) */
+#define DIAG_TASK_NAME_LEN  16
+#define DIAG_RECORD_SIZE    25
+#define DIAG_MAX_TASKS      24
+#define DIAG_HEADER_SIZE    5   /* task_count(1) + total_runtime(4) */
+#define DIAG_FOOTER_SIZE    6   /* timestamp_s(4) + crc16(2) */
+#define DIAG_MIN_LEN        (DIAG_HEADER_SIZE + DIAG_FOOTER_SIZE)
 
-    uint8_t  n_tasks    = payload[0];
-    uint32_t stack_hw   = (uint32_t)( payload[1]
-                        | ((uint32_t)payload[2] <<  8)
-                        | ((uint32_t)payload[3] << 16)
-                        | ((uint32_t)payload[4] << 24));
-    uint32_t stack_used = (uint32_t)( payload[5]
-                        | ((uint32_t)payload[6] <<  8)
-                        | ((uint32_t)payload[7] << 16)
-                        | ((uint32_t)payload[8] << 24));
-    uint32_t ts         = (uint32_t)( payload[9]
-                        | ((uint32_t)payload[10] <<  8)
-                        | ((uint32_t)payload[11] << 16)
-                        | ((uint32_t)payload[12] << 24));
+    if (data_len < DIAG_MIN_LEN) { fprintf(stderr, "decode_diag: short payload\n"); return; }
+
+    uint8_t  task_count    = payload[0];
+    uint32_t total_runtime = (uint32_t)( payload[1]
+                           | ((uint32_t)payload[2] <<  8)
+                           | ((uint32_t)payload[3] << 16)
+                           | ((uint32_t)payload[4] << 24));
+
+    if (task_count > DIAG_MAX_TASKS) task_count = DIAG_MAX_TASKS;
+
+    uint32_t ts_offset = DIAG_HEADER_SIZE + (uint32_t)(DIAG_MAX_TASKS * DIAG_RECORD_SIZE);
+    if (data_len < ts_offset + DIAG_FOOTER_SIZE)
+    {
+        fprintf(stderr, "decode_diag: payload too short for task records\n");
+        return;
+    }
+
+    uint32_t ts = (uint32_t)( payload[ts_offset]
+                | ((uint32_t)payload[ts_offset + 1] <<  8)
+                | ((uint32_t)payload[ts_offset + 2] << 16)
+                | ((uint32_t)payload[ts_offset + 3] << 24));
 
     printf("--- DIAG ---\n");
-    printf("  Tasks:      %u\n",       n_tasks);
-    printf("  Stack free: %u bytes\n", stack_hw);
-    printf("  Stack used: %u bytes\n", stack_used);
-    printf("  Timestamp:  %u s\n",     ts);
+    printf("  Tasks: %u  |  Total runtime: %u ticks  |  Timestamp: %u s\n",
+           task_count, total_runtime, ts);
+    printf("  %-16s  %-10s  %-12s  %-14s  %s\n",
+           "Name", "State", "Stack free", "Runtime", "CPU%");
+    printf("  %-16s  %-10s  %-12s  %-14s  %s\n",
+           "----------------", "----------", "------------", "--------------", "----");
+
+    static const char *state_names[] = {
+        "running", "ready", "blocked", "suspended", "deleted", "invalid"
+    };
+
+    for (uint8_t i = 0; i < task_count; i++)
+    {
+        const uint8_t *rec = payload + DIAG_HEADER_SIZE + (i * DIAG_RECORD_SIZE);
+
+        char name[DIAG_TASK_NAME_LEN + 1];
+        memcpy(name, rec, DIAG_TASK_NAME_LEN);
+        name[DIAG_TASK_NAME_LEN] = '\0';
+
+        uint8_t  state   = rec[16];
+        uint32_t hw      = (uint32_t)( rec[17]
+                         | ((uint32_t)rec[18] <<  8)
+                         | ((uint32_t)rec[19] << 16)
+                         | ((uint32_t)rec[20] << 24));
+        uint32_t runtime = (uint32_t)( rec[21]
+                         | ((uint32_t)rec[22] <<  8)
+                         | ((uint32_t)rec[23] << 16)
+                         | ((uint32_t)rec[24] << 24));
+
+        const char *state_str = (state < 5) ? state_names[state] : state_names[5];
+
+        if (total_runtime > 0)
+            printf("  %-16s  %-10s  %-8u B    %-14u  %.2f%%\n",
+                   name, state_str, hw, runtime,
+                   (runtime * 100.0) / total_runtime);
+        else
+            printf("  %-16s  %-10s  %-8u B    %-14u  n/a\n",
+                   name, state_str, hw, runtime);
+    }
+
+#undef DIAG_TASK_NAME_LEN
+#undef DIAG_RECORD_SIZE
+#undef DIAG_MAX_TASKS
+#undef DIAG_HEADER_SIZE
+#undef DIAG_FOOTER_SIZE
+#undef DIAG_MIN_LEN
 }

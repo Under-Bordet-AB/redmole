@@ -49,6 +49,8 @@ Call `protocol_crc16_init()` once before any CRC operations. The CRC algorithm m
 
 `protocol_recv_packet()` receives a framed packet, validates the CRC, and writes the decoded payload into `payload_out` (must be at least `MAX_PACKET_PAYLOAD` = 12 288 bytes).
 
+`protocol_decode_diag()` prints a per-task table with name, state, free stack bytes, absolute runtime ticks, and CPU percentage calculated from the total runtime counter. Requires `CONFIG_FREERTOS_USE_TRACE_FACILITY=y` and `CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y` on the firmware side.
+
 ### `uart_client`
 
 Vtable-based packet factory. Each packet type is a concrete struct with `uart_base_t` embedded first, giving it a `uart_api` vtable pointer. Callers obtain an opaque `uart_package_t` handle and interact through the factory functions without knowing the concrete type.
@@ -79,7 +81,7 @@ These are the commands that can be sent from the client to the server. Each comm
 | 1 | `TAG_SERVER` | JSON server data, timestamp. |
 | 2 | `TAG_SENSOR` | Temperature, humidity, pressure (×100), timestamp. |
 | 3 | `TAG_RESTART` | Restart acknowledgement, timestamp. |
-| 4 | `TAG_DIAG` | FreeRTOS diagnostics (task count, stack usage), timestamp. |
+| 4 | `TAG_DIAG` | FreeRTOS task snapshot: task count, total runtime ticks, per-task name/state/stack HWM/runtime counter + CPU%, timestamp. |
 | 5 | `TAG_TEST` | Loopback / test packet. |
 
 ## Constants

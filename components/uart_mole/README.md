@@ -27,7 +27,7 @@ The listener task blocks on the UART driver event queue. When a command arrives 
 | 1 | `UART_SERVER_PKG` | JSON server data (PSRAM buffer), Unix timestamp. |
 | 2 | `UART_SENSOR_PKG` | Temperature, humidity, pressure (all ×100), Unix timestamp. |
 | 3 | `UART_RESTART_PKG` | Restart result bitmask, Unix timestamp. |
-| 4 | `UART_DIAG_PKG` | FreeRTOS task count, listener stack HWM and current usage, Unix timestamp. |
+| 4 | `UART_DIAG_PKG` | FreeRTOS task snapshot: task count, total runtime, per-task name/state/stack HWM/runtime counter, Unix timestamp. |
 | 5 | `UART_TEST_PKG` | Test/loopback packet. |
 
 Sensor values are fixed-point integers scaled by 100 (e.g. 2150 = 21.50 °C).
@@ -57,9 +57,9 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group);
 esp_err_t uart_mole_deinit(void);
 ```
 
-`uart_mole_init()` installs the UART driver and ISR via `uart_driver_install()`, allocates a persistent JSON buffer on PSRAM, and spawns the listener FreeRTOS task. The `event_group` pointer is injected from `main` and used to read subsystem state when assembling STATUS packets.
+`uart_mole_init()` installs the UART driver and ISR via `uart_driver_install()`, allocates a persistent JSON buffer and a pre-sized `TaskStatus_t` array (both on PSRAM), and spawns the listener FreeRTOS task. The `event_group` pointer is injected from `main` and used to read subsystem state when assembling STATUS packets.
 
-`uart_mole_deinit()` deletes the listener task, uninstalls the driver and ISR, and frees the JSON buffer.
+`uart_mole_deinit()` deletes the listener task, uninstalls the driver and ISR, and frees the JSON buffer and task array.
 
 ## Configuration (in `uart_ctx_t`)
 
@@ -74,3 +74,14 @@ esp_err_t uart_mole_deinit(void);
 
 - `task_scheduler` — packet transmission is queued through the scheduler.
 - ESP-IDF: `driver/uart`, `driver/gpio`, FreeRTOS event groups and tasks, `esp_crc`.
+
+## FreeRTOS configuration
+
+The DIAG packet uses `uxTaskGetSystemState()` which requires the following in `sdkconfig.defaults`:
+
+```
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
+```
+
+Without these the function is not available and will fail to compile.

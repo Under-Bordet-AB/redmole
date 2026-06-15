@@ -9,6 +9,7 @@
 #include "esp_err.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/idf_additions.h"
@@ -79,6 +80,14 @@ esp_err_t uart_mole_init(EventGroupHandle_t *event_group)
         return ESP_ERR_NO_MEM;
     }
 
+    s_uart_mole.task_array = heap_caps_malloc(UART_DIAG_MAX_TASKS * sizeof(TaskStatus_t), MALLOC_CAP_SPIRAM);
+    if (!s_uart_mole.task_array)
+    {
+        ESP_LOGE(TAG, "task_array alloc failed");
+        heap_caps_free(s_uart_mole.json_buf);
+        return ESP_ERR_NO_MEM;
+    }
+
     const uart_config_t uart_config =
     {
         .baud_rate  = UART_MOLE_BAUD_RATE,
@@ -142,6 +151,11 @@ esp_err_t uart_mole_deinit(void)
     {
         heap_caps_free(s_uart_mole.json_buf);
         s_uart_mole.json_buf = NULL;
+    }
+    if (s_uart_mole.task_array)
+    {
+        heap_caps_free(s_uart_mole.task_array);
+        s_uart_mole.task_array = NULL;
     }
     return ESP_OK;
 }
@@ -389,21 +403,34 @@ static void uart_mole_listener_task(void *pvParameters)
 
             case UART_DIAG_PKG:
             {
-                /* payload (data_len bytes): number_of_tasks + stack_hw + stack_used + timestamp_s + crc16
-                 * crc16 covers:             number_of_tasks + stack_hw + stack_used + timestamp_s         */
-                UBaseType_t free_words = uxTaskGetStackHighWaterMark(s_uart_mole.rtos_task);
-                uint32_t    free_bytes = (uint32_t)(free_words * sizeof(StackType_t));
+                UBaseType_t count = uxTaskGetNumberOfTasks();
+                if (count > UART_DIAG_MAX_TASKS)
+                    count = UART_DIAG_MAX_TASKS;
+
+                uint32_t total_runtime = 0;
+                UBaseType_t filled = uxTaskGetSystemState(s_uart_mole.task_array, count, &total_runtime);
 
                 uart_diag_pkg_t *pkg = &s_uart_mole.pkg_buf.diag;
+                memset(pkg, 0, sizeof(*pkg));
 
-                pkg->tag_bit         = UART_DIAG_PKG;
-                pkg->data_len        = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);
-                pkg->number_of_tasks = (uint8_t)uxTaskGetNumberOfTasks();
-                pkg->stack_hw        = free_bytes;
-                pkg->stack_used      = UART_MOLE_STACK_SIZE - free_bytes;
-                pkg->timestamp_s     = (uint32_t)time(NULL);
-                pkg->crc16           = esp_crc16_le(0, &pkg->number_of_tasks,
-                                                    (uint32_t)(pkg->data_len - sizeof(pkg->crc16)));
+                pkg->tag_bit       = UART_DIAG_PKG;
+                pkg->task_count    = (uint8_t)filled;
+                pkg->total_runtime = total_runtime;
+
+                for (UBaseType_t i = 0; i < filled; i++)
+                {
+                    strncpy(pkg->tasks[i].name, s_uart_mole.task_array[i].pcTaskName,
+                            sizeof(pkg->tasks[i].name) - 1);
+                    pkg->tasks[i].state          = (uint8_t)s_uart_mole.task_array[i].eCurrentState;
+                    pkg->tasks[i].stack_hw_bytes = (uint32_t)(s_uart_mole.task_array[i].usStackHighWaterMark
+                                                              * sizeof(StackType_t));
+                    pkg->tasks[i].runtime_counter = s_uart_mole.task_array[i].ulRunTimeCounter;
+                }
+
+                pkg->data_len    = sizeof(*pkg) - sizeof(pkg->tag_bit) - sizeof(pkg->data_len);
+                pkg->timestamp_s = (uint32_t)time(NULL);
+                pkg->crc16       = esp_crc16_le(0, &pkg->task_count,
+                                               (uint32_t)(pkg->data_len - sizeof(pkg->crc16)));
 
                 s_uart_mole.pkg_tag = UART_DIAG_PKG;
                 task_scheduler_add(&s_uart_mole.task_node, 0);
