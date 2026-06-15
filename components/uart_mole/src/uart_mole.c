@@ -275,6 +275,12 @@ static void uart_mole_listener_task(void *pvParameters)
     uart_event_t event;
     uint8_t cmd;
 
+    /* Adapter TX line is logic-LOW (break) during USB enumeration before the
+     * host opens the port.  This fills the ring buffer with 0x00 (STATUS cmd)
+     * bytes.  Flush them before entering the command loop. */
+    uart_flush_input(UART_MOLE_PORT);
+    xQueueReset(s_uart_mole.queue);
+
     for (;;)
     {
         if (!xQueueReceive(s_uart_mole.queue, &event, portMAX_DELAY))
