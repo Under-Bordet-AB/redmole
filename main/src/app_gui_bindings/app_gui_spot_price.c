@@ -17,7 +17,8 @@
 #include "nac.h"
 
 #define SPOT_PRICE_REFRESH_DELAY_MS 60000U
-#define SPOT_PRICE_INITIAL_DELAY_MS 15000U
+#define SPOT_PRICE_INITIAL_DELAY_MS 12000U
+#define SPOT_PRICE_TIME_RETRY_DELAY_MS 2000U
 #define SPOT_PRICE_RESPONSE_BUF_LEN 24576U
 #define SPOT_PRICE_QUARTERS_PER_HOUR 4U
 #define SPOT_PRICE_VALUE_SCALE 1000.0
@@ -216,7 +217,7 @@ static void spot_price_build_state(
     snprintf(spot_price->current_price_text, sizeof(spot_price->current_price_text), "%s",
              "-- kr/kWh");
     snprintf(spot_price->summary, sizeof(spot_price->summary), "%s",
-             "Spotpris utan moms och skatter.");
+             "Spot price excluding VAT and taxes.");
     app_gui_time_format_unknown_last_updated(spot_price->last_updated,
                                              sizeof(spot_price->last_updated));
 
@@ -326,7 +327,9 @@ static task_status_t spot_price_work(task_node_t *node)
 
     now = time(NULL);
     if ((now < 1700000000) || (localtime_r(&now, &today_time) == NULL)) {
-        ESP_LOGW(APP_GUI_BINDINGS_TAG, "Skipping spot-price refresh until local time is set.");
+        node->run_at_tick =
+            xTaskGetTickCount() + pdMS_TO_TICKS(SPOT_PRICE_TIME_RETRY_DELAY_MS);
+        ESP_LOGI(APP_GUI_BINDINGS_TAG, "Waiting for local time before fetching spot prices...");
         return TASK_RUN_AGAIN;
     }
 
@@ -368,7 +371,7 @@ static task_status_t spot_price_work(task_node_t *node)
                          "Failed to parse tomorrow's spot-price response.");
             }
         } else {
-            ESP_LOGI(APP_GUI_BINDINGS_TAG, "Tomorrow's spot prices are not available yet.");
+            ESP_LOGW(APP_GUI_BINDINGS_TAG, "Tomorrow's spot prices are not available yet.");
         }
     }
 
