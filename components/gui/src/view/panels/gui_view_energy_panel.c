@@ -316,7 +316,7 @@ static void gui_view_update_spot_price_overview(gui_view_t *view,
 
     gui_view_set_label_text_if_changed(view->energy_action_icon, LV_SYMBOL_POWER);
     gui_view_set_label_text_if_changed(view->energy_action_eyebrow, eyebrow_text);
-    gui_view_set_label_text_if_changed(view->energy_action_title, "Spotpris");
+    gui_view_set_label_text_if_changed(view->energy_action_title, "Spot price");
     gui_view_set_label_text_if_changed(view->energy_action_value,
                                        spot_price->current_price_text);
     gui_view_set_label_text_if_changed(view->spot_price_summary_label,
@@ -354,7 +354,7 @@ static void gui_view_update_energy_legend_mode(gui_view_t *view,
         gui_view_set_legend_item_hidden(view->energy_legend_dots[1], true);
         gui_view_set_legend_item_hidden(view->energy_legend_dots[2], true);
         gui_view_set_legend_item_hidden(view->energy_legend_dots[3], true);
-        gui_view_set_label_text_if_changed(view->energy_legend_labels[0], "Spotpris");
+        gui_view_set_label_text_if_changed(view->energy_legend_labels[0], "Spot price");
         if (view->spot_price_summary_label != NULL) {
             lv_obj_clear_flag(view->spot_price_summary_label, LV_OBJ_FLAG_HIDDEN);
         }
@@ -783,7 +783,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content,
     view->energy_leop_mode_button = gui_view_create_energy_mode_button(
         view->energy_mode_row, "LEOP", settings_event_cb, event_user_data);
     view->energy_spot_mode_button = gui_view_create_energy_mode_button(
-        view->energy_mode_row, "Spotpris", settings_event_cb, event_user_data);
+        view->energy_mode_row, "Spot price", settings_event_cb, event_user_data);
 
     overview_row = lv_obj_create(view->energy_plan_panel);
     lv_obj_set_size(overview_row, LV_PCT(100), GUI_VIEW_ENERGY_OVERVIEW_HEIGHT);
@@ -886,7 +886,8 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content,
         "Sell excess", &view->energy_legend_labels[3]);
 
     view->spot_price_summary_label = lv_label_create(legend_container);
-    lv_label_set_text(view->spot_price_summary_label, "Spotpris utan moms och skatter.");
+    lv_label_set_text(view->spot_price_summary_label,
+                      "Spot price excluding VAT and taxes.");
     lv_obj_set_width(view->spot_price_summary_label, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH);
     lv_label_set_long_mode(view->spot_price_summary_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_color(view->spot_price_summary_label, lv_color_hex(0x607089), 0);

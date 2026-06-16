@@ -53,7 +53,7 @@ static void gui_state_init_spot_price(gui_spot_price_state_t *spot_price,
     snprintf(spot_price->current_price_text, sizeof(spot_price->current_price_text), "%s",
              "-- kr/kWh");
     snprintf(spot_price->summary, sizeof(spot_price->summary), "%s",
-             "Spotpris utan moms och skatter.");
+             "Spot price excluding VAT and taxes.");
     gui_state_set_default_last_updated(spot_price->last_updated,
                                        sizeof(spot_price->last_updated));
 }

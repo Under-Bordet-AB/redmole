@@ -120,7 +120,7 @@ typedef struct {
     lv_obj_t *status_line;         /*!< BME280 status line under the metric cards. */
 
     lv_obj_t *energy_plan_chart;   /*!< Chart widget used by the energy panel. */
-    lv_obj_t *energy_mode_row;      /*!< Row containing LEOP/Spotpris mode controls. */
+    lv_obj_t *energy_mode_row;      /*!< Row containing LEOP/spot price mode controls. */
     lv_obj_t *energy_leop_mode_button; /*!< Button that selects the LEOP energy subview. */
     lv_obj_t *energy_spot_mode_button; /*!< Button that selects the spot-price subview. */
     lv_obj_t *energy_action_card;   /*!< Hero card showing the current energy plan action. */
