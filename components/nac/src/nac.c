@@ -539,10 +539,9 @@ static void wifi_disconnect(wifi_ctx_t *self)
     self->state = WIFI_STATE_IDLE;
     http_client_notify_network_down();
     ESP_LOGI(self->tag, "Notified http client of incoming disconnect");
-    /*xEventGroupClearBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
+    xEventGroupClearBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
     xEventGroupClearBits(*s_nac.event_group, UART_MOLE_SERVER_ONLINE_BIT);
     ESP_LOGI(self->tag, "Notified event group of disconnect, bits cleared");
-    */
 
     sntp_sync_stop();
     ESP_LOGI(self->tag, "Stopped SNTP client");
@@ -633,9 +632,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                     self->state == WIFI_STATE_CONNECTED  ||
                     self->state == WIFI_STATE_RECONNECT)
                 {
-                    xEventGroupClearBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
-                    xEventGroupClearBits(*s_nac.event_group, UART_MOLE_SERVER_ONLINE_BIT);
-                    ESP_LOGI(self->tag, "Notified event group of disconnect, bits cleared");
                     wifi_event_sta_disconnected_t *d =
                         (wifi_event_sta_disconnected_t *)event_data;
                     ESP_LOGW(self->tag, "Disconnected, reason: %d — scheduling reconnect",
