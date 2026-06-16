@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include "cJSON.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/task.h"
 #include "http_client.h"
@@ -28,7 +29,23 @@ typedef struct {
     int16_t price_milli_kr;
 } spot_price_quarter_t;
 
-static char s_spot_price_response_buf[SPOT_PRICE_RESPONSE_BUF_LEN + 1U];
+static char *s_spot_price_response_buf;
+
+static esp_err_t spot_price_ensure_response_buf(void)
+{
+    if (s_spot_price_response_buf != NULL) {
+        return ESP_OK;
+    }
+
+    s_spot_price_response_buf = heap_caps_malloc(SPOT_PRICE_RESPONSE_BUF_LEN + 1U,
+                                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_spot_price_response_buf == NULL) {
+        ESP_LOGE(APP_GUI_BINDINGS_TAG, "Spot-price response buffer allocation failed.");
+        return ESP_ERR_NO_MEM;
+    }
+
+    return ESP_OK;
+}
 
 static const char *spot_price_area_code(gui_spot_price_area_t area)
 {
@@ -347,9 +364,16 @@ static task_status_t spot_price_work(task_node_t *node)
         return TASK_RUN_AGAIN;
     }
 
+    http_rc = spot_price_ensure_response_buf();
+    if (http_rc != ESP_OK) {
+        ESP_LOGW(APP_GUI_BINDINGS_TAG, "Spot-price request failed: %s",
+                 esp_err_to_name(http_rc));
+        return TASK_RUN_AGAIN;
+    }
+
     s_spot_price_response_buf[0] = '\0';
     http_rc = http_client_get(url, s_spot_price_response_buf,
-                              sizeof(s_spot_price_response_buf));
+                              SPOT_PRICE_RESPONSE_BUF_LEN + 1U);
     if (http_rc != ESP_OK) {
         ESP_LOGW(APP_GUI_BINDINGS_TAG, "Spot-price request failed: %s",
                  esp_err_to_name(http_rc));
@@ -364,7 +388,7 @@ static task_status_t spot_price_work(task_node_t *node)
     if (spot_price_build_url(url, sizeof(url), &tomorrow_time, spot_price.area)) {
         s_spot_price_response_buf[0] = '\0';
         http_rc = http_client_get(url, s_spot_price_response_buf,
-                                  sizeof(s_spot_price_response_buf));
+                                  SPOT_PRICE_RESPONSE_BUF_LEN + 1U);
         if (http_rc == ESP_OK) {
             if (!spot_price_parse_day_response(s_spot_price_response_buf, 1U, quarters)) {
                 ESP_LOGW(APP_GUI_BINDINGS_TAG,
