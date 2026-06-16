@@ -285,7 +285,7 @@ static void spot_price_build_state(
 
         spot_price_format_value(min_price, min_text, sizeof(min_text));
         spot_price_format_value(max_price, max_text, sizeof(max_text));
-        snprintf(spot_price->summary, sizeof(spot_price->summary), "Min %s / max %s",
+        snprintf(spot_price->summary, sizeof(spot_price->summary), "min %s\nmax %s",
                  min_text, max_text);
     }
 }
