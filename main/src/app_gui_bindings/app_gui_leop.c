@@ -14,6 +14,7 @@
 #include <time.h>
 
 #include "cJSON.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/task.h"
 #include "nac.h"
@@ -32,7 +33,23 @@
  */
 #define LEOP_VALUE_SCALE 1000.0
 
-static char s_leop_response_buf[LEOP_RESPONSE_BUF_LEN + 1U];
+static char *s_leop_response_buf;
+
+static esp_err_t leop_ensure_response_buf(void)
+{
+    if (s_leop_response_buf != NULL) {
+        return ESP_OK;
+    }
+
+    s_leop_response_buf = heap_caps_malloc(LEOP_RESPONSE_BUF_LEN + 1U,
+                                           MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_leop_response_buf == NULL) {
+        ESP_LOGE(APP_GUI_BINDINGS_TAG, "LEOP response buffer allocation failed.");
+        return ESP_ERR_NO_MEM;
+    }
+
+    return ESP_OK;
+}
 
 static uint16_t leop_scale_hourly_average(double hourly_average)
 {
@@ -235,9 +252,15 @@ static task_status_t leop_work(task_node_t *node)
         return TASK_RUN_AGAIN;
     }
 
+    http_rc = leop_ensure_response_buf();
+    if (http_rc != ESP_OK) {
+        ESP_LOGW(APP_GUI_BINDINGS_TAG, "LEOP request failed: %s", esp_err_to_name(http_rc));
+        return TASK_RUN_AGAIN;
+    }
+
     s_leop_response_buf[0] = '\0';
     http_rc = http_client_get(LEOP_REFRESH_URL, s_leop_response_buf,
-                              sizeof(s_leop_response_buf));
+                              LEOP_RESPONSE_BUF_LEN + 1U);
     if (http_rc != ESP_OK) {
         ESP_LOGW(APP_GUI_BINDINGS_TAG, "LEOP request failed: %s", esp_err_to_name(http_rc));
         return TASK_RUN_AGAIN;
