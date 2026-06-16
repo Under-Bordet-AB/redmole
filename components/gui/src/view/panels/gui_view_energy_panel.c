@@ -301,6 +301,7 @@ static void gui_view_update_energy_action_overview(gui_view_t *view,
 {
     gui_view_update_energy_action_card(view, energy_plan);
     gui_view_update_energy_action_strip(view, energy_plan);
+    lv_obj_clear_flag(view->energy_action_title, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void gui_view_update_spot_price_overview(gui_view_t *view,
@@ -322,7 +323,8 @@ static void gui_view_update_spot_price_overview(gui_view_t *view,
 
     gui_view_set_label_text_if_changed(view->energy_action_icon, LV_SYMBOL_POWER);
     gui_view_set_label_text_if_changed(view->energy_action_eyebrow, eyebrow_text);
-    gui_view_set_label_text_if_changed(view->energy_action_title, "Spot price");
+    gui_view_set_label_text_if_changed(view->energy_action_title, "Current price");
+    lv_obj_add_flag(view->energy_action_title, LV_OBJ_FLAG_HIDDEN);
     gui_view_set_label_text_if_changed(view->energy_action_value,
                                        spot_price->current_price_text);
     gui_view_set_label_text_if_changed(view->spot_price_summary_label,
