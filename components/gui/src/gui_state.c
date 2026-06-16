@@ -28,6 +28,36 @@ static void gui_state_set_default_last_updated(char *text, size_t text_len)
     snprintf(text, text_len, "%s", "Last updated: --:--:--");
 }
 
+static gui_spot_price_area_t gui_state_resolve_spot_price_area(gui_spot_price_area_t area)
+{
+    switch (area) {
+        case GUI_SPOT_PRICE_AREA_SE1:
+        case GUI_SPOT_PRICE_AREA_SE2:
+        case GUI_SPOT_PRICE_AREA_SE3:
+        case GUI_SPOT_PRICE_AREA_SE4:
+            return area;
+        default:
+            return GUI_SPOT_PRICE_AREA_SE3;
+    }
+}
+
+static void gui_state_init_spot_price(gui_spot_price_state_t *spot_price,
+                                      gui_spot_price_area_t area)
+{
+    if (spot_price == NULL) {
+        return;
+    }
+
+    memset(spot_price, 0, sizeof(*spot_price));
+    spot_price->area = gui_state_resolve_spot_price_area(area);
+    snprintf(spot_price->current_price_text, sizeof(spot_price->current_price_text), "%s",
+             "-- kr/kWh");
+    snprintf(spot_price->summary, sizeof(spot_price->summary), "%s",
+             "Spotpris utan moms och skatter.");
+    gui_state_set_default_last_updated(spot_price->last_updated,
+                                       sizeof(spot_price->last_updated));
+}
+
 static void gui_state_reset_wifi_scan(gui_state_t *state)
 {
     if (state == NULL) {
@@ -122,6 +152,16 @@ static bool gui_state_energy_plan_equals(const gui_energy_plan_t *left,
     return memcmp(left, right, sizeof(*left)) == 0;
 }
 
+static bool gui_state_spot_price_equals(const gui_spot_price_state_t *left,
+                                        const gui_spot_price_state_t *right)
+{
+    if ((left == NULL) || (right == NULL)) {
+        return false;
+    }
+
+    return memcmp(left, right, sizeof(*left)) == 0;
+}
+
 static bool gui_state_forecast_equals(const gui_forecast_state_t *left,
                                       const gui_forecast_state_t *right)
 {
@@ -201,6 +241,7 @@ void gui_state_init(gui_state_t *state)
 
     memset(state, 0, sizeof(*state));
     state->active_panel = GUI_PANEL_BME280;
+    state->energy_panel_mode = GUI_ENERGY_PANEL_MODE_LEOP;
     state->appearance.theme = gui_theme_default();
     state->appearance.show_background_image = true;
     state->appearance.night_variant_enabled = false;
@@ -216,6 +257,7 @@ void gui_state_init(gui_state_t *state)
                                        sizeof(state->sensor.last_updated));
     gui_state_set_default_last_updated(state->energy_plan.last_updated,
                                        sizeof(state->energy_plan.last_updated));
+    gui_state_init_spot_price(&state->spot_price, GUI_SPOT_PRICE_AREA_SE3);
     gui_state_init_forecast(&state->forecast);
     gui_state_reset_wifi_scan(state);
     gui_state_copy_status(&state->wifi, "Press Scan to search for Wi-Fi networks.");
@@ -250,6 +292,60 @@ bool gui_state_set_energy_plan(gui_state_t *state, const gui_energy_plan_t *ener
     }
 
     state->energy_plan = *energy_plan;
+    return true;
+}
+
+bool gui_state_set_energy_panel_mode(gui_state_t *state, gui_energy_panel_mode_t mode)
+{
+    if (state == NULL) {
+        return false;
+    }
+
+    if ((mode != GUI_ENERGY_PANEL_MODE_LEOP) &&
+        (mode != GUI_ENERGY_PANEL_MODE_SPOT_PRICE)) {
+        mode = GUI_ENERGY_PANEL_MODE_LEOP;
+    }
+
+    if (state->energy_panel_mode == mode) {
+        return false;
+    }
+
+    state->energy_panel_mode = mode;
+    return true;
+}
+
+bool gui_state_set_spot_price(gui_state_t *state,
+                              const gui_spot_price_state_t *spot_price)
+{
+    gui_spot_price_state_t resolved;
+
+    if ((state == NULL) || (spot_price == NULL)) {
+        return false;
+    }
+
+    resolved = *spot_price;
+    resolved.area = gui_state_resolve_spot_price_area(resolved.area);
+
+    if (gui_state_spot_price_equals(&state->spot_price, &resolved)) {
+        return false;
+    }
+
+    state->spot_price = resolved;
+    return true;
+}
+
+bool gui_state_set_spot_price_area(gui_state_t *state, gui_spot_price_area_t area)
+{
+    if (state == NULL) {
+        return false;
+    }
+
+    area = gui_state_resolve_spot_price_area(area);
+    if (state->spot_price.area == area) {
+        return false;
+    }
+
+    gui_state_init_spot_price(&state->spot_price, area);
     return true;
 }
 
@@ -498,8 +594,10 @@ void gui_state_build_screen_model(const gui_state_t *state, gui_view_model_t *mo
     }
 
     model->active_panel = state->active_panel;
+    model->energy_panel_mode = state->energy_panel_mode;
     model->sensor = state->sensor;
     model->energy_plan = state->energy_plan;
+    model->spot_price = state->spot_price;
     model->forecast = state->forecast;
     model->wifi = state->wifi;
     model->wifi_state = state->wifi_state;
