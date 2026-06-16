@@ -13,8 +13,11 @@
  *
  * @param view View object that stores created widget pointers, must not be NULL.
  * @param content Parent content container, must not be NULL.
+ * @param settings_event_cb Callback for mode switch interactions, may be NULL.
+ * @param event_user_data Caller-owned user data forwarded to the callback.
  */
-void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content);
+void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content,
+                                lv_event_cb_t settings_event_cb, void *event_user_data);
 
 /**
  * @brief Apply the current energy plan model to the energy panel widgets.

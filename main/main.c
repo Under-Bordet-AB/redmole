@@ -80,7 +80,7 @@ static esp_err_t init_single_instance_modules(EventGroupHandle_t* event_group) {
         return rv;
     }
 
-    blufi_main();
+    // blufi_main();
 
     return ESP_OK;
 }

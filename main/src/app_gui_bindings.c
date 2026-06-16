@@ -42,13 +42,16 @@ esp_err_t app_gui_bindings_init(gui_ctx_t *gui, EventGroupHandle_t *event_group)
 
     app_gui_settings_cache_current_appearance(&s_bindings, gui);
     app_gui_settings_cache_current_location(&s_bindings, gui);
+    app_gui_settings_cache_current_spot_price_area(&s_bindings, gui);
     (void)app_gui_settings_load_saved_location(&s_bindings, gui);
+    (void)app_gui_settings_load_saved_spot_price_area(&s_bindings, gui);
     (void)app_gui_wifi_load_saved_metadata(&s_bindings, gui);
     app_gui_bindings_sync(gui);
     //(void)app_gui_wifi_queue_saved_autoconnect(&s_bindings, gui);
 
     app_gui_forecast_register_task(&s_bindings);
     app_gui_leop_register_task(&s_bindings);
+    app_gui_spot_price_register_task(&s_bindings);
     app_gui_sync_register_sensor_task(&s_bindings);
 
     return ESP_OK;
@@ -64,4 +67,5 @@ void app_gui_bindings_sync(gui_ctx_t *gui)
 
     (void)app_gui_settings_save_appearance_if_changed(&s_bindings, gui);
     (void)app_gui_settings_save_location_if_changed(&s_bindings, gui);
+    (void)app_gui_settings_save_spot_price_area_if_changed(&s_bindings, gui);
 }

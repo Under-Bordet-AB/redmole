@@ -89,6 +89,8 @@ typedef struct {
     lv_obj_t *location_longitude_label; /*!< Label for the longitude textarea. */
     lv_obj_t *location_longitude_textarea; /*!< Text area used to edit longitude. */
     lv_obj_t *location_keyboard;      /*!< On-screen keyboard dedicated to location input. */
+    lv_obj_t *spot_price_area_card;   /*!< Settings subsection containing spot-price area controls. */
+    lv_obj_t *spot_price_area_dropdown; /*!< Dropdown used to select SE1-SE4. */
     lv_obj_t *reset_card;              /*!< Settings subsection containing reset controls. */
     lv_obj_t *reset_button;            /*!< Button that requests a settings reset. */
 
@@ -118,6 +120,9 @@ typedef struct {
     lv_obj_t *status_line;         /*!< BME280 status line under the metric cards. */
 
     lv_obj_t *energy_plan_chart;   /*!< Chart widget used by the energy panel. */
+    lv_obj_t *energy_mode_row;      /*!< Row containing LEOP/spot price mode controls. */
+    lv_obj_t *energy_leop_mode_button; /*!< Button that selects the LEOP energy subview. */
+    lv_obj_t *energy_spot_mode_button; /*!< Button that selects the spot-price subview. */
     lv_obj_t *energy_action_card;   /*!< Hero card showing the current energy plan action. */
     lv_obj_t *energy_action_icon;   /*!< Symbol label for the current energy plan action. */
     lv_obj_t *energy_action_eyebrow; /*!< Time context label for the current energy action. */
@@ -126,6 +131,7 @@ typedef struct {
     lv_obj_t *energy_action_segments[GUI_ENERGY_PLAN_POINT_COUNT]; /*!< 24-hour action strip cells. */
     lv_obj_t *energy_legend_dots[4]; /*!< Legend markers for the four energy series. */
     lv_obj_t *energy_legend_labels[4]; /*!< Legend labels for the four energy series. */
+    lv_obj_t *spot_price_summary_label; /*!< Summary label shown in the spot-price subview. */
     lv_obj_t *energy_time_labels[GUI_ENERGY_PLAN_TIME_LABEL_COUNT]; /*!< Time labels under the energy chart. */
     lv_chart_series_t *buy_series; /*!< Grid purchase chart series. */
     lv_chart_series_t *solar_series; /*!< Solar usage chart series. */
@@ -134,12 +140,18 @@ typedef struct {
 
     gui_panel_id_t last_active_panel;        /*!< Last panel applied to the navigation state. */
     bool has_last_active_panel;              /*!< True when last_active_panel contains a valid cached value. */
+    gui_energy_panel_mode_t last_energy_panel_mode; /*!< Last energy panel subview applied. */
+    bool has_last_energy_panel_mode;         /*!< True when last_energy_panel_mode is initialized. */
     gui_energy_plan_t last_energy_plan;      /*!< Last energy plan applied to the chart. */
     bool has_last_energy_plan;               /*!< True when last_energy_plan contains a valid cached value. */
+    gui_spot_price_state_t last_spot_price;  /*!< Last spot-price state applied to the chart. */
+    bool has_last_spot_price;                /*!< True when last_spot_price contains a valid cached value. */
     gui_wifi_settings_t last_wifi_settings;  /*!< Last Wi-Fi settings model applied to the dialogs and cards. */
     bool has_last_wifi_settings;             /*!< True when last_wifi_settings contains a valid cached value. */
     gui_location_settings_t last_location_settings; /*!< Last location settings model applied to the System page. */
     bool has_last_location_settings;         /*!< True when last_location_settings contains a valid cached value. */
+    gui_spot_price_area_t last_spot_price_area; /*!< Last spot-price area reflected in Settings. */
+    bool has_last_spot_price_area;           /*!< True when last_spot_price_area is initialized. */
     gui_view_theme_t current_theme;          /*!< Theme currently applied to the view. */
     bool current_show_background_image;      /*!< Cached background image visibility setting. */
     bool current_night_variant_enabled;      /*!< Cached night variant setting. */

@@ -127,6 +127,33 @@ static bool gui_view_location_settings_changed(gui_view_t *view,
            (strcmp(view->last_location_settings.longitude, location->longitude) != 0);
 }
 
+static uint16_t gui_view_spot_price_area_dropdown_index(gui_spot_price_area_t area)
+{
+    switch (area) {
+        case GUI_SPOT_PRICE_AREA_SE1:
+            return 0U;
+        case GUI_SPOT_PRICE_AREA_SE2:
+            return 1U;
+        case GUI_SPOT_PRICE_AREA_SE3:
+            return 2U;
+        case GUI_SPOT_PRICE_AREA_SE4:
+            return 3U;
+        default:
+            return 2U;
+    }
+}
+
+static bool gui_view_spot_price_area_changed(gui_view_t *view,
+                                             gui_spot_price_area_t area)
+{
+    if (view == NULL) {
+        return false;
+    }
+
+    return !view->has_last_spot_price_area ||
+           (view->last_spot_price_area != area);
+}
+
 static const char *gui_view_wifi_card_status_text(const gui_wifi_settings_t *wifi)
 {
     if (wifi == NULL) {
@@ -612,6 +639,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     lv_obj_t *bluetooth_card;
     lv_obj_t *brightness_card;
     lv_obj_t *location_card;
+    lv_obj_t *spot_price_area_card;
     lv_obj_t *reset_card;
     lv_obj_t *theme_card;
     lv_obj_t *bluetooth_status;
@@ -630,6 +658,8 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->location_longitude_label = NULL;
     view->location_longitude_textarea = NULL;
     view->location_keyboard = NULL;
+    view->spot_price_area_card = NULL;
+    view->spot_price_area_dropdown = NULL;
     view->reset_card = NULL;
     view->password_dialog_spinner = NULL;
     view->password_dialog_status_label = NULL;
@@ -925,7 +955,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
         event_user_data);
 
     location_card = gui_view_create_setting_item_card(
-        system_stack, "Location", "Enter latitude and longitude in decimal degrees.",
+        system_stack, "Location", "Latitude and longitude in decimal degrees.",
         LV_SIZE_CONTENT);
     gui_view_set_settings_grid_card(location_card);
     view->location_card = location_card;
@@ -935,6 +965,27 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     (void)gui_view_create_settings_field_row(location_card, &view->location_longitude_label,
                                              &view->location_longitude_textarea, "Longitude",
                                              "18.0686", settings_event_cb, event_user_data);
+
+    spot_price_area_card = gui_view_create_setting_item_card(
+        system_stack, "Spot-price area", "Price area for spot-price data.",
+        LV_SIZE_CONTENT);
+    gui_view_set_settings_grid_card(spot_price_area_card);
+    view->spot_price_area_card = spot_price_area_card;
+
+    view->spot_price_area_dropdown = lv_dropdown_create(spot_price_area_card);
+    lv_obj_set_size(view->spot_price_area_dropdown, LV_PCT(100), 46);
+    lv_dropdown_set_options(view->spot_price_area_dropdown,
+                            "SE1 / Luleå\nSE2 / Sundsvall\nSE3 / Stockholm\nSE4 / Malmö");
+    lv_dropdown_set_selected(view->spot_price_area_dropdown, 2);
+    lv_obj_add_event_cb(view->spot_price_area_dropdown, settings_event_cb,
+                        LV_EVENT_VALUE_CHANGED, event_user_data);
+    lv_obj_set_style_radius(view->spot_price_area_dropdown, 14, 0);
+    lv_obj_set_style_shadow_width(view->spot_price_area_dropdown, 0, 0);
+    lv_obj_set_style_border_width(view->spot_price_area_dropdown, 1, 0);
+    lv_obj_set_style_border_color(view->spot_price_area_dropdown, lv_color_hex(0xD7E1EE), 0);
+    lv_obj_set_style_bg_color(view->spot_price_area_dropdown, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_bg_opa(view->spot_price_area_dropdown, LV_OPA_COVER, 0);
+    lv_obj_set_style_text_color(view->spot_price_area_dropdown, lv_color_hex(0x10213D), 0);
 
     // Reset card for the systems panel
     reset_card = gui_view_create_setting_item_card(
@@ -1104,6 +1155,7 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     bool can_disconnect;
     bool is_connecting;
     bool location_changed;
+    bool spot_price_area_changed;
     bool wifi_changed;
     uint8_t network_index;
 
@@ -1113,7 +1165,8 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
 
     wifi_changed = gui_view_wifi_settings_changed(view, &model->wifi);
     location_changed = gui_view_location_settings_changed(view, &model->location);
-    if (!wifi_changed && !location_changed &&
+    spot_price_area_changed = gui_view_spot_price_area_changed(view, model->spot_price.area);
+    if (!wifi_changed && !location_changed && !spot_price_area_changed &&
         !gui_view_appearance_settings_changed(view, &model->appearance)) {
         return;
     }
@@ -1238,6 +1291,13 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
         gui_view_set_textarea_text_if_changed(view->location_longitude_textarea,
                                               model->location.longitude);
     }
+    if (view->spot_price_area_dropdown != NULL) {
+        uint16_t selected_index = gui_view_spot_price_area_dropdown_index(model->spot_price.area);
+
+        if (lv_dropdown_get_selected(view->spot_price_area_dropdown) != selected_index) {
+            lv_dropdown_set_selected(view->spot_price_area_dropdown, selected_index);
+        }
+    }
 
     if (model->wifi.network_count == 0U) {
         if (model->wifi.status_text[0] != '\0') {
@@ -1285,4 +1345,6 @@ void gui_view_apply_settings_panel(gui_view_t *view, const gui_view_model_t *mod
     view->has_last_wifi_settings = true;
     view->last_location_settings = model->location;
     view->has_last_location_settings = true;
+    view->last_spot_price_area = model->spot_price.area;
+    view->has_last_spot_price_area = true;
 }
