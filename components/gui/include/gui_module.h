@@ -181,6 +181,43 @@ void gui_set_energy_plan_state(gui_ctx_t *self, const gui_energy_plan_t *energy_
 bool gui_get_energy_plan_state(gui_ctx_t *self, gui_energy_plan_t *energy_plan);
 
 /**
+ * @brief Update the latest spot-price values used by the GUI.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param spot_price Spot-price values to copy into the GUI state, must not be NULL.
+ */
+void gui_set_spot_price_state(gui_ctx_t *self,
+                              const gui_spot_price_state_t *spot_price);
+
+/**
+ * @brief Read back the current spot-price values stored by the GUI.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param spot_price Output pointer that receives the current spot-price state on success, must not be NULL.
+ * @return True when the context is ready and the spot-price state was written.
+ */
+bool gui_get_spot_price_state(gui_ctx_t *self, gui_spot_price_state_t *spot_price);
+
+/**
+ * @brief Update the selected spot-price area.
+ *
+ * Clears existing spot-price points until a fresh feed update is published.
+ *
+ * @param self Initialized GUI context; NULL is ignored.
+ * @param area Swedish electricity price area.
+ */
+void gui_set_spot_price_area(gui_ctx_t *self, gui_spot_price_area_t area);
+
+/**
+ * @brief Read back the selected spot-price area.
+ *
+ * @param self Initialized GUI context; NULL returns false.
+ * @param area Output pointer that receives the current spot-price area on success.
+ * @return True when the context is ready and the spot-price area was written.
+ */
+bool gui_get_spot_price_area(gui_ctx_t *self, gui_spot_price_area_t *area);
+
+/**
  * @brief Update the latest forecast values used by the GUI.
  *
  * @param self Initialized GUI context; NULL is ignored.

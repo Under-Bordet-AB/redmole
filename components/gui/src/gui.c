@@ -177,6 +177,31 @@ static bool gui_update_location_from_textarea(gui_runtime_t *runtime, lv_obj_t *
     return gui_state_set_location_settings(&runtime->state, &location);
 }
 
+static bool gui_dropdown_index_to_spot_price_area(uint16_t index,
+                                                  gui_spot_price_area_t *area)
+{
+    if (area == NULL) {
+        return false;
+    }
+
+    switch (index) {
+        case 0:
+            *area = GUI_SPOT_PRICE_AREA_SE1;
+            return true;
+        case 1:
+            *area = GUI_SPOT_PRICE_AREA_SE2;
+            return true;
+        case 2:
+            *area = GUI_SPOT_PRICE_AREA_SE3;
+            return true;
+        case 3:
+            *area = GUI_SPOT_PRICE_AREA_SE4;
+            return true;
+        default:
+            return false;
+    }
+}
+
 static void gui_notify_reset_requested(gui_runtime_t *runtime) {
     if ((runtime == NULL) || (runtime->owner == NULL) || (runtime->bindings.on_reset_requested == NULL)) {
             return;
@@ -286,6 +311,48 @@ static void gui_handle_brightness_event(gui_runtime_t *runtime, lv_obj_t *target
     brightness_percent = lv_slider_get_value(runtime->screen.brightness_slider);
     gui_platform_set_brightness(brightness_percent);
     gui_screen_sync_brightness(&runtime->screen, brightness_percent);
+}
+
+static void gui_handle_energy_mode_event(gui_runtime_t *runtime, lv_obj_t *target,
+                                         lv_event_code_t event_code)
+{
+    gui_energy_panel_mode_t mode;
+
+    if ((runtime == NULL) || (event_code != LV_EVENT_CLICKED)) {
+        return;
+    }
+
+    if (target == runtime->screen.energy_leop_mode_button) {
+        mode = GUI_ENERGY_PANEL_MODE_LEOP;
+    } else if (target == runtime->screen.energy_spot_mode_button) {
+        mode = GUI_ENERGY_PANEL_MODE_SPOT_PRICE;
+    } else {
+        return;
+    }
+
+    if (gui_state_set_energy_panel_mode(&runtime->state, mode)) {
+        gui_render_runtime(runtime);
+    }
+}
+
+static void gui_handle_spot_price_area_event(gui_runtime_t *runtime, lv_obj_t *target,
+                                             lv_event_code_t event_code)
+{
+    gui_spot_price_area_t area;
+
+    if ((runtime == NULL) || (target != runtime->screen.spot_price_area_dropdown) ||
+        (event_code != LV_EVENT_VALUE_CHANGED)) {
+        return;
+    }
+
+    if (!gui_dropdown_index_to_spot_price_area(
+            lv_dropdown_get_selected(runtime->screen.spot_price_area_dropdown), &area)) {
+        return;
+    }
+
+    if (gui_state_set_spot_price_area(&runtime->state, area)) {
+        gui_render_runtime(runtime);
+    }
 }
 
 static void gui_handle_password_textarea_event(gui_runtime_t *runtime, lv_obj_t *target,
@@ -501,6 +568,8 @@ static void gui_handle_settings_event(lv_event_t *event)
 
     gui_handle_theme_event(runtime, target, event_code);
     gui_handle_brightness_event(runtime, target, event_code);
+    gui_handle_energy_mode_event(runtime, target, event_code);
+    gui_handle_spot_price_area_event(runtime, target, event_code);
     gui_handle_password_textarea_event(runtime, target, event_code);
     gui_handle_location_textarea_event(runtime, target, event_code);
     gui_handle_settings_navigation_event(runtime, target, event_code);
@@ -698,6 +767,60 @@ bool gui_get_energy_plan_state(gui_ctx_t *self, gui_energy_plan_t *energy_plan)
     }
 
     *energy_plan = runtime->state.energy_plan;
+    lvgl_port_unlock();
+    return true;
+}
+
+void gui_set_spot_price_state(gui_ctx_t *self, const gui_spot_price_state_t *spot_price)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (spot_price == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    if (gui_state_set_spot_price(&runtime->state, spot_price)) {
+        gui_render_runtime(runtime);
+    }
+    lvgl_port_unlock();
+}
+
+bool gui_get_spot_price_state(gui_ctx_t *self, gui_spot_price_state_t *spot_price)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (spot_price == NULL) || !lvgl_port_lock(-1)) {
+        return false;
+    }
+
+    *spot_price = runtime->state.spot_price;
+    lvgl_port_unlock();
+    return true;
+}
+
+void gui_set_spot_price_area(gui_ctx_t *self, gui_spot_price_area_t area)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || !lvgl_port_lock(-1)) {
+        return;
+    }
+
+    if (gui_state_set_spot_price_area(&runtime->state, area)) {
+        gui_render_runtime(runtime);
+    }
+    lvgl_port_unlock();
+}
+
+bool gui_get_spot_price_area(gui_ctx_t *self, gui_spot_price_area_t *area)
+{
+    gui_runtime_t *runtime = gui_get_runtime(self);
+
+    if ((runtime == NULL) || (area == NULL) || !lvgl_port_lock(-1)) {
+        return false;
+    }
+
+    *area = runtime->state.spot_price.area;
     lvgl_port_unlock();
     return true;
 }

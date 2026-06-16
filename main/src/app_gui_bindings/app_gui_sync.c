@@ -114,11 +114,17 @@ void app_gui_sync_runtime(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui)
     if (wifi_state_changed && (ctx->last_wifi_state == GUI_WIFI_STATE_CONNECTED)) {
         app_gui_forecast_schedule_now(ctx);
         app_gui_leop_schedule_now(ctx);
+        app_gui_spot_price_schedule_now(ctx);
     }
 
     if (ctx->location_changed) {
         app_gui_forecast_schedule_now(ctx);
         ctx->location_changed = false;
+    }
+
+    if (ctx->spot_price_area_changed) {
+        app_gui_spot_price_schedule_now(ctx);
+        ctx->spot_price_area_changed = false;
     }
 
     sync_sensor(gui);

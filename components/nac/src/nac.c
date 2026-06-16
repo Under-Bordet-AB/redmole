@@ -26,6 +26,7 @@
 #include "freertos/task.h"
 #include "sdkconfig.h"
 #include "task_scheduler.h"
+#include "uart_mole.h"
 
 #define REDMOLE_WIFI_SSID   CONFIG_REDMOLE_WIFI_SSID        // Set fallback SSID using menuconfig
 #define REDMOLE_WIFI_PASS   CONFIG_REDMOLE_WIFI_PASSWORD    // Set fallback password using menuconfig
@@ -539,7 +540,8 @@ static void wifi_disconnect(wifi_ctx_t *self)
     http_client_notify_network_down();
     ESP_LOGI(self->tag, "Notified http client of incoming disconnect");
     xEventGroupClearBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
-    ESP_LOGI(self->tag, "Notified event group of disconnect");
+    xEventGroupClearBits(*s_nac.event_group, UART_MOLE_SERVER_ONLINE_BIT);
+    ESP_LOGI(self->tag, "Notified event group of disconnect, bits cleared");
 
     sntp_sync_stop();
     ESP_LOGI(self->tag, "Stopped SNTP client");
@@ -666,6 +668,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(self->tag, "Started SNTP client");
         xEventGroupSetBits(*s_nac.event_group, UART_MOLE_WIFI_CONNECTED_BIT);
         ESP_LOGI(self->tag, "Notified event group of connect");
+        xEventGroupSetBits(*s_nac.event_group, UART_MOLE_SERVER_ONLINE_BIT);
         if (self->saved_to_nvs == 0 && s_wifi_ssid[0] != '\0')
         {
             rm_nvs_set_str("wifi_ssid", s_wifi_ssid);

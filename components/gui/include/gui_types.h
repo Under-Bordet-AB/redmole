@@ -23,6 +23,24 @@ typedef enum {
 } gui_panel_id_t;
 
 /**
+ * @brief View mode for the energy panel.
+ */
+typedef enum {
+    GUI_ENERGY_PANEL_MODE_LEOP = 0,      /*!< Show the LEOP action plan chart. */
+    GUI_ENERGY_PANEL_MODE_SPOT_PRICE,    /*!< Show the spot-price chart. */
+} gui_energy_panel_mode_t;
+
+/**
+ * @brief Swedish electricity price areas supported by the spot-price feed.
+ */
+typedef enum {
+    GUI_SPOT_PRICE_AREA_SE1 = 0, /*!< SE1 / Luleå / Norra Sverige. */
+    GUI_SPOT_PRICE_AREA_SE2,     /*!< SE2 / Sundsvall / Norra Mellansverige. */
+    GUI_SPOT_PRICE_AREA_SE3,     /*!< SE3 / Stockholm / Södra Mellansverige. */
+    GUI_SPOT_PRICE_AREA_SE4,     /*!< SE4 / Malmö / Södra Sverige. */
+} gui_spot_price_area_t;
+
+/**
  * @brief Available visual themes for the GUI.
  */
 typedef enum {
@@ -53,6 +71,8 @@ typedef enum {
 
 /** Hourly points stored in an energy plan day profile. */
 #define GUI_ENERGY_PLAN_POINT_COUNT 24
+/** Hourly points stored in a forward-looking spot-price profile. */
+#define GUI_SPOT_PRICE_POINT_COUNT 24
 /** Hour labels shown under the energy plan chart. */
 #define GUI_ENERGY_PLAN_TIME_LABEL_COUNT 5
 /** Number of daily forecast entries rendered in the forecast panel. */
@@ -93,6 +113,10 @@ typedef enum {
 #define GUI_FORECAST_DAY_RANGE_TEXT_MAX_LEN 20
 /** Maximum length of a last-updated timestamp label. */
 #define GUI_LAST_UPDATED_TEXT_MAX_LEN 32
+/** Maximum length of the current spot-price value text. */
+#define GUI_SPOT_PRICE_VALUE_TEXT_MAX_LEN 24
+/** Maximum length of the spot-price summary text. */
+#define GUI_SPOT_PRICE_SUMMARY_TEXT_MAX_LEN 64
 
 /**
  * @brief Latest sensor readings displayed by the GUI.
@@ -117,6 +141,21 @@ typedef struct {
     uint8_t start_hour; /*!< Hour represented by the first chart point, 0-23. */
     char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Null-terminated last successful update timestamp. */
 } gui_energy_plan_t;
+
+/**
+ * @brief Spot-price values rendered by the energy panel.
+ */
+typedef struct {
+    int16_t price_milli_kr[GUI_SPOT_PRICE_POINT_COUNT]; /*!< Hourly kr/kWh values, scaled by 1000. */
+    bool valid_points[GUI_SPOT_PRICE_POINT_COUNT]; /*!< True when the paired price point is known. */
+    int16_t current_price_milli_kr; /*!< Current quarter-hour kr/kWh value, scaled by 1000. */
+    bool has_current_price; /*!< True when current_price_milli_kr contains a fetched value. */
+    uint8_t start_hour; /*!< Hour represented by the first chart point, 0-23. */
+    gui_spot_price_area_t area; /*!< Selected Swedish price area used for the feed. */
+    char current_price_text[GUI_SPOT_PRICE_VALUE_TEXT_MAX_LEN]; /*!< Formatted current price value. */
+    char summary[GUI_SPOT_PRICE_SUMMARY_TEXT_MAX_LEN]; /*!< Compact min/max or availability summary. */
+    char last_updated[GUI_LAST_UPDATED_TEXT_MAX_LEN]; /*!< Null-terminated last successful update timestamp. */
+} gui_spot_price_state_t;
 
 /**
  * @brief Forecast details shown in the side card.
@@ -234,8 +273,10 @@ typedef struct {
  */
 typedef struct {
     gui_panel_id_t active_panel;                /*!< Panel that should be visible in the content area. */
+    gui_energy_panel_mode_t energy_panel_mode;  /*!< Subview shown inside the energy panel. */
     gui_sensor_state_t sensor;                  /*!< Latest environmental sensor state. */
     gui_energy_plan_t energy_plan;              /*!< Energy plan series rendered on the chart panel. */
+    gui_spot_price_state_t spot_price;          /*!< Spot-price series rendered on the energy panel. */
     gui_forecast_state_t forecast;              /*!< Forecast data rendered on the forecast panel. */
     gui_wifi_settings_t wifi;                   /*!< Wi-Fi dialog and connection settings. */
     gui_wifi_state_t wifi_state;                /*!< Sidebar Wi-Fi status indicator state. */

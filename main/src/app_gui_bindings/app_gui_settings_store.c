@@ -52,6 +52,19 @@ static bool parse_coordinate_in_range(const char *text, double min_value, double
     return (value >= min_value) && (value <= max_value);
 }
 
+static gui_spot_price_area_t resolve_spot_price_area(uint8_t area)
+{
+    switch ((gui_spot_price_area_t)area) {
+        case GUI_SPOT_PRICE_AREA_SE1:
+        case GUI_SPOT_PRICE_AREA_SE2:
+        case GUI_SPOT_PRICE_AREA_SE3:
+        case GUI_SPOT_PRICE_AREA_SE4:
+            return (gui_spot_price_area_t)area;
+        default:
+            return GUI_SPOT_PRICE_AREA_SE3;
+    }
+}
+
 bool app_gui_settings_load_saved_appearance(gui_init_config_t *config)
 {
     uint8_t value = 0;
@@ -122,6 +135,19 @@ void app_gui_settings_cache_current_location(app_gui_bindings_ctx_t *ctx, gui_ct
 
     ctx->last_location = location;
     ctx->has_last_location = true;
+}
+
+void app_gui_settings_cache_current_spot_price_area(app_gui_bindings_ctx_t *ctx,
+                                                    gui_ctx_t *gui)
+{
+    gui_spot_price_area_t area;
+
+    if ((ctx == NULL) || (gui == NULL) || !gui_get_spot_price_area(gui, &area)) {
+        return;
+    }
+
+    ctx->last_spot_price_area = resolve_spot_price_area((uint8_t)area);
+    ctx->has_last_spot_price_area = true;
 }
 
 bool app_gui_settings_load_location_for_forecast(app_gui_bindings_ctx_t *ctx,
@@ -197,6 +223,32 @@ bool app_gui_settings_load_saved_location(app_gui_bindings_ctx_t *ctx, gui_ctx_t
 
     gui_set_location_settings(gui, &location);
     app_gui_settings_cache_current_location(ctx, gui);
+    return true;
+}
+
+bool app_gui_settings_load_saved_spot_price_area(app_gui_bindings_ctx_t *ctx,
+                                                 gui_ctx_t *gui)
+{
+    uint8_t saved_area = (uint8_t)GUI_SPOT_PRICE_AREA_SE3;
+    gui_spot_price_area_t area;
+
+    if ((ctx == NULL) || (gui == NULL)) {
+        return false;
+    }
+
+    if (rm_nvs_get_u8(GUI_NVS_KEY_PRICE_AREA, &saved_area) != ESP_OK) {
+        saved_area = (uint8_t)GUI_SPOT_PRICE_AREA_SE3;
+    }
+
+    area = resolve_spot_price_area(saved_area);
+    gui_set_spot_price_area(gui, area);
+    ctx->last_spot_price_area = area;
+    ctx->has_last_spot_price_area = true;
+
+    if (area != (gui_spot_price_area_t)saved_area) {
+        (void)rm_nvs_set_u8(GUI_NVS_KEY_PRICE_AREA, (uint8_t)area);
+    }
+
     return true;
 }
 
@@ -334,6 +386,34 @@ bool app_gui_settings_save_location_if_changed(app_gui_bindings_ctx_t *ctx, gui_
     return true;
 }
 
+bool app_gui_settings_save_spot_price_area_if_changed(app_gui_bindings_ctx_t *ctx,
+                                                      gui_ctx_t *gui)
+{
+    gui_spot_price_area_t area;
+    esp_err_t err;
+
+    if ((ctx == NULL) || (gui == NULL) || !gui_get_spot_price_area(gui, &area)) {
+        return false;
+    }
+
+    area = resolve_spot_price_area((uint8_t)area);
+    if (ctx->has_last_spot_price_area && (ctx->last_spot_price_area == area)) {
+        return false;
+    }
+
+    err = rm_nvs_set_u8(GUI_NVS_KEY_PRICE_AREA, (uint8_t)area);
+    if (err != ESP_OK) {
+        ESP_LOGE(APP_GUI_BINDINGS_TAG, "rm_nvs_set_u8(%s) failed: %s",
+                 GUI_NVS_KEY_PRICE_AREA, esp_err_to_name(err));
+        return false;
+    }
+
+    ctx->last_spot_price_area = area;
+    ctx->has_last_spot_price_area = true;
+    ctx->spot_price_area_changed = true;
+    return true;
+}
+
 void app_gui_on_reset_requested(gui_ctx_t *gui, void *user_data) {
     app_gui_bindings_ctx_t *ctx = (app_gui_bindings_ctx_t *)user_data;
     gui_appearance_settings_t appearance = {
@@ -381,6 +461,11 @@ void app_gui_on_reset_requested(gui_ctx_t *gui, void *user_data) {
         rm_nvs_erase_key(GUI_NVS_KEY_LON);
     }
 
+    rm_nvs_key_exists(GUI_NVS_KEY_PRICE_AREA, &key_exists);
+    if (key_exists) {
+        rm_nvs_erase_key(GUI_NVS_KEY_PRICE_AREA);
+    }
+
     rm_nvs_key_exists(GUI_NVS_KEY_WIFI_SSID, &key_exists);
     if (key_exists) {
         rm_nvs_erase_key(GUI_NVS_KEY_WIFI_SSID);
@@ -405,6 +490,7 @@ void app_gui_on_reset_requested(gui_ctx_t *gui, void *user_data) {
     gui_set_appearance_settings(gui, &appearance);
     gui_set_brightness(gui, 82);
     gui_set_location_settings(gui, &location);
+    gui_set_spot_price_area(gui, GUI_SPOT_PRICE_AREA_SE3);
     gui_set_wifi_settings(gui, &wifi);
     gui_set_wifi_state(gui, GUI_WIFI_STATE_IDLE);
 
@@ -418,6 +504,9 @@ void app_gui_on_reset_requested(gui_ctx_t *gui, void *user_data) {
     ctx->has_last_appearance = true;
     ctx->last_location = location;
     ctx->has_last_location = true;
+    ctx->last_spot_price_area = GUI_SPOT_PRICE_AREA_SE3;
+    ctx->has_last_spot_price_area = true;
+    ctx->spot_price_area_changed = true;
     ctx->last_brightness = 82;
     ctx->has_last_brightness = true;
     ctx->last_wifi_state = GUI_WIFI_STATE_IDLE;

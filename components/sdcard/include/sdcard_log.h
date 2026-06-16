@@ -13,7 +13,8 @@ extern "C" {
 esp_err_t sdcard_log_init(const char *dir_path);
 
 /**
- * Flush or close logging
+ * Stop logging and release resources.
+ * Pending queued log messages may be discarded.
  */
 void sdcard_log_dispose(void);
 

@@ -127,7 +127,9 @@ static void gui_view_apply_update_label(gui_view_t *view, const gui_view_model_t
         text = model->sensor.last_updated;
     } else if (model->active_panel == GUI_PANEL_ENERGY_PLAN) {
         panel = view->energy_plan_panel;
-        text = model->energy_plan.last_updated;
+        text = (model->energy_panel_mode == GUI_ENERGY_PANEL_MODE_SPOT_PRICE)
+                   ? model->spot_price.last_updated
+                   : model->energy_plan.last_updated;
     } else if (model->active_panel == GUI_PANEL_FORECAST) {
         panel = view->forecast_panel;
         text = model->forecast.last_updated;
@@ -957,6 +959,8 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
                                  subtitle_text, effective_theme);
     gui_view_style_settings_card(view->location_card, item_bg, item_border, title_text,
                                  subtitle_text, effective_theme);
+    gui_view_style_settings_card(view->spot_price_area_card, item_bg, item_border,
+                                 title_text, subtitle_text, effective_theme);
     gui_view_style_settings_card(view->reset_card, item_bg, item_border, title_text,
                                  subtitle_text, effective_theme);
     if (view->wifi_status_label != NULL) {
@@ -993,6 +997,35 @@ void gui_view_apply_theme(gui_view_t *view, gui_view_theme_t theme, bool show_ba
         lv_obj_set_style_text_color(view->theme_dropdown, title_text, 0);
         lv_obj_set_style_text_font(view->theme_dropdown, body_font, 0);
         dropdown_list = lv_dropdown_get_list(view->theme_dropdown);
+        if (dropdown_list != NULL) {
+            lv_obj_set_style_bg_color(dropdown_list, dropdown_bg, 0);
+            lv_obj_set_style_bg_opa(dropdown_list, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_color(dropdown_list, dropdown_border, 0);
+            lv_obj_set_style_text_color(dropdown_list, title_text, 0);
+            lv_obj_set_style_text_font(dropdown_list, body_font, 0);
+            lv_obj_set_style_bg_color(dropdown_list, dropdown_selected_bg,
+                                      LV_PART_SELECTED | LV_STATE_CHECKED);
+            lv_obj_set_style_bg_opa(dropdown_list, LV_OPA_COVER,
+                                    LV_PART_SELECTED | LV_STATE_CHECKED);
+            lv_obj_set_style_text_color(dropdown_list, dropdown_selected_text,
+                                        LV_PART_SELECTED | LV_STATE_CHECKED);
+            lv_obj_set_style_text_font(dropdown_list, body_font,
+                                       LV_PART_SELECTED | LV_STATE_CHECKED);
+            lv_obj_set_style_bg_color(dropdown_list, dropdown_selected_bg, LV_PART_SELECTED);
+            lv_obj_set_style_text_color(dropdown_list, dropdown_selected_text,
+                                        LV_PART_SELECTED);
+            lv_obj_set_style_text_font(dropdown_list, body_font, LV_PART_SELECTED);
+        }
+    }
+
+    if (view->spot_price_area_dropdown != NULL) {
+        lv_obj_set_style_bg_color(view->spot_price_area_dropdown, dropdown_bg, 0);
+        lv_obj_set_style_bg_opa(view->spot_price_area_dropdown, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(view->spot_price_area_dropdown, dropdown_border, 0);
+        lv_obj_set_style_border_width(view->spot_price_area_dropdown, 1, 0);
+        lv_obj_set_style_text_color(view->spot_price_area_dropdown, title_text, 0);
+        lv_obj_set_style_text_font(view->spot_price_area_dropdown, body_font, 0);
+        dropdown_list = lv_dropdown_get_list(view->spot_price_area_dropdown);
         if (dropdown_list != NULL) {
             lv_obj_set_style_bg_color(dropdown_list, dropdown_bg, 0);
             lv_obj_set_style_bg_opa(dropdown_list, LV_OPA_COVER, 0);
@@ -1433,7 +1466,7 @@ void gui_view_init(gui_view_t *view, const gui_view_model_t *model, lv_event_cb_
 
     gui_view_init_bme280_panel(view, content);
     gui_view_init_settings_panel(view, settings_event_cb, event_user_data);
-    gui_view_init_energy_panel(view, content);
+    gui_view_init_energy_panel(view, content, settings_event_cb, event_user_data);
     gui_view_init_forecast_panel(view, content);
 
     view->update_label = lv_label_create(view->screen);

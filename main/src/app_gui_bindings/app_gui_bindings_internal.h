@@ -43,6 +43,10 @@ typedef struct {
     gui_location_settings_t last_location; /*!< Last location settings persisted or observed. */
     bool location_changed;           /*!< True when forecast data should be refreshed for a new location. */
 
+    bool has_last_spot_price_area;   /*!< True when last_spot_price_area contains a valid value. */
+    gui_spot_price_area_t last_spot_price_area; /*!< Last spot-price area persisted or observed. */
+    bool spot_price_area_changed;    /*!< True when spot-price data should be refreshed for a new area. */
+
     bool has_last_brightness;        /*!< True when last_brightness contains a valid cached value. */
     int32_t last_brightness;         /*!< Last persisted brightness percentage. */
 
@@ -51,6 +55,7 @@ typedef struct {
 
     task_node_t forecast_task;       /*!< Scheduler node for periodic forecast refresh. */
     task_node_t leop_task;           /*!< Scheduler node for periodic LEOP refresh. */
+    task_node_t spot_price_task;     /*!< Scheduler node for periodic spot-price refresh. */
     task_node_t sensor_task;         /*!< Scheduler node for periodic sensor refresh. */
 } app_gui_bindings_ctx_t;
 
@@ -79,6 +84,15 @@ void app_gui_settings_cache_current_appearance(app_gui_bindings_ctx_t *ctx, gui_
 void app_gui_settings_cache_current_location(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui);
 
 /**
+ * @brief Cache the GUI's current spot-price area setting.
+ *
+ * @param ctx Binding context to update; NULL is ignored.
+ * @param gui GUI context to read from; NULL is ignored.
+ */
+void app_gui_settings_cache_current_spot_price_area(app_gui_bindings_ctx_t *ctx,
+                                                    gui_ctx_t *gui);
+
+/**
  * @brief Load saved location settings from NVS and apply them to the GUI.
  *
  * Defaults are applied when no saved coordinates exist.
@@ -88,6 +102,18 @@ void app_gui_settings_cache_current_location(app_gui_bindings_ctx_t *ctx, gui_ct
  * @return True when a location model was applied.
  */
 bool app_gui_settings_load_saved_location(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui);
+
+/**
+ * @brief Load the saved spot-price area from NVS and apply it to the GUI.
+ *
+ * Defaults to SE3 when no valid saved area exists.
+ *
+ * @param ctx Binding context to update, must not be NULL.
+ * @param gui GUI context to update, must not be NULL.
+ * @return True when a spot-price area was applied.
+ */
+bool app_gui_settings_load_saved_spot_price_area(app_gui_bindings_ctx_t *ctx,
+                                                 gui_ctx_t *gui);
 
 /**
  * @brief Persist appearance or brightness changes to NVS.
@@ -108,6 +134,16 @@ bool app_gui_settings_save_appearance_if_changed(app_gui_bindings_ctx_t *ctx, gu
  * @return True when the location was written successfully.
  */
 bool app_gui_settings_save_location_if_changed(app_gui_bindings_ctx_t *ctx, gui_ctx_t *gui);
+
+/**
+ * @brief Persist spot-price area changes to NVS.
+ *
+ * @param ctx Binding context with cached previous value, must not be NULL.
+ * @param gui GUI context to read from, must not be NULL.
+ * @return True when the area was written successfully.
+ */
+bool app_gui_settings_save_spot_price_area_if_changed(app_gui_bindings_ctx_t *ctx,
+                                                      gui_ctx_t *gui);
 
 /**
  * @brief Read and validate the location used for forecast requests.
@@ -224,6 +260,20 @@ void app_gui_leop_register_task(app_gui_bindings_ctx_t *ctx);
  * @param ctx Binding context containing the scheduler node; NULL or inactive task is ignored.
  */
 void app_gui_leop_schedule_now(app_gui_bindings_ctx_t *ctx);
+
+/**
+ * @brief Register the periodic spot-price refresh scheduler node.
+ *
+ * @param ctx Binding context containing the scheduler node; NULL is ignored.
+ */
+void app_gui_spot_price_register_task(app_gui_bindings_ctx_t *ctx);
+
+/**
+ * @brief Schedule the spot-price refresh task to run immediately.
+ *
+ * @param ctx Binding context containing the scheduler node; NULL or inactive task is ignored.
+ */
+void app_gui_spot_price_schedule_now(app_gui_bindings_ctx_t *ctx);
 
 /**
  * @brief Write the placeholder last-updated label.
