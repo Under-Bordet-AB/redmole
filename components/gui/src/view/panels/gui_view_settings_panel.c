@@ -955,7 +955,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
         event_user_data);
 
     location_card = gui_view_create_setting_item_card(
-        system_stack, "Location", "Enter latitude and longitude in decimal degrees.",
+        system_stack, "Location", "Latitude and longitude in decimal degrees.",
         LV_SIZE_CONTENT);
     gui_view_set_settings_grid_card(location_card);
     view->location_card = location_card;
@@ -967,7 +967,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
                                              "18.0686", settings_event_cb, event_user_data);
 
     spot_price_area_card = gui_view_create_setting_item_card(
-        system_stack, "Spot-price area", "Choose Swedish price area for spot-price data.",
+        system_stack, "Spot-price area", "Price area for spot-price data.",
         LV_SIZE_CONTENT);
     gui_view_set_settings_grid_card(spot_price_area_card);
     view->spot_price_area_card = spot_price_area_card;
