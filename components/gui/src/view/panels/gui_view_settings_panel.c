@@ -975,7 +975,7 @@ void gui_view_init_settings_panel(gui_view_t *view, lv_event_cb_t settings_event
     view->spot_price_area_dropdown = lv_dropdown_create(spot_price_area_card);
     lv_obj_set_size(view->spot_price_area_dropdown, LV_PCT(100), 46);
     lv_dropdown_set_options(view->spot_price_area_dropdown,
-                            "SE1 / Luleå\nSE2 / Sundsvall\nSE3 / Stockholm\nSE4 / Malmö");
+                            "SE1 / Lulea\nSE2 / Sundsvall\nSE3 / Stockholm\nSE4 / Malmo");
     lv_dropdown_set_selected(view->spot_price_area_dropdown, 2);
     lv_obj_add_event_cb(view->spot_price_area_dropdown, settings_event_cb,
                         LV_EVENT_VALUE_CHANGED, event_user_data);
