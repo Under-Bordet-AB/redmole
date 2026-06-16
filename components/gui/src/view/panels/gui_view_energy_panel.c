@@ -11,9 +11,15 @@
 #include "../gui_view_common.h"
 
 #define GUI_VIEW_ENERGY_PANEL_MARGIN 24
+#define GUI_VIEW_ENERGY_PANEL_ROW_GAP 14
 #define GUI_VIEW_ENERGY_MODE_ROW_HEIGHT 40
-#define GUI_VIEW_ENERGY_MODE_BUTTON_WIDTH 104
+#define GUI_VIEW_ENERGY_MODE_BUTTON_WIDTH 128
 #define GUI_VIEW_ENERGY_MODE_BUTTON_HEIGHT 34
+#define GUI_VIEW_ENERGY_MODE_BUTTON_GAP 10
+#define GUI_VIEW_ENERGY_MODE_ROW_WIDTH \
+    ((GUI_VIEW_ENERGY_MODE_BUTTON_WIDTH * 2) + GUI_VIEW_ENERGY_MODE_BUTTON_GAP)
+#define GUI_VIEW_ENERGY_MODE_SPACER_HEIGHT \
+    (GUI_VIEW_ENERGY_MODE_ROW_HEIGHT - GUI_VIEW_ENERGY_PANEL_ROW_GAP)
 #define GUI_VIEW_ENERGY_OVERVIEW_HEIGHT 128
 #define GUI_VIEW_ENERGY_ACTION_STRIP_HEIGHT 26
 #define GUI_VIEW_ENERGY_ACTION_SEGMENT_HEIGHT 14
@@ -572,6 +578,10 @@ static void gui_view_layout_energy_panel(gui_view_t *view)
     lv_obj_set_size(view->energy_plan_panel, panel_width, panel_height);
     lv_obj_align(view->energy_plan_panel, LV_ALIGN_CENTER, 0, 0);
 
+    if (view->energy_mode_row != NULL) {
+        lv_obj_move_foreground(view->energy_mode_row);
+    }
+
     overview_row = lv_obj_get_child(view->energy_plan_panel, 1);
     action_strip_row = lv_obj_get_child(view->energy_plan_panel, 2);
     time_row = lv_obj_get_child(view->energy_plan_panel, 4);
@@ -587,7 +597,10 @@ static void gui_view_layout_energy_panel(gui_view_t *view)
         lv_obj_set_width(overview_row, chart_width);
     }
     if (view->energy_mode_row != NULL) {
-        lv_obj_set_width(view->energy_mode_row, chart_width);
+        lv_obj_set_size(view->energy_mode_row, GUI_VIEW_ENERGY_MODE_ROW_WIDTH,
+                        GUI_VIEW_ENERGY_MODE_ROW_HEIGHT);
+        lv_obj_align(view->energy_mode_row, LV_ALIGN_TOP_MID, 0, -10);
+        lv_obj_move_foreground(view->energy_mode_row);
     }
     if (legend_container != NULL) {
         lv_obj_set_width(legend_container, GUI_VIEW_ENERGY_LEGEND_ITEM_WIDTH);
@@ -734,6 +747,7 @@ static lv_obj_t *gui_view_create_energy_mode_button(lv_obj_t *parent,
 void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content,
                                 lv_event_cb_t settings_event_cb, void *event_user_data)
 {
+    lv_obj_t *mode_spacer;
     lv_obj_t *overview_row;
     lv_obj_t *legend_container;
     lv_obj_t *action_strip_row;
@@ -760,7 +774,7 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content,
     lv_obj_set_style_border_width(view->energy_plan_panel, 1, 0);
     lv_obj_set_style_border_color(view->energy_plan_panel, lv_color_hex(0xD9E3F1), 0);
     lv_obj_set_style_pad_all(view->energy_plan_panel, 24, 0);
-    lv_obj_set_style_pad_row(view->energy_plan_panel, 14, 0);
+    lv_obj_set_style_pad_row(view->energy_plan_panel, GUI_VIEW_ENERGY_PANEL_ROW_GAP, 0);
     lv_obj_clear_flag(view->energy_plan_panel, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_layout(view->energy_plan_panel, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(view->energy_plan_panel, LV_FLEX_FLOW_COLUMN);
@@ -768,22 +782,34 @@ void gui_view_init_energy_panel(gui_view_t *view, lv_obj_t *content,
                           LV_FLEX_ALIGN_CENTER);
 
     view->energy_mode_row = lv_obj_create(view->energy_plan_panel);
-    lv_obj_set_size(view->energy_mode_row, LV_PCT(100), GUI_VIEW_ENERGY_MODE_ROW_HEIGHT);
+    lv_obj_set_size(view->energy_mode_row, GUI_VIEW_ENERGY_MODE_ROW_WIDTH,
+                    GUI_VIEW_ENERGY_MODE_ROW_HEIGHT);
     lv_obj_set_style_bg_opa(view->energy_mode_row, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(view->energy_mode_row, 0, 0);
     lv_obj_set_style_shadow_width(view->energy_mode_row, 0, 0);
     lv_obj_set_style_pad_all(view->energy_mode_row, 0, 0);
-    lv_obj_set_style_pad_column(view->energy_mode_row, 10, 0);
+    lv_obj_set_style_pad_column(view->energy_mode_row, GUI_VIEW_ENERGY_MODE_BUTTON_GAP, 0);
     lv_obj_clear_flag(view->energy_mode_row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(view->energy_mode_row,
+                    LV_OBJ_FLAG_IGNORE_LAYOUT | LV_OBJ_FLAG_FLOATING);
     lv_obj_set_layout(view->energy_mode_row, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(view->energy_mode_row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(view->energy_mode_row, LV_FLEX_ALIGN_END,
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_align(view->energy_mode_row, LV_ALIGN_TOP_RIGHT, 0, 0);
 
     view->energy_leop_mode_button = gui_view_create_energy_mode_button(
         view->energy_mode_row, "LEOP", settings_event_cb, event_user_data);
     view->energy_spot_mode_button = gui_view_create_energy_mode_button(
         view->energy_mode_row, "Spot price", settings_event_cb, event_user_data);
+
+    mode_spacer = lv_obj_create(view->energy_plan_panel);
+    lv_obj_set_size(mode_spacer, LV_PCT(100), GUI_VIEW_ENERGY_MODE_SPACER_HEIGHT);
+    lv_obj_set_style_bg_opa(mode_spacer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(mode_spacer, 0, 0);
+    lv_obj_set_style_shadow_width(mode_spacer, 0, 0);
+    lv_obj_set_style_pad_all(mode_spacer, 0, 0);
+    lv_obj_clear_flag(mode_spacer, LV_OBJ_FLAG_SCROLLABLE);
 
     overview_row = lv_obj_create(view->energy_plan_panel);
     lv_obj_set_size(overview_row, LV_PCT(100), GUI_VIEW_ENERGY_OVERVIEW_HEIGHT);
