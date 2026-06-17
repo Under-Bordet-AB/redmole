@@ -5,26 +5,22 @@
 Jag har arbetat med tre moduler: `rm_nvs`, `board_i2c` och
 `environment_measurements`.
 
-Min röda tråd har varit att varje modul ska äga en resurs eller ett tydligt
+Min tanke är att varje modul ska äga en resurs eller ett tydligt
 ansvarsområde. Sedan försöker jag dölja implementationen bakom ett så litet
 interface som möjligt.
 
-Då får vi EN tydlig plats för kontroll, logging, ändringar och felsökning.
-Applikationslagret kan bara anropa enkla funktioner för det den behöver.
+Då får vi EN tydlig plats för kontroll, logging, ändringar och felsökning
+och applikationslagret kan bara anropa enkla funktioner för det den behöver.
 
 ## Slide 1: `rm_nvs`
 
-`rm_nvs` är en wrapper ovanpå ESP-IDF:s NVS, alltså flash-lagring för
-inställningar.
-
 Om varje modul använder ESP-IDF:s API direkt får vi
 snabbt flera olika sätt att öppna handles, välja namespace, göra commit och
-hantera fel. Därför samlar wrappern den hanteringen på ett ställe.
+hantera fel. Därför samlar vår `rm_nvs` wrapper den hanteringen på ett ställe.
 
-I vår modul är namespace centralt definierat och API:t är uppdelat i typade
-funktioner, till exempel för olika värdetyper. Det gör att vi kan validera
-argument innan vi skriver och att resten av applikationen kan lita på
-NVS-värdena.
+Namespace är centralt definierat och API:t är uppdelat i typade
+funktioner.  Det gör att vi kan validera
+argument.
 
 Vi skriver ganska sällan till NVS, så vi behöver inte optimera med batching nu.
 Det viktiga är att alla skrivningar går genom samma modul. Om vi senare vill
@@ -35,65 +31,47 @@ då en tydlig och plats att göra det på.
 
 `board_i2c` äger åtkomsten till kortets gemensamma I2C-buss.
 
-På bussen finns flera enheter, till exempel BME280-sensorn och
-touch-kontrollern. Modulen äger inte enheterna och den känner inte till deras
-protokoll. Den äger bara transporten och ser till att åtkomsten sker på ett
-kontrollerat sätt.
+Modulen äger inte I2C-enheterna. Den äger projektets gemensamma gräns mot
+bussen och ser till att åtkomsten sker på ett kontrollerat sätt.
 
-En enhetsdriver registrerar sin device på bussen och använder sedan
-funktioner för till exempel registerläsning och registerskrivning.
+Poängen är framför allt att varje modul inte ska initiera och konfigurera samma
+fysiska buss själv. Det ska finnas en gemensam bus-instans och en gemensam
+policy för hur devices på bussen hanteras.
 
-Det viktiga är att bara en transaktion använder bussen åt gången. Om två delar
-av systemet försöker prata över I2C samtidigt kan värden bli korrupta eller
-transaktioner störa varandra. Därför validerar `board_i2c` anropet, tar ett lås,
-låter ESP-IDF-drivern utföra transaktionen och släpper sedan låset.
+Modulen initierar bussen, registrerar devices, validerar anrop och
+håller livscykel och hjälpfunktioner samlade. Själva transaktionen lämnas sedan
+till ESP-IDF-drivern.
 
 Samma ägarskapsidé finns här: en delad fysisk resurs får en tydlig
-ägare, och framtida loggning eller felsökning kan läggas på ett ställe.
+ägare, och framtida utökning eller kontroll kan läggas på ett ställe.
 
 ## Slide 3: `environment_measurements`
 
 Den största modulen är `environment_measurements`. Den äger flödet från lokal
 miljösensor till användbar mätdata.
 
-Resten av applikationen ska inte behöva känna till BME280-register,
-kalibreringsformler eller hur polling fungerar. Den ska bara kunna fråga efter
-senaste giltiga mätdata via modulens smala C-API.
+Resten av applikationen ska inte behöva känna till något om hårdvara eller polling.
+Den ska bara kunna fråga efter senaste giltiga mätdata via modulens smala C-API.
 
 Internt finns en `MeasurementsManager` som äger polling-tasken. Den läser med
-intervallet inställt från menuconfig och anropar en producent. Just nu är producenten
+intervallet inställningarna från menuconfig och anropar en producent. Just nu är producenten
 `Bme280Producer`, som i sin tur använder `Bme280Sensor`-drivern.
 
-`Bme280Sensor` hanterar det hårdvaruspecifika: registerläsning över I2C,
-kalibreringsdata och kompensation av råvärden. Efter det översätter
-`Bme280Producer` resultatet till en `MeasurementBatch` med logiska mätkanaler,
-till exempel temperatur, luftfuktighet och tryck.
-
-Den här designen kom efter en första mer direkt C-lösning. Den fungerade, men
-den var hårt formad runt BME280 och en fast sample-struct. Därför flyttade jag
-ansvaret från "läs den här sensorn" till "publicera miljömätningar som logiska
-kanaler".
-
-Vi lagrar inte en BME280-formad struct i hela systemet. I stället bryts värdena
-upp i generiska kanaler.`MeasurementStore` lagrar senaste värdet och metadata per kanal.
-
-Det här är inte tänkt som en stor generell abstraktion. Det är snarare minsta
- rimliga steget efter en helt hårdkodadvBME280-driver. Så fort vi vill kunna
- simulera sensorn, byta sensor, lägga till
-en mer exakt temperatursensor eller kombinera intern och extern temperatur
-behöver vi ändå separera fysisk källa från logisk mätdata. Kanalerna gör det på
-ett billigt sätt.
-
-Alla producenter följer samma C++ `MeasurementProducer`-interface. Det betyder att
-den riktiga BME280-producenten och en simulerad producent kan användas genom
-samma pipeline. Manager och store behöver inte veta om datan kommer från
-hårdvara eller simulering.
-
-När batchen kommer tillbaka validerar managern den, sätter en monoton
-tidsstämpel och publicerar den till `MeasurementStore`. Store uppdaterar
-kanalerna under samma mutex, så mätvärden från samma avläsning hålls ihop.
+Drivern hanterar det hårdvaruspecifika och 
+Producern delar upp mätvärdena till en `MeasurementBatch` med separata mätkanaler. För bme280 blir det: temperatur, luftfuktighet och tryck.
 
 Vid C-API-gränsen väljer vi sedan vilka kanaler som ska kombineras till den
 datastruktur som konsumenten behöver. Just nu är det ett indoor snapshot med
-temperatur, luftfuktighet och tryck. Men internt är lagringen inte hårt låst
-till just BME280 eller exakt den publika strukturen.
+temperatur, luftfuktighet och tryck. 
+
+Detta är inte tänkt som en stor generell abstraktion. Det är tänkt som minsta
+rimliga steget efter att bara "hårdkoda" hela systemet runt BME280 sensorn.
+
+Så fort vi vill kunna simulera sensorn, byta sensor, lägga till en mer exakt separat temperatursensor eller flera olika sensorer behöver vi ändå separera fysisk källa från logisk mätdata.
+
+Jag tycker att kanalerna gör det på ett billigt sätt.
+
+Alla producenter följer samma C++ `MeasurementProducer`-interface. Det är så 
+simulering och implementering av nya sensorer blir enkel.
+
+DEt är även enkelt att i C API:et exponera nya kombinationer av kanaler till applagret.

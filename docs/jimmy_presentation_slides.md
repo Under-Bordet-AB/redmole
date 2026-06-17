@@ -41,8 +41,9 @@ sequenceDiagram
 ```
 
 - Äger den delade fysiska I2C-bussen och dess livscykel.
+- Hindrar att varje modul initierar samma buss separat.
 - Validerar argument innan en fysisk transaktion startas.
-- Serialiserar samtidiga transaktioner med ett lås.
+- Samlar validering, devices och hjälpfunktioner bakom ett projekt-API.
 - Håller sensorprotokoll utanför bussmodulen.
 
 ## MODUL: `environment_measurements`
