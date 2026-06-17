@@ -1,14 +1,8 @@
-# Individuell reflektion över grupparbetet RedMole
+# Individuell reflektion över grupparbetet RedMole / LEOP Terminal, Jimmy Jordan
 
-## NVS, delad I2C-buss och miljömätningar
+## Om detta dokument
 
-**Författare:** Jimmy Jordan
-
-**Kurs:** Kurs 4
-
-## Läsanvisning
-
-Detta dokument ger en överblick över mitt arbete, mina viktigaste designbeslut och vad jag har lärt mig. Exakta API-kontrakt, konfigurationer och implementationsdetaljer finns närmare koden:
+Detta dokument ger en överblick över mitt arbete, mina viktigaste designbeslut och vad jag har lärt mig i kursprojektet RedMole / LEOP Terminal. Exakta API-kontrakt, konfigurationer och implementationsdetaljer finns närmare koden:
 
 | Modul | Detaljerad dokumentation | Publikt API |
 |---|---|---|
@@ -28,21 +22,17 @@ Jag har byggt dessa tre moduler:
 
 Den gemensamma designidén är att varje modul ska vara enkel att använda, ha ett tydligt ansvar, äga sitt tillstånd och exponera ett begränsat API. Resten av applikationen ska behöva känna till så lite som möjligt om modulens interna implementation.
 
-Arbetet var iterativt: jag byggde först lösningar som fungerade och gjorde om designen när modulgränserna visade sig vara fel. Miljömodulen är det tydligaste exemplet, eftersom den första fungerande C-lösningen senare ersattes av en C++-design uppbyggd kring miljömätningar i stället för en specifik sensor.
-
-## Systemöversikt
-
-Applikationen initierar först `board_i2c` och därefter miljömodulen, som använder den delade bussen för BME280. GUI och UART hämtar sedan kopior av den senaste mätningen. `rm_nvs` används separat för beständiga inställningar.
+Arbetet var iterativt: jag byggde först lösningar som fungerade och gjorde om designen när modulgränserna visade sig vara fel. Miljömodulen är det tydligaste exemplet, eftersom den första fungerande C-lösningen senare ersattes av en C++-design baserad på ett gemensamt producentinterface som delar upp råa mätvärden till individuella kanaler.
 
 ## Modulmodell, ägarskap och exekvering
 
-De tre modulerna är single-instance i den färdiga produkten, men de arbetar på olika sätt:
+De tre modulerna är "single-instance", men de arbetar på olika sätt:
 
 | Modul | Exekveringsmodell | Äger främst | Hur data delas |
 |---|---|---|---|
 | `rm_nvs` | Passiv C-servicemodul som kör i anroparens task. | Wrapperns init-status, namespace och lagringspolicy. | Värden och buffertar kopieras in eller ut genom API:t. |
 | `board_i2c` | Passiv C-servicemodul som kör i anroparens task. | Den gemensamma bussens konfiguration, handle och livscykel. | Anroparägda buffertar och device-handles används för transaktioner. |
-| `environment_measurements` | Aktiv produktmodul med en egen polling-task. | Producenter, polling, senaste kanalvärden och synkroniseringsobjekt. | Konsumenter får en kopia av en sammanhängande snapshot. |
+| `environment_measurements` | Aktiv modul med en egen polling-task. | Producenter, polling, senaste kanalvärden och synkroniseringsobjekt. | Konsumenter får en kopia av en sammanhängande snapshot. |
 
 ## `rm_nvs`: enkel och gemensam beständig lagring
 
@@ -50,10 +40,9 @@ ESP-IDF erbjuder redan NVS, men utan en gemensam wrapper hade varje del av appli
 
 Jag valde medvetet en enkel design:
 
-- varje operation öppnar och stänger ett eget handle,
-- varje lyckad skrivning committas direkt,
-- modulen äger en kopia av applikationens namespace,
-- initiering och modulens livscykel skyddas mot samtidiga anrop.
+- varje operation öppnar och stänger ett eget handle
+- varje lyckad skrivning committas direkt
+- initiering och modulens livscykel skyddas mot samtidiga anrop
 
 Det ger lite extra arbete vid varje operation och fler flash-skrivningar, men NVS används bara för enstaka inställningar och inte i tidskritisk kod. Tydligt ägarskap var därför viktigare än maximal prestanda.
 
@@ -63,15 +52,15 @@ Modulens lås skyddar livscykeln och namespace när ett handle öppnas, medan ES
 
 ## `board_i2c`: ägarskap av en delad fysisk resurs
 
-Flera enheter använder samma fysiska I2C-buss. Om varje drivrutin själv försökte initiera och kontrollera bussen skulle konfiguration, synkronisering och livscykel bli utspridda i systemet. Det skulle öka risken för buggar när flera tasks försöker använda bussen samtidigt eller när drivrutiner gör motstridiga antaganden om bussens inställningar. 
+Flera enheter använder samma fysiska I2C-buss. Om varje drivrutin själv försökte initiera och kontrollera bussen skulle konfiguration, device-registrering och livscykel bli utspridda i systemet.
 
 `board_i2c` äger därför själva bussen och ger drivrutiner gemensamma funktioner för att registrera enheter samt läsa och skriva.
 
-Modulen ser till att två wrapper-anrop inte utför busstransaktioner samtidigt. Låset skyddar däremot bara ett publikt anrop i taget, inte en serie av flera separata anrop. När det första anropet har släppt låset kan en annan task hinna utföra en transaktion innan nästa anrop börjar. En operation som måste vara odelbar behöver därför uttryckas som ett enda wrapper- och driveranrop.
+ESP-IDF:s I2C-masterdriver synkroniserar själva mastertransaktionerna internt. `board_i2c` ersätter alltså inte drivrutinens semafor, utan samlar projektets policy ovanpå den: bus-initiering, device-konfiguration, argumentvalidering, hjälpfunktioner och kontrollerad livscykel.
 
-Min viktigaste insikt från denna modul är att en buss inte bara är en samling hjälpfunktioner. Den är en delad fysisk resurs som behöver en tydlig ägare.
+Respektive drivrutin behåller sitt device-handle. Ett centralt device-register eller en köad bus manager hade kunnat ge mer kontroll, men skulle öka komplexiteten utan att lösa ett aktuellt behov. För nuvarande korta, synkrona transaktioner och ESP-IDF:s egen transaktionssynkronisering är den enklare lösningen rimlig.
 
-Respektive drivrutin behåller sitt device-handle. Ett centralt register eller en köad bus manager hade kunnat ge mer kontroll, men skulle öka komplexiteten utan att lösa ett aktuellt behov. För nuvarande korta, synkrona transaktioner är den enklare lösningen rimlig.
+Min viktigaste insikt från denna modul är att en buss inte bara är en samling hjälpfunktioner. Den är en delad fysisk resurs som behöver en tydlig ägare. Samma tanke gäller NVS: även enkla resurser behöver en gemensam policy när flera utvecklare bygger på samma system.
 
 ## `environment_measurements`: från sensorspecifik kod till logiskt ansvar
 
@@ -105,16 +94,7 @@ En enda task pollar producenterna sekventiellt. En lyckad sensoravläsning publi
 
 Task, stack och synkroniseringsobjekt har statisk eller processlång lagring. Mätflödet behöver därför inte dynamisk allokering.
 
-### Samtidighet och felhantering
-
-Miljömodulen använder flera synkroniseringsmekanismer med olika ansvar:
-
-- En enda manager-task pollar alla producenter sekventiellt.
-- `MeasurementStore` använder mutex för atomisk publicering, invalidering och kopiering.
-- En atomisk flagga kommunicerar stoppbegäran till polling-tasken.
-- Task notifications används för tidsstyrd väntan och för att väcka tasken.
-- En binär semafor bekräftar att tasken har observerat ett stopp.
-- `board_i2c` serialiserar de underliggande busstransaktionerna.
+### Felhantering
 
 Felhanteringen försöker hålla resten av applikationen enkel. Om en sensoravläsning misslyckas ogiltigförklaras producentens kanaler direkt, så gammal data inte fortsätter visas som aktuell. Sensorn markeras samtidigt som ej redo, och nästa läsförsök gör om hela initieringen. På så sätt kan modulen återhämta sig från en tillfällig frånkoppling utan att hela systemet behöver startas om.
 
@@ -126,11 +106,11 @@ Tidsstämplarna baseras på monoton tid sedan uppstart. De används för att avg
 
 Den nya miljömodulen har fler typer och lager än den första C-lösningen. Vinsten är att hårdvaruprotokoll, produktion, polling, lagring och publik representation kan förändras mer oberoende av varandra. Kostnaden är att arkitekturen kräver tydligare dokumentation och tar längre tid att förstå.
 
-Kanalmodellen gör det enklare att senare byta sensor, lägga till mätvärden eller skicka batchar vidare. Nuvarande produkt väljer dock exakt en inomhusproducent vid kompilering och exponerar bara den senaste inomhusmätningen.
+Kanalmodellen gör det enklare att byta eller lägga till sensorer och exponera nya kombinationer av kanaler via C-API:t. Nuvarande produkt väljer dock exakt en inomhusproducent vid kompilering och exponerar bara den senaste inomhusmätningen.
 
 ## Testning och felhantering
 
-Testerna byggs som en separat ESP-IDF-testfirmware som flashas och körs på det fysiska ESP32-S3-kortet. När testfirmwaren startar kör Unity automatiskt alla registrerade testfall och skriver ut en sammanfattning.
+Testerna byggs som en separat ESP-IDF-testfirmware som flashas och körs på det fysiska ESP32-S3-kortet. När testfirmwaren startar kör Unity automatiskt alla registrerade testfall och skriver ut en sammanfattning. Det är inte en full CI-lösning, men det är ett steg mot repeterbar testautomation eftersom samma testfirmware kan byggas och köras på samma sätt efter varje ändring.
 
 Varje modul har ett enkelt test. Poängen just nu är att lära mig hur Unity integreras med ESP-IDF och hur man skriver enkla tester:
 
@@ -140,11 +120,10 @@ Varje modul har ett enkelt test. Poängen just nu är att lära mig hur Unity in
 | `board_i2c` | Kör argumentvalideringen på målplattformen utan att utföra en fysisk busstransaktion. | Kommunikation med anslutna enheter, timeouter, bussfel och samtidiga användare. |
 | `environment_measurements` | Kör simulatorproducenten på målplattformen och verifierar en batch med tre mätningar. | Verklig BME280, store, färskhetskontroll, återhämtning och samtidighet. |
 
-Testfirmwaren verifierar att produktionskomponenterna kan byggas, länkas och köras på rätt målplattform, men simulator- och argumenttester verifierar inte ansluten periferihårdvara.
 
 ## AI-användning
 
-AI har skrivit det mesta av koden i de tre modulerna. Jag har använt AI för att bolla idéer, få korta förklaringar och minihandledningar samt omvandla mina krav och designbeslut till C- och C++-kod, tester och dokumentation. Detta var särskilt viktigt för C++-syntax och ESP-IDF-detaljer, där jag förstod de övergripande koncepten bättre än jag behärskade språket och ramverket.
+AI har skrivit mycket av koden i de tre modulerna. Jag har löpande använt AI för att bolla idéer, få korta förklaringar och minihandledningar samt omvandla mina krav och designbeslut till kod. Detta var särskilt viktigt för C++-syntax och ESP-IDF-detaljer, där jag förstod de övergripande koncepten bättre än jag behärskade språket och ramverket. AI kan både förklara på rätt nivå för mig samt länka till relevant dokumentation för manuell verifikation.
 
 ### Min arbetsprocess
 
@@ -154,13 +133,11 @@ Den sista passagen är viktigast för mitt lärande. Då går jag igenom koden m
 
 ### Möjligheter och risker
 
-AI gjorde det möjligt att snabbt prova designalternativ och genomföra den sena omskrivningen till C++. Utan stödet hade jag sannolikt inte hunnit lika långt. Den största risken är samtidigt att AI kan producera kod som ser professionell ut men som jag inte förstår, behöver eller har verifierat.
+AI gjorde det möjligt att snabbt prova designalternativ och genomföra den sena omskrivningen till C++ under projektets slutskede. Git-historiken visar att den nya environment-modulen började ta form den 3 juni. Eftersom jag behövde resa bort av familjeskäl den 9 juni gjordes kärnan av omskrivningen på ungefär fem dagar. Utan AI-stödet hade jag sannolikt inte hunnit iterera så snabbt.
 
-### Min nuvarande förståelse
+Den största risken är samtidigt att AI kan producera kod som ser professionell ut men som jag inte förstår, behöver eller har verifierat. Jag har manuellt gått igenom all kod, men fem dagar är för kort tid för att förstå C++ och alla finstilta nyanser i modulen på djupet. I skarp produktion har man dock sannolikt längre tid på sig.
 
-Jag förstår systemets övergripande design, modulernas ansvar, ägarskap, dataflöden och viktigaste avvägningar. Jag har läst all kod jag genererat minst en gång. Min förståelse är starkast på system- och designnivå, medan min praktiska behärskning av C++ fortfarande behöver utvecklas.
-
-Arbetssättet har lärt mig att AI kan vara mycket effektivt för implementation, men att det inte ersätter förståelse eller tekniskt ansvar.
+Arbetssättet har lärt mig att AI kan vara mycket effektivt för implementation, men att det inte ersätter förståelse och att AI aldrig kan ta tekniskt ansvar.
 
 ## Slutsats
 
@@ -168,6 +145,6 @@ De tre modulerna visar samma grundidé på olika nivåer: en modul ska äga sitt
 
 Den viktigaste lärdomen är att först lösa det aktuella problemet och därefter välja små generaliseringar som förbättrar testbarheten eller stödjer sannolika nästa steg. På så sätt kunde designen växa fram iterativt medan jag själv lärde mig både embedded och C++.
 
-Arbetet har också gjort dataägarskap och synkronisering tydligare för mig. Kopiering över API-gränser låter en modul behålla kontroll över sitt interna tillstånd. 
+Arbetet har också gjort dataägarskap och synkronisering tydligare för mig. Kopiering över API-gränser låter en modul behålla kontroll över sitt interna tillstånd.
 
 Jag gick in i kursen utan tidigare kunskap om inbyggda system och har byggt upp en betydligt större förståelse för området. Att i ett verkligt projekt få designa en C++-modul som hanterar hårdvara, tasks, synkronisering och fel, men samtidigt erbjuder ett enkelt API till resten av programmet, var väldigt lärorikt. Till nästa projekt tar jag med mig vikten av tydligt ansvar och ägarskap, men också att låta designen utvecklas stegvis utifrån verkliga behov.
