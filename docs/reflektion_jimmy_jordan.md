@@ -1,16 +1,41 @@
-# Individuell reflektion över grupparbetet RedMole / LEOP Terminal, Jimmy Jordan
+---
+title: Individuell reflektion - RedMole / LEOP Terminal
+"markdown-pdf":
+  styles:
+    - reflection-pdf.css
+  stylesRelativePathFile: true
+  includeDefaultStyles: false
+  format: A4
+  margin:
+    top: 18mm
+    bottom: 18mm
+    left: 18mm
+    right: 18mm
+  displayHeaderFooter: true
+  headerTemplate: '<div style="width:100%;font-size:8px;color:#6b7280;margin:0 18mm;display:flex;justify-content:space-between;"><span>Individuell reflektion</span><span>RedMole / LEOP Terminal</span></div>'
+  footerTemplate: '<div style="width:100%;font-size:8px;color:#6b7280;margin:0 18mm;text-align:center;"><span class="pageNumber"></span> / <span class="totalPages"></span></div>'
+  printBackground: true
+---
+
+# Individuell reflektion
+<p class="document-subtitle">RedMole / LEOP Terminal</p>
+<p class="document-meta">Jimmy Jordan · Inbyggda system och industriell programmering</p>
 
 ## Om detta dokument
 
-Detta dokument ger en överblick över mitt arbete, mina viktigaste designbeslut och vad jag har lärt mig i kursprojektet RedMole / LEOP Terminal. Exakta API-kontrakt, konfigurationer och implementationsdetaljer finns närmare koden:
+Detta dokument ger en överblick över mitt arbete, mina viktigaste designbeslut och vad jag har lärt mig i kursprojektet RedMole. Exakta API-kontrakt, konfigurationer och implementationsdetaljer finns närmare koden:
 
-| Modul | Detaljerad dokumentation | Publikt API |
-|---|---|---|
-| `rm_nvs` | [NVS README](../components/nvs/README.md) | [`rm_nvs.h`](../components/nvs/include/rm_nvs.h) |
-| `board_i2c` | [Board I2C README](../components/board_i2c/README.md) | [`board_i2c.h`](../components/board_i2c/include/board_i2c.h) |
-| `environment_measurements` | [Environment Measurements README](../components/environment_measurements/README.md) | [`environment_measurements.h`](../components/environment_measurements/include/environment_measurements.h) |
+- `rm_nvs`
+  - README: `components/nvs/README.md`
+  - API: `components/nvs/include/rm_nvs.h`
+- `board_i2c`
+  - README: `components/board_i2c/README.md`
+  - API: `components/board_i2c/include/board_i2c.h`
+- `environment_measurements`
+  - README: `components/environment_measurements/README.md`
+  - API: `components/environment_measurements/include/environment_measurements.h`
 
-[Testfirmwarens README](../test/README.md) beskriver hur Unity-testerna byggs, flashas och körs på ESP32-S3-kortet.
+Testfirmwarens README finns i `test/README.md` och beskriver hur Unity-testerna byggs, flashas och körs på ESP32-S3-kortet.
 
 ## Mitt arbete
 
@@ -28,11 +53,13 @@ Arbetet var iterativt: jag byggde först lösningar som fungerade och gjorde om 
 
 De tre modulerna är "single-instance", men de arbetar på olika sätt:
 
-| Modul | Exekveringsmodell | Äger främst | Hur data delas |
-|---|---|---|---|
-| `rm_nvs` | Passiv C-servicemodul som kör i anroparens task. | Wrapperns init-status, namespace och lagringspolicy. | Värden och buffertar kopieras in eller ut genom API:t. |
-| `board_i2c` | Passiv C-servicemodul som kör i anroparens task. | Den gemensamma bussens konfiguration, handle och livscykel. | Anroparägda buffertar och device-handles används för transaktioner. |
-| `environment_measurements` | Aktiv modul med en egen polling-task. | Producenter, polling, senaste kanalvärden och synkroniseringsobjekt. | Konsumenter får en kopia av en sammanhängande snapshot. |
+| Modul | Exekveringsmodell | Äger främst | Hur data delas | Minnesstrategi |
+|---|---|---|---|---|
+| `rm_nvs` | Passiv C-servicemodul som kör i anroparens task. | Wrapperns init-status, namespace och lagringspolicy. | Värden och buffertar kopieras in eller ut genom API:t. | Modulens eget tillstånd ligger statiskt. Läs- och skrivbuffertar ägs av anroparen. |
+| `board_i2c` | Passiv C-servicemodul som kör i anroparens task. | Den gemensamma bussens konfiguration, handle och livscykel. | Anroparägda buffertar och device-handles används för transaktioner. | Modulens eget tillstånd ligger statiskt. Device-handles skapas av ESP-IDF och ägs därefter av anroparen. |
+| `environment_measurements` | Aktiv modul med en egen polling-task. | Producenter, polling, senaste kanalvärden och synkroniseringsobjekt. | Konsumenter får en kopia av en sammanhängande snapshot. | Producenter, store, task-stack och synkroniseringsobjekt har statisk eller processlång lagring. |
+
+En viktig regel i mina moduler är att de inte använder dynamisk minnesallokering. Där modulerna behöver minne är det antingen statiskt, processlångt eller ägt av anroparen. ESP-IDF kan fortfarande hantera interna resurser bakom sina egna handles, till exempel NVS- och I2C-handles, men den dynamiken är då inkapslad i ramverket och inte utspridd i projektets modulkod.
 
 ## `rm_nvs`: enkel och gemensam beständig lagring
 
@@ -46,6 +73,8 @@ Jag valde medvetet en enkel design:
 
 Det ger lite extra arbete vid varje operation och fler flash-skrivningar, men NVS används bara för enstaka inställningar och inte i tidskritisk kod. Tydligt ägarskap var därför viktigare än maximal prestanda.
 
+En praktisk följd av wrappern är att framtida lagringspolicy också får en naturlig plats. Om projektet senare behöver batching, mer detaljerad loggning eller statistik över flash-skrivningar kan det läggas i `rm_nvs` utan att varje konsument behöver ändras.
+
 Den största begränsningen är att återställning efter initieringsfel kan radera hela standardpartitionen. Detta är dokumenterat i API:t och behöver hanteras mer försiktigt om mer värdefull data lagras där. I projektets nuvarande form prioriterar jag att enheten kan återställa en användbar NVS-partition och starta, även om användaren då kan behöva konfigurera sina inställningar igen.
 
 Modulens lås skyddar livscykeln och namespace när ett handle öppnas, medan ESP-IDF synkroniserar själva operationen. Flera publika anrop blir därför inte en atomisk transaktion. Arbetet lärde mig att även en tunn wrapper ger värde när den samlar gemensam policy och bygger in korrekt användning i API:t.
@@ -54,7 +83,7 @@ Modulens lås skyddar livscykeln och namespace när ett handle öppnas, medan ES
 
 Flera enheter använder samma fysiska I2C-buss. Om varje drivrutin själv försökte initiera och kontrollera bussen skulle konfiguration, device-registrering och livscykel bli utspridda i systemet.
 
-`board_i2c` äger därför själva bussen och ger drivrutiner gemensamma funktioner för att registrera enheter samt läsa och skriva.
+`board_i2c` äger därför själva bussen och ger drivrutiner gemensamma funktioner för att registrera enheter samt läsa och skriva. Den äger däremot inte de enskilda I2C-enheternas protokoll eller tillstånd. BME280-logik, touchlogik och IO-expanderlogik hör hemma i sina egna drivrutiner. `board_i2c` äger projektets gemensamma gräns mot den fysiska bussen.
 
 ESP-IDF:s I2C-masterdriver synkroniserar själva mastertransaktionerna internt. `board_i2c` ersätter alltså inte drivrutinens semafor, utan samlar projektets policy ovanpå den: bus-initiering, device-konfiguration, argumentvalidering, hjälpfunktioner och kontrollerad livscykel.
 
@@ -66,9 +95,13 @@ Min viktigaste insikt från denna modul är att en buss inte bara är en samling
 
 Miljömodulen krävde flest designiterationer. Den första lösningen bestod av separata C-moduler för BME280, polling och lagring. Samma fasta struktur med temperatur, luftfuktighet och tryck kopierades genom hela kedjan. Uppdelningen såg flexibel ut, men alla delar var i praktiken bundna till BME280:s form.
 
-Det gjorde förändringar dyra. En ny sensor eller en ny typ av mätning hade krävt ändringar i flera strukturer, kopieringsfunktioner och konsumenter. Simulatorn använde dessutom dynamisk allokering, och valet mellan simulator och verklig sensor var inbyggt som ett globalt kompileringsval utan ett gemensamt producentkontrakt.
+Valet mellan simulator och verklig sensor var inbyggt som ett globalt kompileringsval utan ett gemensamt producentkontrakt.
 
-När jag skrev om lösningen började jag i stället med frågan: **vilket ansvar ska modulen äga?** Svaret var miljömätningar, inte en specifik BME280.
+Det hade inte i sig varit fel att bygga en lösning direkt runt BME280, eftersom det var den sensor projektet faktiskt använde. Svagheten var snarare att min första C-lösning försökte se ut som ett mer generellt sensorsystem, samtidigt som den fortfarande var hårt bunden till BME280 under ytan.
+
+Eftersom kursen handlar om systemutveckling ville jag hellre göra modulgränserna ärliga: antingen skriva en enkel BME280-lösning, eller bygga en avgränsad men verklig systemmodell för miljömätningar.
+
+När jag skrev om lösningen i C++ började jag i stället med frågan: **vilket ansvar ska modulen äga?** Svaret var miljömätningar, inte en specifik BME280.
 
 ```mermaid
 flowchart LR
@@ -86,13 +119,17 @@ flowchart LR
     API --> CONSUMER
 ```
 
-C++ används internt för att uttrycka separata ansvar och ett gemensamt producentinterface. Resten av applikationen använder fortfarande ett litet C-API.
+C++ används internt för att uttrycka separata ansvar och ett gemensamt producentinterface. Resten av applikationen använder fortfarande ett litet C-API och behöver därför inte känna till hårdvarudetaljerna bakom mätningen.
 
-Kanalmodellen är det designbeslut jag är mest nöjd med. Producenter översätter sensorspecifika avläsningar till logiska kanaler. Därför kan polling och lagring i stor utsträckning förbli oförändrade när nya sensorer eller mätvärden tillkommer. Förändringarna hamnar främst vid modulens kanter: i hårdvarudrivrutiner, producenter och de publika funktioner som väljer vilka kanaler en konsument behöver.
+Kanalmodellen är det designbeslut jag är mest nöjd med. `Bme280Sensor` hanterar det hårdvaruspecifika, medan `Bme280Producer` översätter en sammanhängande sensoravläsning till logiska kanaler. Vid C-API-gränsen väljer modulen sedan vilka kanaler som ska kombineras till den datastruktur som konsumenten behöver. Just nu är det en inomhusmätning med temperatur, luftfuktighet och tryck.
+
+Detta är inte tänkt som en stor generell abstraktion, utan som minsta rimliga steg efter att först ha hårdkodat systemet runt BME280-sensorns form. Så fort projektet behöver simulera sensorn, byta sensor, lägga till en mer exakt separat temperatursensor eller kombinera flera sensorer behöver fysisk källa ändå separeras från logisk mätdata. Kanalerna gör den separationen tydlig och enkel.
+
+Tanken är att polling och lagring i stor utsträckning kan förbli oförändrade när nya sensorer eller mätvärden tillkommer. Förändringarna hamnar främst vid modulens kanter: i hårdvarudrivrutiner, producenter och de publika funktioner som väljer vilka kanaler en konsument behöver.
 
 En enda task pollar producenterna sekventiellt. En lyckad sensoravläsning publiceras som en sammanhängande batch, så en konsument får värden från samma mättillfälle. Vid läsfel ogiltigförklaras producentens kanaler och modulen försöker återhämta sensorn vid senare pollningar.
 
-Task, stack och synkroniseringsobjekt har statisk eller processlång lagring. Mätflödet behöver därför inte dynamisk allokering.
+Task, stack och synkroniseringsobjekt har statisk eller processlång lagring. Tillsammans med den statiska producentuppsättningen gör det att mätflödet inte behöver dynamisk allokering.
 
 ### Felhantering
 
@@ -100,44 +137,45 @@ Felhanteringen försöker hålla resten av applikationen enkel. Om en sensoravl�
 
 ### Tidsstämplar
 
-Tidsstämplarna baseras på monoton tid sedan uppstart. De används för att avgöra om en mätning fortfarande är färsk, men representerar inte verkligt datum eller klockslag. Projektet har fungerande synkronisering av systemklockan, men jag valde att inte integrera den i miljömodulen på grund av tidsbrist.
+Tidsstämplarna baseras på monoton tid sedan uppstart. De används för att avgöra om en mätning fortfarande är färsk, men representerar inte verkligt datum eller klockslag. Projektet har fungerande synkronisering av systemklockan, men jag valde att hålla miljömodulen avgränsad till mätningarnas interna färskhet i stället för att koppla den till verklig tid.
 
 ### Avvägningar och framtida utveckling
 
 Den nya miljömodulen har fler typer och lager än den första C-lösningen. Vinsten är att hårdvaruprotokoll, produktion, polling, lagring och publik representation kan förändras mer oberoende av varandra. Kostnaden är att arkitekturen kräver tydligare dokumentation och tar längre tid att förstå.
 
-Kanalmodellen gör det enklare att byta eller lägga till sensorer och exponera nya kombinationer av kanaler via C-API:t. Nuvarande produkt väljer dock exakt en inomhusproducent vid kompilering och exponerar bara den senaste inomhusmätningen.
+Kanalmodellen gör det enklare att byta eller lägga till sensorer och exponera nya kombinationer av kanaler via C-API:t. Nuvarande produkt väljer dock exakt en inomhusproducent vid kompilering, simulerad eller verklig, och exponerar bara den senaste inomhusmätningen.
 
-## Testning och felhantering
+## Testning och verifiering
 
-Testerna byggs som en separat ESP-IDF-testfirmware som flashas och körs på det fysiska ESP32-S3-kortet. När testfirmwaren startar kör Unity automatiskt alla registrerade testfall och skriver ut en sammanfattning. Det är inte en full CI-lösning, men det är ett steg mot repeterbar testautomation eftersom samma testfirmware kan byggas och köras på samma sätt efter varje ändring.
+Testerna byggs som en separat ESP-IDF-testfirmware som flashas och körs på det fysiska ESP32-S3-kortet. När testfirmwaren startar kör Unity automatiskt alla registrerade testfall och skriver ut en sammanfattning.
 
-Varje modul har ett enkelt test. Poängen just nu är att lära mig hur Unity integreras med ESP-IDF och hur man skriver enkla tester:
+Varje modul har ett avgränsat test. Syftet är både att verifiera ett centralt beteende i modulen och att etablera hur Unity-tester kan byggas och köras i projektet:
 
-| Modul | Vad testfirmwaren verifierar | Vad som fortfarande saknas |
-|---|---|---|
-| `rm_nvs` | Skriver, läser och raderar ett värde mot kortets riktiga NVS-flash. | Fler datatyper, samtidighet och verifiering över omstart. |
-| `board_i2c` | Kör argumentvalideringen på målplattformen utan att utföra en fysisk busstransaktion. | Kommunikation med anslutna enheter, timeouter, bussfel och samtidiga användare. |
-| `environment_measurements` | Kör simulatorproducenten på målplattformen och verifierar en batch med tre mätningar. | Verklig BME280, store, färskhetskontroll, återhämtning och samtidighet. |
-
+| Modul | Vad testfirmwaren verifierar |
+|---|---|
+| `rm_nvs` | Skriver, läser och raderar ett värde mot kortets riktiga NVS-flash. |
+| `board_i2c` | Kör argumentvalideringen på målplattformen utan att utföra en fysisk busstransaktion. |
+| `environment_measurements` | Kör simulatorproducenten på målplattformen och verifierar en batch med tre mätningar. |
 
 ## AI-användning
 
-AI har skrivit mycket av koden i de tre modulerna. Jag har löpande använt AI för att bolla idéer, få korta förklaringar och minihandledningar samt omvandla mina krav och designbeslut till kod. Detta var särskilt viktigt för C++-syntax och ESP-IDF-detaljer, där jag förstod de övergripande koncepten bättre än jag behärskade språket och ramverket. AI kan både förklara på rätt nivå för mig samt länka till relevant dokumentation för manuell verifikation.
+Jag har använt AI mycket och medvetet i projektet. Det har varit ett verktyg för att bolla idéer, få korta förklaringar och minihandledningar samt omvandla mina krav och designbeslut till kod. Detta var särskilt viktigt för C++-syntax och ESP-IDF-detaljer, där jag förstod de övergripande koncepten bättre än jag behärskade språket och ramverket. En stor fördel för mig som student var att snabbt kunna djupdyka i ett specifikt koncept, få det förklarat på rätt nivå och sedan kontrollera mot relevant dokumentation.
 
 ### Min arbetsprocess
 
-Jag använder först AI för att förbättra problemformuleringen och jämföra möjliga lösningar. Därefter låter jag ofta AI implementera den valda lösningen. Efter implementationen granskar och förenklar jag ändringen, bygger och kör projektet och bedömer på nytt om lösningen faktiskt löser problemet utan onödig komplexitet.
+Jag använder först AI för att utforska och förbättra problemformuleringen och jämföra möjliga lösningar. Därefter använder jag AI för att ta fram ett första implementationsförslag. Den lösningen är inte färdig bara för att den kompilerar eller ser rimlig ut. Den måste granskas, förenklas, byggas, köras och bedömas mot problemet jag faktiskt försöker lösa.
 
-Den sista passagen är viktigast för mitt lärande. Då går jag igenom koden manuellt men använder fortfarande AI för att fråga om oklar syntax, språkfunktioner och alternativa lösningar. Detta tar längst tid, men det är först här som koden, och inte bara designen, blir "min".
+Granskningen sker inte som ett separat steg efteråt, utan som en kontinuerlig loop genom hela arbetet. Jag växlar mellan att formulera krav, låta AI föreslå lösningar, manuellt granska och ändra koden, kontrollera mot dokumentation, bygga och testa, förenkla och sedan ompröva lösningen igen.
+
+Min erfarenhet är att många problem med AI-användning uppstår när denna loop hoppas över. Koden kan snabbt se färdig ut, men utan den manuella genomgången blir det lätt någon annans lösning som jag bara har klistrat in. Det är först genom att enträget arbeta igenom denna loop som koden, och inte bara designidén, blir "min".
 
 ### Möjligheter och risker
 
-AI gjorde det möjligt att snabbt prova designalternativ och genomföra den sena omskrivningen till C++ under projektets slutskede. Git-historiken visar att den nya environment-modulen började ta form den 3 juni. Eftersom jag behövde resa bort av familjeskäl den 9 juni gjordes kärnan av omskrivningen på ungefär fem dagar. Utan AI-stödet hade jag sannolikt inte hunnit iterera så snabbt.
+AI gjorde det möjligt att snabbare prova designalternativ och genomföra omskrivningen av miljömodulen till C++ när den tidigare C-designens begränsningar blev tydliga. AI-stödet gjorde det realistiskt att välja den mer strukturerade lösningen i stället för att behålla mer av den sensorspecifika strukturen.
 
-Den största risken är samtidigt att AI kan producera kod som ser professionell ut men som jag inte förstår, behöver eller har verifierat. Jag har manuellt gått igenom all kod, men fem dagar är för kort tid för att förstå C++ och alla finstilta nyanser i modulen på djupet. I skarp produktion har man dock sannolikt längre tid på sig.
+Risken med AI är inte att verktyget används mycket, utan att det används utan tillräcklig teknisk kontroll. AI kan producera lösningar som ser färdiga ut men som jag ännu inte förstår eller har verifierat. Därför behöver den manuella kontrollen vara en del av arbetssättet, inte något som görs snabbt på slutet.
 
-Arbetssättet har lärt mig att AI kan vara mycket effektivt för implementation, men att det inte ersätter förståelse och att AI aldrig kan ta tekniskt ansvar.
+Arbetssättet har lärt mig att AI kan vara mycket effektivt för implementation och lärande, men att det inte ersätter förståelse och att AI aldrig kan ta tekniskt ansvar.
 
 ## Slutsats
 
@@ -147,4 +185,4 @@ Den viktigaste lärdomen är att först lösa det aktuella problemet och däreft
 
 Arbetet har också gjort dataägarskap och synkronisering tydligare för mig. Kopiering över API-gränser låter en modul behålla kontroll över sitt interna tillstånd.
 
-Jag gick in i kursen utan tidigare kunskap om inbyggda system och har byggt upp en betydligt större förståelse för området. Att i ett verkligt projekt få designa en C++-modul som hanterar hårdvara, tasks, synkronisering och fel, men samtidigt erbjuder ett enkelt API till resten av programmet, var väldigt lärorikt. Till nästa projekt tar jag med mig vikten av tydligt ansvar och ägarskap, men också att låta designen utvecklas stegvis utifrån verkliga behov.
+Jag gick in i kursen utan tidigare kunskap om inbyggda system och nästan noll erfarenhet av C++, och har byggt upp en betydligt större förståelse för båda områdena. Att i ett verkligt projekt få designa en C++-modul som hanterar hårdvara, tasks, synkronisering och fel, men samtidigt erbjuder ett enkelt API till resten av programmet, var väldigt lärorikt. Till nästa projekt tar jag med mig vikten av tydligt ansvar och ägarskap, men också att låta designen utvecklas stegvis utifrån verkliga behov.
